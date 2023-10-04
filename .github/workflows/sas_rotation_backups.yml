@@ -42,7 +42,7 @@ jobs:
     - name: Generate an expiry date (+7 days)
       id: date
       run: |
-        echo "::set-output name=sas_token_expiry_date::$(date -d "+7 days" +"%Y-%m-%d")"
+        echo "{sas_token_expiry_date}=$(date -d "+7 days" +"%Y-%m-%d")" >> $GITHUB_OUTPUT
     # authenticate to Azure
     - name: Authenticate to Azure
       uses: azure/login@v1
