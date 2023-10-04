@@ -40,6 +40,7 @@ jobs:
       with:
         azcliversion: 2.0.72
         inlineScript: |
+          az account set --subscription ${{ env.AZURE_DEVTEST_SUBSCRIPTION_ID }}
           DEVTEST_SAS_TOKEN=$(az storage account generate-sas --subscription ${{ env.AZURE_DEVTEST_SUBSCRIPTION_ID }} --account-name ${{ env.AZURE_DEVTEST_STORAGE_ACCOUNT_NAME }} --permissions rl --resource-types oc --services b --https-only --expiry "${{ steps.date.outputs.sas_token_expiry_date }}" -o tsv)
           echo "::set-output name=devtest_sas_token::$DEVTEST_SAS_TOKEN"
     # get the SAS token for the prod storage account
@@ -49,5 +50,6 @@ jobs:
       with:
         azcliversion: 2.0.72
         inlineScript: |
+          az account set --subscription ${{ env.AZURE_PROD_SUBSCRIPTION_ID }}
           PROD_SAS_TOKEN=$(az storage account generate-sas --subscription ${{ env.AZURE_PROD_SUBSCRIPTION_ID }} --account-name ${{ env.AZURE_PROD_STORAGE_ACCOUNT_NAME }} --permissions rl --resource-types oc --services b --https-only --expiry "${{ steps.date.outputs.sas_token_expiry_date }}" -o tsv)
           echo "::set-output name=prod_sas_token::$PROD_SAS_TOKEN"
