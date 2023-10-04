@@ -9,7 +9,7 @@ on:
   # trigger on pull requests
   pull_request:
     branches:
-      - **
+      - '*'
   # trigger on pushes to main
   push:
     branches:
