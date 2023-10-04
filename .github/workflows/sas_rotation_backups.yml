@@ -43,7 +43,7 @@ jobs:
       id: date
       run: |
         EXPIRY=$(date -d "+7 days" +"%Y-%m-%d")
-        echo "{sas_token_expiry_date}={EXPIRY}" >> $GITHUB_OUTPUT
+        echo "sas_token_expiry_date=${EXPIRY}" >> $GITHUB_OUTPUT
     # authenticate to Azure
     - name: Authenticate to Azure
       uses: azure/login@v1
@@ -55,14 +55,14 @@ jobs:
       run: |
         az account set --subscription ${{ env.AZURE_DEVTEST_SUBSCRIPTION_ID }}
         DEVTEST_SAS_TOKEN=$(az storage account generate-sas --subscription ${{ env.AZURE_DEVTEST_SUBSCRIPTION_ID }} --account-name ${{ env.AZURE_DEVTEST_STORAGE_ACCOUNT_NAME }} --permissions rl --resource-types oc --services b --https-only --expiry "${{ steps.date.outputs.sas_token_expiry_date }}" -o tsv --only-show-errors)
-        echo "{devtest_sas_token}={DEVTEST_SAS_TOKEN}" >> $GITHUB_OUTPUT
+        echo "devtest_sas_token=${DEVTEST_SAS_TOKEN}" >> $GITHUB_OUTPUT
     # get the SAS token for the prod storage account
     - name: Get Prod SAS token
       id: prod-sas-token
       run: |
         az account set --subscription ${{ env.AZURE_PROD_SUBSCRIPTION_ID }}
         PROD_SAS_TOKEN=$(az storage account generate-sas --subscription ${{ env.AZURE_PROD_SUBSCRIPTION_ID }} --account-name ${{ env.AZURE_PROD_STORAGE_ACCOUNT_NAME }} --permissions rl --resource-types oc --services b --https-only --expiry "${{ steps.date.outputs.sas_token_expiry_date }}" -o tsv --only-show-errors)
-        echo "{prod_sas_token}={PROD_SAS_TOKEN}" >> $GITHUB_OUTPUT
+        echo "prod_sas_token=${PROD_SAS_TOKEN}" >> $GITHUB_OUTPUT
   update-sas-tokens-preprod:
     name: Update SAS tokens in AWS NOMIS preprod environment
     needs: rotate-sas-tokens
