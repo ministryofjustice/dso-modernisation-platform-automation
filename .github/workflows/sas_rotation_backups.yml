@@ -6,10 +6,10 @@ on:
     - cron: "0 0 */5 * *"
   # allow manual triggering
   workflow_dispatch:
-  # trigger on pull requests
+  # trigger on pull requests on any branch
   pull_request:
     branches:
-      - '*'
+      - "*"
   # trigger on pushes to main
   push:
     branches:
