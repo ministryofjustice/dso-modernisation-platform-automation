@@ -1,0 +1,53 @@
+name: Azure Storage SAS Token Rotation - Backups
+
+on:
+  # create a schedule to run every 5 days
+  schedule:
+    - cron: "0 0 */5 * *"
+  # allow manual triggering
+  workflow_dispatch:
+
+
+env:
+  # Azure credentials are managed in GitHub Secrets via dso-infra-azure-ad
+  AZURE_CREDENTIALS: ${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}
+  AZURE_DEVTEST_SUBSCRIPTION_ID: ${{ secrets.DSO_DEVTEST_SUBSCRIPTION_ID }}
+  AZURE_PROD_SUBSCRIPTION_ID: ${{ secrets.DSO_PROD_SUBSCRIPTION_ID }}
+  AZURE_DEVTEST_STORAGE_ACCOUNT_NAME: ${{ secrets.DSO_DEVTEST_STORAGE_ACCOUNT_NAME }}
+  AZURE_PROD_STORAGE_ACCOUNT_NAME: ${{ secrets.DSO_PROD_STORAGE_ACCOUNT_NAME }}
+  MODERNISATION_PLATFORM_NOMIS_PREPRODUCTION_ACCOUNT_ID: ${{ secrets.MODERNISATION_PLATFORM_NOMIS_PREPRODUCTION_ACCOUNT_ID }}
+  MODERNISATION_PLATFORM_NOMIS_PRODUCTION_ACCOUNT_ID: ${{ secrets.MODERNISATION_PLATFORM_NOMIS_PRODUCTION_ACCOUNT_ID }}
+
+
+jobs:
+  rotate-sas-tokens:
+    runs-on: ubuntu-latest
+    steps:
+    # generate a date 7 days from now
+    - name: Generate an expiry date (+7 days)
+      id: date
+      run: |
+        echo "::set-output name=sas_token_expiry_date::$(date -d "+7 days" +"%Y-%m-%d")"
+    # authenticate to Azure
+    - name: Authenticate to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ env.AZURE_CREDENTIALS }}
+    # get the SAS token for the dev/test storage account
+    - name: Get Dev/Test SAS token
+      id: sas-token
+      uses: Azure/cli@v1
+      with:
+        azcliversion: 2.0.72
+        inlineScript: |
+          DEVTEST_SAS_TOKEN=$(az storage account generate-sas --subscription ${{ env.AZURE_DEVTEST_SUBSCRIPTION_ID }} --account-name ${{ env.AZURE_DEVTEST_STORAGE_ACCOUNT_NAME }} --permissions rl --resource-types oc --services b --https-only --expiry "${{ steps.date.outputs.sas_token_expiry_date }}" -o tsv)
+          echo "::set-output name=devtest_sas_token::$DEVTEST_SAS_TOKEN"
+    # get the SAS token for the prod storage account
+    - name: Get Prod SAS token
+      id: prod-sas-token
+      uses: Azure/cli@v1
+      with:
+        azcliversion: 2.0.72
+        inlineScript: |
+          PROD_SAS_TOKEN=$(az storage account generate-sas --subscription ${{ env.AZURE_PROD_SUBSCRIPTION_ID }} --account-name ${{ env.AZURE_PROD_STORAGE_ACCOUNT_NAME }} --permissions rl --resource-types oc --services b --https-only --expiry "${{ steps.date.outputs.sas_token_expiry_date }}" -o tsv)
+          echo "::set-output name=prod_sas_token::$PROD_SAS_TOKEN"
