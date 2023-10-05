@@ -5,7 +5,6 @@ permissions:
   id-token: write
   contents: read
 
-
 on:
   # create a schedule to run every 5 days
   schedule:
@@ -21,7 +20,6 @@ on:
     branches:
       - main
 
-
 env:
   # Azure credentials are managed in GitHub Secrets via dso-infra-azure-ad
   AZURE_CREDENTIALS: ${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}
@@ -32,10 +30,9 @@ env:
   MODERNISATION_PLATFORM_NOMIS_PREPRODUCTION_ACCOUNT_ID: ${{ secrets.MODERNISATION_PLATFORM_NOMIS_PREPRODUCTION_ACCOUNT_ID }}
   MODERNISATION_PLATFORM_NOMIS_PRODUCTION_ACCOUNT_ID: ${{ secrets.MODERNISATION_PLATFORM_NOMIS_PRODUCTION_ACCOUNT_ID }}
 
-
 jobs:
-  rotate-sas-tokens:
-    name: Rotate SAS tokens for Azure Storage accounts
+  create-expiry-date:
+    name: Create Expiry Date
     runs-on: ubuntu-latest
     outputs:
       sas_token_expiry_date: ${{ steps.date.outputs.sas_token_expiry_date }}
@@ -49,7 +46,7 @@ jobs:
 
   update-sas-tokens-preprod:
     name: Update SAS tokens in AWS NOMIS preprod environment
-    needs: rotate-sas-tokens
+    needs: create-expiry-date
     runs-on: ubuntu-latest
     steps:
       # authenticate to Azure
@@ -62,7 +59,7 @@ jobs:
         id: devtest-sas-token
         run: |
           az account set --subscription ${{ env.AZURE_DEVTEST_SUBSCRIPTION_ID }}
-          DEVTEST_SAS_TOKEN=$(az storage account generate-sas --subscription ${{ env.AZURE_DEVTEST_SUBSCRIPTION_ID }} --account-name ${{ env.AZURE_DEVTEST_STORAGE_ACCOUNT_NAME }} --permissions rl --resource-types oc --services b --https-only --expiry "${{ needs.rotate-sas-tokens.outputs.sas_token_expiry_date }}" -o tsv --only-show-errors)
+          DEVTEST_SAS_TOKEN=$(az storage account generate-sas --subscription ${{ env.AZURE_DEVTEST_SUBSCRIPTION_ID }} --account-name ${{ env.AZURE_DEVTEST_STORAGE_ACCOUNT_NAME }} --permissions rl --resource-types oc --services b --https-only --expiry "${{ needs.create-expiry-date.outputs.sas_token_expiry_date }}" -o tsv --only-show-errors)
           echo "::add-mask::$DEVTEST_SAS_TOKEN"
           echo "sas_token=${DEVTEST_SAS_TOKEN}" >> $GITHUB_OUTPUT
       # Configure AWS credentials
@@ -77,10 +74,9 @@ jobs:
         run: |
           aws ssm put-parameter --name /azure/sas_token --value "${{ steps.devtest-sas-token.outputs.sas_token }}" --type SecureString --overwrite
 
-
   update-sas-tokens-prod:
     name: Update SAS tokens in AWS NOMIS prod environment
-    needs: rotate-sas-tokens
+    needs: create-expiry-date
     runs-on: ubuntu-latest
     steps:
       # authenticate to Azure
@@ -93,7 +89,7 @@ jobs:
         id: prod-sas-token
         run: |
           az account set --subscription ${{ env.AZURE_PROD_SUBSCRIPTION_ID }}
-          PROD_SAS_TOKEN=$(az storage account generate-sas --subscription ${{ env.AZURE_PROD_SUBSCRIPTION_ID }} --account-name ${{ env.AZURE_PROD_STORAGE_ACCOUNT_NAME }} --permissions rl --resource-types oc --services b --https-only --expiry "${{ needs.rotate-sas-tokens.outputs.sas_token_expiry_date }}" -o tsv --only-show-errors)
+          PROD_SAS_TOKEN=$(az storage account generate-sas --subscription ${{ env.AZURE_PROD_SUBSCRIPTION_ID }} --account-name ${{ env.AZURE_PROD_STORAGE_ACCOUNT_NAME }} --permissions rl --resource-types oc --services b --https-only --expiry "${{ needs.create-expiry-date.outputs.sas_token_expiry_date }}" -o tsv --only-show-errors)
           echo "::add-mask::$PROD_SAS_TOKEN"
           echo "sas_token=${PROD_SAS_TOKEN}" >> $GITHUB_OUTPUT
       # Configure AWS credentials
@@ -107,4 +103,3 @@ jobs:
       - name: Update the SAS token in the AWS preprod environment SSM parameter
         run: |
           aws ssm put-parameter --name /azure/sas_token --value "${{ steps.prod-sas-token.outputs.sas_token }}" --type SecureString --overwrite
-  
