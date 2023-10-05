@@ -37,6 +37,10 @@ jobs:
   rotate-sas-tokens:
     name: Rotate SAS tokens for Azure Storage accounts
     runs-on: ubuntu-latest
+    outputs:
+      sas_token_expiry_date: ${{ steps.date.outputs.sas_token_expiry_date }}
+      devtest_sas_token: ${{ steps.devtest-sas-token.outputs.sas_token }}
+      prod_sas_token: ${{ steps.prod-sas-token.outputs.sas_token }}
     steps:
     # generate a date 7 days from now
     - name: Generate an expiry date (+7 days)
@@ -51,18 +55,18 @@ jobs:
         creds: ${{ env.AZURE_CREDENTIALS }}
     # get the SAS token for the dev/test storage account
     - name: Get Dev/Test SAS token
-      id: sas-token
+      id: devtest-sas-token
       run: |
         az account set --subscription ${{ env.AZURE_DEVTEST_SUBSCRIPTION_ID }}
         DEVTEST_SAS_TOKEN=$(az storage account generate-sas --subscription ${{ env.AZURE_DEVTEST_SUBSCRIPTION_ID }} --account-name ${{ env.AZURE_DEVTEST_STORAGE_ACCOUNT_NAME }} --permissions rl --resource-types oc --services b --https-only --expiry "${{ steps.date.outputs.sas_token_expiry_date }}" -o tsv --only-show-errors)
-        echo "devtest_sas_token=${DEVTEST_SAS_TOKEN}" >> $GITHUB_OUTPUT
+        echo "sas_token=${DEVTEST_SAS_TOKEN}" >> $GITHUB_OUTPUT
     # get the SAS token for the prod storage account
     - name: Get Prod SAS token
       id: prod-sas-token
       run: |
         az account set --subscription ${{ env.AZURE_PROD_SUBSCRIPTION_ID }}
         PROD_SAS_TOKEN=$(az storage account generate-sas --subscription ${{ env.AZURE_PROD_SUBSCRIPTION_ID }} --account-name ${{ env.AZURE_PROD_STORAGE_ACCOUNT_NAME }} --permissions rl --resource-types oc --services b --https-only --expiry "${{ steps.date.outputs.sas_token_expiry_date }}" -o tsv --only-show-errors)
-        echo "prod_sas_token=${PROD_SAS_TOKEN}" >> $GITHUB_OUTPUT
+        echo "sas_token=${PROD_SAS_TOKEN}" >> $GITHUB_OUTPUT
   update-sas-tokens-preprod:
     name: Update SAS tokens in AWS NOMIS preprod environment
     needs: rotate-sas-tokens
@@ -78,7 +82,7 @@ jobs:
       # Update the SAS token in the AWS preprod environment SSM parameter
       - name: Update the SAS token in the AWS preprod environment SSM parameter
         run: |
-          aws ssm put-parameter --name /azure/sas_token --value "${{ steps.sas-token.outputs.devtest_sas_token }}" --type SecureString --overwrite
+          aws ssm put-parameter --name /azure/sas_token --value "${{ needs.rotate-sas-tokens.outputs.devtest_sas_token }}" --type SecureString --overwrite
   update-sas-tokens-prod:
     name: Update SAS tokens in AWS NOMIS prod environment
     needs: rotate-sas-tokens
@@ -94,5 +98,5 @@ jobs:
       # Update the SAS token in the AWS preprod environment SSM parameter
       - name: Update the SAS token in the AWS preprod environment SSM parameter
         run: |
-          aws ssm put-parameter --name /azure/sas_token --value "${{ steps.prod-sas-token.outputs.prod_sas_token }}" --type SecureString --overwrite
+          aws ssm put-parameter --name /azure/sas_token --value "${{ needs.rotate-sas-tokens.outputs.prod_sas_token }}" --type SecureString --overwrite
   
