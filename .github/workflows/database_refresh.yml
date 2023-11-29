@@ -9,8 +9,6 @@ on:
     branches:
       - master
   push:
-    branches:
-      - **
 
 env:
   MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID }}
