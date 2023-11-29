@@ -13,6 +13,7 @@ on:
 env:
   MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID }}
   MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE }}
+  DSO_GITHUB_PAT: ${{ secrets.DSO_GITHUB_PAT }}
 
 jobs:
   configure-aws-credentials:
@@ -29,7 +30,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
-          token: ${{ secrets.DSO_GITHUB_PAT }}
+          token: ${{ env.DSO_GITHUB_PAT }}
           ref: master
           path: configuration-management
           fetch-depth: 1
