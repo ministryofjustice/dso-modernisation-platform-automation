@@ -31,7 +31,7 @@ jobs:
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           token: ${{ env.DSO_GITHUB_PAT }}
-          ref: master
+          ref: main
           path: configuration-management
           fetch-depth: 1
       - name: Run Ansible Ping
