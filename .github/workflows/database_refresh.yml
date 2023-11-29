@@ -29,8 +29,10 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
+          token: ${{ secrets.DSO_GITHUB_PAT }}
           ref: master
           path: configuration-management
+          fetch-depth: 1
       - name: Run Ansible Ping
         run: |
           ansible -i hosts/instance_aws_ec2.yml -m ping server_type_hmpps_oem
