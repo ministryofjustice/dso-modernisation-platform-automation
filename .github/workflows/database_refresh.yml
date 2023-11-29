@@ -16,7 +16,7 @@ env:
 
 jobs:
   configure-aws-credentials:
-    name: Configure AWS Credentials
+    name: Get Oracle Control File Name
     runs-on: ubuntu-latest
     steps:
       - name: Configure AWS Credentials
@@ -28,7 +28,7 @@ jobs:
       - name: Checkout MP Configuration Management Repo
         uses: actions/checkout@v2
         with:
-          repository: modernisation-platform-ops/configuration-management
+          repository: ministryofjustice/modernisation-platform-configuration-management
           ref: master
           path: configuration-management
       - name: Run Ansible Ping
