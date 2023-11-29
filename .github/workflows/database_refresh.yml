@@ -1,0 +1,37 @@
+name: AWS Database Refresh
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  pull_request:
+    branches:
+      - master
+
+env:
+  MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID }}
+  MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE }}
+
+jobs:
+  configure-aws-credentials:
+    name: Configure AWS Credentials
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
+        with:
+          role-to-assume: "arn:aws:iam::${{ env.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID}}:role/${{ env.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE }}"
+          role-session-name: github-aws-database-refresh
+          aws-region: eu-west-2
+      - name: Checkout MP Configuration Management Repo
+        uses: actions/checkout@v2
+        with:
+          repository: modernisation-platform-ops/configuration-management
+          ref: master
+          path: configuration-management
+      - name: Run Ansible Ping
+        run: |
+          ansible -i hosts/instance_aws_ec2.yml -m ping server_type_hmpps_oem
+        working-directory: configuration-management/ansible
+
