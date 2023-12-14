@@ -62,8 +62,8 @@ jobs:
       - name: Configure Modernisation Platform AWS credentials
         uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
         with:
-          role-to-assume: "arn:aws:iam::${{ env.MODERNISATION_PLATFORM_NOMIS_PREPRODUCTION_ACCOUNT_ID }}:role/sas-token-rotator"
-          role-session-name: "github-sas-token-rotator"
+          role-to-assume: "arn:aws:iam::${{ env.MODERNISATION_PLATFORM_NOMIS_PREPRODUCTION_ACCOUNT_ID }}:role/SasTokenRotatorRole"
+          role-session-name: "SasTokenRotatorRole-GHA"
           aws-region: eu-west-2
       # Update the SAS token in the AWS preprod environment SSM parameter
       - name: Update the SAS token in the AWS preprod environment SSM parameter
