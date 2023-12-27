@@ -98,7 +98,7 @@ jobs:
           role-session-name: "SasTokenRotatorRole-GHA"
           aws-region: eu-west-2
       # Update the SAS token in the AWS test environment SSM parameter
-      - name: Update the SAS token in the AWS preprod environment SSM parameter
+      - name: Update the SAS token in the AWS test environment SSM parameter
         run: |
           aws ssm put-parameter --name /azure/sas_token --value "${{ steps.devtest-sas-token.outputs.sas_token }}" --type SecureString --overwrite
 
@@ -157,7 +157,7 @@ jobs:
           role-to-assume: "arn:aws:iam::${{ env.MODERNISATION_PLATFORM_NOMIS_PRODUCTION_ACCOUNT_ID }}:role/SasTokenRotatorRole"
           role-session-name: "github-sas-token-rotator"
           aws-region: eu-west-2
-      # Update the SAS token in the AWS preprod environment SSM parameter
-      - name: Update the SAS token in the AWS preprod environment SSM parameter
+      # Update the SAS token in the AWS prod environment SSM parameter
+      - name: Update the SAS token in the AWS prod environment SSM parameter
         run: |
           aws ssm put-parameter --name /azure/sas_token --value "${{ steps.prod-sas-token.outputs.sas_token }}" --type SecureString --overwrite
