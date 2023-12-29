@@ -12,9 +12,14 @@ on:
   # allow manual triggering
   workflow_dispatch:
   # trigger on pushes to main
-  push:
+  pull_request:
     branches:
-      - main
+      - master
+    paths:
+      - 'database_refresh.yml'
+  push:
+    paths:
+      - 'database_refresh.yml'
 
 env:
   # Azure credentials are managed in GitHub Secrets via dso-infra-azure-ad
