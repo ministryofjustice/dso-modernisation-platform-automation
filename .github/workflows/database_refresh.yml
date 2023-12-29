@@ -4,11 +4,16 @@ permissions:
   id-token: write
   contents: read
 
+
 on:
   pull_request:
     branches:
       - master
+    paths:
+      - 'database_refresh.yml'
   push:
+    paths:
+      - 'database_refresh.yml'
 
 env:
   MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID }}
