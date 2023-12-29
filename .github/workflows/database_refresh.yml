@@ -1,0 +1,48 @@
+name: AWS Database Refresh
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+
+env:
+  MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID }}
+  MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE }}
+  DSO_GITHUB_PAT: ${{ secrets.DSO_GITHUB_PAT }}
+
+jobs:
+  configure-aws-credentials:
+    name: Get Oracle Control File Name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
+        with:
+          role-to-assume: "arn:aws:iam::${{ env.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID}}:role/${{ env.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE }}"
+          role-session-name: github-aws-database-refresh
+          aws-region: eu-west-2
+      - name: Checkout MP Configuration Management Repo
+        uses: actions/checkout@v2
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          token: ${{ env.DSO_GITHUB_PAT }}
+          ref: main
+          path: configuration-management
+          fetch-depth: 1
+      - name: Setup Ansible
+        run: |
+          DEPENDENCIES=`cat requirements.txt | tr '\n' ' '`
+          pipx inject ansible-core $DEPENDENCIES
+          ansible-galaxy role install -r requirements.yml
+          ansible-galaxy collection install -r requirements.yml
+        working-directory: configuration-management/ansible
+      - name: Run Ansible Ping
+        run: |
+          ansible -i hosts/instance_aws_ec2.yml -m ping server_type_hmpps_oem
+        working-directory: configuration-management/ansible
+
