@@ -31,7 +31,7 @@ jobs:
           role-session-name: github-aws-database-refresh
           aws-region: eu-west-2
       - name: Checkout MP Configuration Management Repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           token: ${{ env.DSO_GITHUB_PAT }}
