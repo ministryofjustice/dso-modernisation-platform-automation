@@ -5,7 +5,7 @@ on:
 
 jobs:
   refresh_db:
-    uses: dso-modernisation-platform-automation/.github/workflows/database_refresh.yml@main
+    uses: ministryofjustice/dso-modernisation-platform-automation/.github/workflows/database_refresh.yml@main
     with:
       oracle_db_refresh_db_name: 'CNOMT1'
       oracle_db_refresh_file: 'CNOMT1.txt'
@@ -14,3 +14,4 @@ jobs:
       source_account_role: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE }}
       target_account_id: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID }}
       target_account_role: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE }}
+
