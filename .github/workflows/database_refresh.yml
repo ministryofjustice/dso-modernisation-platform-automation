@@ -28,9 +28,9 @@ on:
       target_account_role:
         description: 'Target AWS Account Role'
         required: true
-
-env:
-  DSO_GITHUB_PAT: ${{ secrets.DSO_GITHUB_PAT }}
+      dso_github_pat:
+        description: 'DSO GitHub Personal Access Token'
+        required: true
 
 jobs:
   get_control_file_name:
@@ -47,7 +47,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
-          token: ${{ env.DSO_GITHUB_PAT }}
+          token: ${{ secrets.dso_github_pat }}
           ref: main
           path: configuration-management
           fetch-depth: 1

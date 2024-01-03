@@ -10,6 +10,7 @@ jobs:
       oracle_db_refresh_db_name: 'CNOMT1'
       oracle_db_refresh_file: 'CNOMT1.txt'
     secrets:
+      dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
       source_account_id: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID }}
       source_account_role: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE }}
       target_account_id: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID }}
