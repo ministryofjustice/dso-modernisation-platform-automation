@@ -5,21 +5,32 @@ permissions:
   contents: read
 
 on:
-  pull_request:
-    branches:
-      - master
-    paths:
-      - 'database_refresh.yml'
-  push:
-    paths:
-      - 'database_refresh.yml'
+  workflow_call:
+    inputs:
+      oracle_db_refresh_db_name:
+        description: 'Oracle Database Name'
+        required: true
+        type: string
+      oracle_db_refresh_file:
+        description: 'Oracle Database Control File Name'
+        required: true
+        type: string
+    secrets:
+      source_account_id:
+        description: 'Source AWS Account ID'
+        required: true
+      source_account_role:
+        description: 'Source AWS Account Role'
+        required: true
+      target_account_id:
+        description: 'Target AWS Account ID'
+        required: true
+      target_account_role:
+        description: 'Target AWS Account Role'
+        required: true
 
 env:
-  MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID }}
-  MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE }}
   DSO_GITHUB_PAT: ${{ secrets.DSO_GITHUB_PAT }}
-  ORACLE_DB_REFRESH_DB_NAME: "CNOMT1"
-  ORACLE_DB_REFRESH_FILE: "latest_backup_control_file.txt"
 
 jobs:
   get_control_file_name:
@@ -29,7 +40,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
         with:
-          role-to-assume: "arn:aws:iam::${{ env.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID}}:role/${{ env.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE }}"
+          role-to-assume: "arn:aws:iam::${{ secrets.source_account_id }}:role/${{ secrets.source_account_role }}"
           role-session-name: github-aws-database-refresh
           aws-region: eu-west-2
       - name: Checkout MP Configuration Management Repo
@@ -57,14 +68,14 @@ jobs:
           ansible -i hosts/instance_aws_ec2.yml \
             --module-name include_role \
             --args name=oracle-db-refresh \
-            --extra-vars='ORACLE_DB_REFRESH_DB_NAME=${{ env.ORACLE_DB_REFRESH_DB_NAME }},ORACLE_DB_REFRESH_FILE=${{ env.ORACLE_DB_REFRESH_FILE }}' \
+            --extra-vars='ORACLE_DB_REFRESH_DB_NAME=${{ inputs.oracle_db_refresh_db_name }},ORACLE_DB_REFRESH_FILE=${{ inputs.oracle_db_refresh_file }}' \
             server_type_hmpps_oem
         working-directory: configuration-management/ansible
       - name: Upload control file
         uses: actions/upload-artifact@c7d193f32edcb7bfad88892161225aeda64e9392 # v4.0.0
         with:
           name: control_file
-          path: ${{ env.GITHUB_WORKSPACE }}/${{ env.ORACLE_DB_REFRESH_FILE }}
+          path: ${{ env.GITHUB_WORKSPACE }}/${{ inputs.oracle_db_refresh_file }}
 
   put_control_file_name:
     name: Download Oracle Control File Name
@@ -75,7 +86,6 @@ jobs:
         uses: actions/download-artifact@f44cd7b40bfd40b6aa1cc1b9b5b7bf03d3c67110 # v4.1.0
         with:
           name: control_file
-          path: ${{ env.GITHUB_WORKSPACE }}/control_file
       - name: Cat control file
         run: |
-          cat ${{ env.GITHUB_WORKSPACE }}/${{ env.ORACLE_DB_REFRESH_FILE }}
+          cat ${{ env.GITHUB_WORKSPACE }}/${{ inputs.oracle_db_refresh_file }}
