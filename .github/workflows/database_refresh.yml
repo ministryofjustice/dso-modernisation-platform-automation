@@ -18,9 +18,11 @@ env:
   MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID }}
   MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ROLE }}
   DSO_GITHUB_PAT: ${{ secrets.DSO_GITHUB_PAT }}
+  ORACLE_DB_REFRESH_DB_NAME: "CNOMT1"
+  ORACLE_DB_REFRESH_FILE: "latest_backup_control_file.txt"
 
 jobs:
-  configure-aws-credentials:
+  get_control_file_name:
     name: Get Oracle Control File Name
     runs-on: ubuntu-latest
     steps:
@@ -49,4 +51,31 @@ jobs:
         run: |
           ansible -i hosts/instance_aws_ec2.yml -m ping server_type_hmpps_oem
         working-directory: configuration-management/ansible
+      - name: Get Oracle Control File Name
+        id: get_control_file_name
+        run: |
+          ansible -i hosts/instance_aws_ec2.yml \
+            --module-name include_role \
+            --args name=oracle-db-refresh \
+            --extra-vars='ORACLE_DB_REFRESH_DB_NAME=${{ env.ORACLE_DB_REFRESH_DB_NAME }},ORACLE_DB_REFRESH_FILE=${{ env.ORACLE_DB_REFRESH_FILE }}' \
+            server_type_hmpps_oem
+        working-directory: configuration-management/ansible
+      - name: Upload control file
+        uses: actions/upload-artifact@c7d193f32edcb7bfad88892161225aeda64e9392 # v4.0.0
+        with:
+          name: control_file
+          path: ${{ env.GITHUB_WORKSPACE }}/${{ env.ORACLE_DB_REFRESH_FILE }}
 
+  put_control_file_name:
+    name: Download Oracle Control File Name
+    runs-on: ubuntu-latest
+    needs: get_control_file_name
+    steps:
+      - name: Download control file
+        uses: actions/download-artifact@f44cd7b40bfd40b6aa1cc1b9b5b7bf03d3c67110 # v4.1.0
+        with:
+          name: control_file
+          path: ${{ env.GITHUB_WORKSPACE }}/control_file
+      - name: Cat control file
+        run: |
+          cat ${{ env.GITHUB_WORKSPACE }}/${{ env.ORACLE_DB_REFRESH_FILE }}
