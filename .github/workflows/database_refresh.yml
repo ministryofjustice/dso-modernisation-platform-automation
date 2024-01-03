@@ -65,7 +65,7 @@ jobs:
       - name: Get Oracle Control File Name
         id: get_control_file_name
         run: |
-          ansible -i hosts/instance_aws_ec2.yml \
+          ansible -vvv -i hosts/instance_aws_ec2.yml \
             --module-name include_role \
             --args name=oracle-db-refresh \
             --extra-vars='ORACLE_DB_REFRESH_DB_NAME=${{ inputs.oracle_db_refresh_db_name }},ORACLE_DB_REFRESH_FILE=${{ inputs.oracle_db_refresh_file }}' \
