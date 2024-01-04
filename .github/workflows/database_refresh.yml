@@ -65,7 +65,7 @@ jobs:
       - name: Get Oracle Control File Name
         id: get_control_file_name
         run: |
-          ansible -vvv -i hosts/instance_aws_ec2.yml \
+          ansible -i hosts/instance_aws_ec2.yml \
             --module-name include_role \
             --args name=oracle-db-refresh \
             --extra-vars='ORACLE_DB_REFRESH_DB_NAME=${{ inputs.oracle_db_refresh_db_name }} ORACLE_DB_REFRESH_FILE=${{ inputs.oracle_db_refresh_file }}' \
@@ -75,7 +75,7 @@ jobs:
         uses: actions/upload-artifact@c7d193f32edcb7bfad88892161225aeda64e9392 # v4.0.0
         with:
           name: control_file
-          path: ${{ env.GITHUB_WORKSPACE }}/${{ inputs.oracle_db_refresh_file }}
+          path: ${{ inputs.oracle_db_refresh_file }}
 
   put_control_file_name:
     name: Download Oracle Control File Name
@@ -88,4 +88,4 @@ jobs:
           name: control_file
       - name: Cat control file
         run: |
-          cat ${{ env.GITHUB_WORKSPACE }}/${{ inputs.oracle_db_refresh_file }}
+          cat ${{ inputs.oracle_db_refresh_file }}
