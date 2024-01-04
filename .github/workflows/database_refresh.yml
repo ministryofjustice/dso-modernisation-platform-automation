@@ -23,18 +23,20 @@ on:
         description: 'Target Ansible Group'
         required: true
         type: string
+      target_account_role:
+        description: 'Target AWS Account Role'
+        required: true
+        type: string
+      source_account_role:
+        description: 'Source AWS Account Role'
+        required: true
+        type: string
     secrets:
       source_account_id:
         description: 'Source AWS Account ID'
         required: true
-      source_account_role:
-        description: 'Source AWS Account Role'
-        required: true
       target_account_id:
         description: 'Target AWS Account ID'
-        required: true
-      target_account_role:
-        description: 'Target AWS Account Role'
         required: true
       dso_github_pat:
         description: 'DSO GitHub Personal Access Token'
