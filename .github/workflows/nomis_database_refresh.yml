@@ -5,7 +5,7 @@ on:
 
 jobs:
   refresh_db:
-    uses: ministryofjustice/dso-modernisation-platform-automation/.github/workflows/reusable/database_refresh.yml@main
+    uses: ministryofjustice/dso-modernisation-platform-automation/.github/workflows/database_refresh.yml@main
     with:
       oracle_db_refresh_db_name: 'CNOMT1'
       oracle_db_refresh_file: 'CNOMT1.txt'
