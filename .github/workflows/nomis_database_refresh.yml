@@ -11,7 +11,7 @@ jobs:
       oracle_db_refresh_file: 'CNOMT1.txt'
       source_account_role: "DBRefresherRole"
       source_ansible_group: "server_type_hmpps_oem"
-      target_account_role: "DBRefresherRole"
+      target_account_role: "DbRefresherRole"
       target_ansible_group: "server_type_nomis_db"
     secrets:
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}

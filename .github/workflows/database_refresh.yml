@@ -70,7 +70,7 @@ jobs:
         working-directory: configuration-management/ansible
       - name: Run Ansible Ping
         run: |
-          ansible -i hosts/instance_aws_ec2.yml -m ping ${{ inputs.source_ansible_group }}}
+          ansible -i hosts/instance_aws_ec2.yml -m ping ${{ inputs.source_ansible_group }}
         working-directory: configuration-management/ansible
       - name: Get Oracle Control File Name
         id: get_control_file_name
