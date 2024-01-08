@@ -127,6 +127,7 @@ jobs:
             --module-name copy \
             --args "src=${GITHUB_WORKSPACE}/${{ inputs.oracle_db_refresh_file }} dest=/tmp/${{ inputs.oracle_db_refresh_file }}" \
             ${{ inputs.target_ansible_group }}
+        working-directory: configuration-management/ansible
       - name: Cat control file
         run: |
           cat ${{ inputs.oracle_db_refresh_file }}
