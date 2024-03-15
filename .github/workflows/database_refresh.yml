@@ -118,7 +118,7 @@ jobs:
           ansible -i hosts/instance_aws_ec2.yml -m ping ${{ inputs.target_ansible_group }}
         working-directory: configuration-management/ansible
       - name: Download control file
-        uses: actions/download-artifact@eaceaf801fd36c7dee90939fad912460b18a1ffe # v4.1.2
+        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
         with:
           name: control_file
       - name: Copy control file to target
