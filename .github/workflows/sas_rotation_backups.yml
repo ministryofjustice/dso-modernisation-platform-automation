@@ -23,7 +23,6 @@ on:
 
 env:
   # Azure credentials are managed in GitHub Secrets via dso-infra-azure-ad
-  PROJECTS: [ "nomis-development", "nomis-test", "nomis-preproduction", "nomis-production", "oasys-development", "oasys-test", "oasys-preproduction", "oasys-production", "corporate-staff-rostering-development", "corporate-staff-rostering-test", "corporate-staff-rostering-preproduction", "corporate-staff-rostering-production"]
   AZURE_CREDENTIALS: ${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}
   AZURE_DEVTEST_SUBSCRIPTION_ID: ${{ secrets.DSO_DEVTEST_SUBSCRIPTION_ID }}
   AZURE_PROD_SUBSCRIPTION_ID: ${{ secrets.DSO_PROD_SUBSCRIPTION_ID }}
