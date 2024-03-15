@@ -79,7 +79,7 @@ jobs:
     steps:
       # authenticate to Azure
       - name: Authenticate to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
       # get the SAS token for the dev/test storage account
@@ -109,7 +109,7 @@ jobs:
     steps:
       # authenticate to Azure
       - name: Authenticate to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
       # get the SAS token for the dev/test storage account
@@ -139,7 +139,7 @@ jobs:
     steps:
       # authenticate to Azure
       - name: Authenticate to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
       # get the SAS token for the prod storage account
@@ -169,7 +169,7 @@ jobs:
     steps:
       # authenticate to Azure
       - name: Authenticate to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
       # get the SAS token for the prod storage account
@@ -199,7 +199,7 @@ jobs:
     steps:
       # authenticate to Azure
       - name: Authenticate to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
       # get the SAS token for the dev/test storage account
@@ -229,7 +229,7 @@ jobs:
     steps:
       # authenticate to Azure
       - name: Authenticate to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
       # get the SAS token for the dev/test storage account
@@ -259,7 +259,7 @@ jobs:
     steps:
       # authenticate to Azure
       - name: Authenticate to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
       # get the SAS token for the prod storage account
@@ -289,7 +289,7 @@ jobs:
     steps:
       # authenticate to Azure
       - name: Authenticate to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
       # get the SAS token for the prod storage account
@@ -319,7 +319,7 @@ jobs:
     steps:
       # authenticate to Azure
       - name: Authenticate to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
       # get the SAS token for the dev/test storage account
@@ -349,7 +349,7 @@ jobs:
     steps:
       # authenticate to Azure
       - name: Authenticate to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
       # get the SAS token for the dev/test storage account
@@ -379,7 +379,7 @@ jobs:
     steps:
       # authenticate to Azure
       - name: Authenticate to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
       # get the SAS token for the prod storage account
@@ -409,7 +409,7 @@ jobs:
     steps:
       # authenticate to Azure
       - name: Authenticate to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
       # get the SAS token for the prod storage account
