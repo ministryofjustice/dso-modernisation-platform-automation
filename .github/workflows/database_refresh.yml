@@ -54,7 +54,7 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
       - name: Checkout MP Configuration Management Repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           token: ${{ secrets.dso_github_pat }}
@@ -99,7 +99,7 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-2"
           aws-region: eu-west-2
       - name: Checkout MP Configuration Management Repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           token: ${{ secrets.dso_github_pat }}
