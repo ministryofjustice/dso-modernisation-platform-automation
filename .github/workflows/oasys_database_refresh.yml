@@ -1,5 +1,10 @@
 name: OASYS Database Refresh
 
+# NOTE: MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT secret is
+# exact copy of the modernisation-platform environment_management
+# secret. You can retrieve via AWS CLI like this:
+#   aws secretsmanager get-secret-value --secret-id arn:aws:secretsmanager:eu-west-2:{{ modernisation-platform account id }}:secret:environment_management --output text --query SecretString --profile oassys-development
+
 on:
   workflow_dispatch:
 
@@ -7,14 +12,12 @@ jobs:
   refresh_db:
     uses: ministryofjustice/dso-modernisation-platform-automation/.github/workflows/database_refresh.yml@main
     with:
-      oracle_db_refresh_db_name: 'CNOMT1'
-      oracle_db_refresh_file: 'CNOMT1.txt'
-      source_account_role: "DBRefresherRole"
-      source_ansible_group: "server_type_hmpps_oem"
-      target_account_role: "DBRefresherRole"
-      target_ansible_group: "server_type_nomis_db"
+      source_oem_account_name: "hmpps-oem-production"
+      source_oem_hostname: "prod-oem-a"
+      source_db_name: "PROASYS"
+      target_db_account_name: "oasys-preproduction"
+      target_db_hostname: "pp-oasys-db-b"
+      target_db_name: "PPROASYS"
     secrets:
+      account_ids: ${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
-      source_account_id: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID }}
-      target_account_id: ${{ secrets.MODERNISATION_PLATFORM_NOMIS_TEST_ACCOUNT_ID }}
-
