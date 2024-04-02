@@ -45,7 +45,7 @@ jobs:
     name: Run ansible against OEM EC2
     runs-on: ubuntu-latest
     env:
-      SOURCE_OEM_ACCOUNT_ID: ${{ fromJSON(secrets.environment_management).account_ids }}
+      SOURCE_OEM_ACCOUNT_ID: ${{ secrets.environment_management['account_ids'] }}
     steps:
       - name: Debug
         run:
