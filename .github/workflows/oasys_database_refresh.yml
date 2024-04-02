@@ -10,7 +10,7 @@ on:
 
 jobs:
   refresh_db:
-    uses: ministryofjustice/dso-modernisation-platform-automation/.github/workflows/database_refresh.yml@main
+    uses: ministryofjustice/dso-modernisation-platform-automation/.github/workflows/database_refresh.yml@DSOS-2668/db-refresh-pipeline-improvements
     with:
       source_oem_account_name: "hmpps-oem-production"
       source_oem_hostname: "prod-oem-a"
