@@ -41,6 +41,8 @@ on:
 
 env:
   ENVIRONMENT_MANAGEMENT: "${{ secrets.environment_management }}"
+  SOURCE_OEM_ACCOUNT_NUMBER: "${{ fromJSON(secrets.environment_management).account_ids[inputs.source_oem_account_name] }}"
+  TARGET_DB_ACCOUNT_NUMBER: "${{ fromJSON(secrets.environment_management).account_ids[inputs.target_db_account_name] }}"
 
 jobs:
 
@@ -48,18 +50,19 @@ jobs:
     name: Run ansible against OEM EC2
     runs-on: ubuntu-latest
     steps:
-      - name: Get AWS Account Number
-        run: |
-          ACCOUNT_NUMBER=$(jq -r -e --arg account_name "${{ inputs.source_oem_account_name }}" '.account_ids[$account_name]' <<< $ENVIRONMENT_MANAGEMENT)
-          echo "SOURCE_OEM_ACCOUNT_NUMBER=${ACCOUNT_NUMBER}" >> $GITHUB_ENV
+      # - name: Get AWS Account Number
+      #   run: |
+      #     ACCOUNT_NUMBER=$(jq -r -e --arg account_name "${{ inputs.source_oem_account_name }}" '.account_ids[$account_name]' <<< $ENVIRONMENT_MANAGEMENT)
+      #     echo "SOURCE_OEM_ACCOUNT_NUMBER=${ACCOUNT_NUMBER}" >> $GITHUB_ENV
 
       - name: Debug
         run:
           echo "$SOURCE_OEM_ACCOUNT_NUMBER"
+          echo "$TARGET_DB_ACCOUNT_NUNBER"
 
-      - name: Debug2
-        run:
-          echo "${{ fromJSON(secrets.environment_management).account_ids[inputs.source_oem_account_name] }}"
+      # - name: Debug2
+      #   run:
+      #     echo "${{ fromJSON(secrets.environment_management).account_ids[inputs.source_oem_account_name] }}"
 
       # - name: Configure AWS Credentials
       #   uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
