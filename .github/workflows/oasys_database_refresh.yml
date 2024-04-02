@@ -8,9 +8,6 @@ name: OASYS Database Refresh
 on:
   workflow_dispatch:
 
-env:
-  MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT: ${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT) }}
-
 jobs:
   refresh_db:
     uses: ministryofjustice/dso-modernisation-platform-automation/.github/workflows/database_refresh.yml@DSOS-2668/db-refresh-pipeline-improvements
@@ -22,5 +19,5 @@ jobs:
       target_db_hostname: "pp-oasys-db-b"
       target_db_name: "PPROASYS"
     secrets:
-      account_ids: ${{ env.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT.account_ids }}
+      account_ids: ${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT) }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
