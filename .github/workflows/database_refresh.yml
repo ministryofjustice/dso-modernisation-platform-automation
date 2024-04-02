@@ -48,7 +48,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          role-to-assume: "arn:aws:iam::${{ secrets.account_ids[input.source_oem_account_name] }}:role/DBRefresherRole"
+          role-to-assume: "arn:aws:iam::${{ secrets.account_ids[inputs.source_oem_account_name] }}:role/DBRefresherRole"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
       - name: Checkout MP Configuration Management Repo
@@ -97,7 +97,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          role-to-assume: "arn:aws:iam::${{ secrets.account_ids[input.target_db_account_name] }}:role/DBRefresherRole"
+          role-to-assume: "arn:aws:iam::${{ secrets.account_ids[inputs.target_db_account_name] }}:role/DBRefresherRole"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-2"
           aws-region: eu-west-2
       - name: Checkout MP Configuration Management Repo
