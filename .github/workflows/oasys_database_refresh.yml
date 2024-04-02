@@ -1,0 +1,20 @@
+name: OASYS Database Refresh
+
+on:
+  workflow_dispatch:
+
+jobs:
+  refresh_db:
+    uses: ministryofjustice/dso-modernisation-platform-automation/.github/workflows/database_refresh.yml@main
+    with:
+      oracle_db_refresh_db_name: 'CNOMT1'
+      oracle_db_refresh_file: 'CNOMT1.txt'
+      source_account_role: "DBRefresherRole"
+      source_ansible_group: "server_type_hmpps_oem"
+      target_account_role: "DBRefresherRole"
+      target_ansible_group: "server_type_nomis_db"
+    secrets:
+      dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
+      source_account_id: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID }}
+      target_account_id: ${{ secrets.MODERNISATION_PLATFORM_NOMIS_TEST_ACCOUNT_ID }}
+
