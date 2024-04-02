@@ -19,5 +19,5 @@ jobs:
       target_db_hostname: "pp-oasys-db-b"
       target_db_name: "PPROASYS"
     secrets:
-      account_ids: ${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT) }}
+      environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
