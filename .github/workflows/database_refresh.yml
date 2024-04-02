@@ -40,7 +40,7 @@ on:
         required: true
 
 env:
-  ENVIRONMENT_MANAGEMENT: "${{ secrets.modernisation_platform_environments }}"
+  ENVIRONMENT_MANAGEMENT: "${{ secrets.environment_management }}"
 
 jobs:
 
