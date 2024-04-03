@@ -78,6 +78,10 @@ jobs:
         run: |
           ansible -m ping ${{ inputs.source_oem_hostname }}
         working-directory: configuration-management/ansible
+      - name: Run Ansible Playbook against source OEM
+        run: |
+          ansible-playbook site.yml -e role=ansible-script --tags ec2patch --limit ${{ inputs.source_oem_hostname }}
+        working-directory: configuration-management/ansible
       # - name: Get Oracle Control File Name
       #   id: get_control_file_name
       #   run: |
@@ -93,51 +97,55 @@ jobs:
       #     name: control_file
       #     path: ${{ inputs.oracle_db_refresh_file }}
 
-#  run_target_ansible:
-#    name: Download Oracle Control File Name
-#    runs-on: ubuntu-latest
-#    needs: run_source_ansible
-#    steps:
-#      - name: Configure AWS Credentials
-#        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
-#        with:
-#          role-to-assume: "arn:aws:iam::${{ secrets.account_ids[inputs.target_db_account_name] }}:role/modernisation-platform-oidc-cicd"
-#          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-2"
-#          aws-region: eu-west-2
-#      - name: Checkout MP Configuration Management Repo
-#        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
-#        with:
-#          repository: ministryofjustice/modernisation-platform-configuration-management
-#          token: ${{ secrets.dso_github_pat }}
-#          ref: main
-#          path: configuration-management
-#          fetch-depth: 1
-#      - name: Setup Ansible
-#        run: |
-#          DEPENDENCIES=`cat requirements.txt | tr '\n' ' '`
-#          pipx inject ansible-core $DEPENDENCIES
-#          ansible-galaxy role install -r requirements.yml
-#          ansible-galaxy collection install -r requirements.yml
-#        working-directory: configuration-management/ansible
-#      - name: Run Ansible Graph
-#        run: |
-#          ansible-inventory --graph
-#        working-directory: configuration-management/ansible
-#      # - name: Ping
-#      #   run: |
-#      #     ansible -i hosts/instance_aws_ec2.yml -m ping ${{ inputs.target_ansible_group }}
-#      #   working-directory: configuration-management/ansible
-#      # - name: Download control file
-#      #   uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
-#      #   with:
-#      #     name: control_file
-#      # - name: Copy control file to target
-#      #   run: |
-#      #     ansible -i hosts/instance_aws_ec2.yml \
-#      #       --module-name copy \
-#      #       --args "src=${GITHUB_WORKSPACE}/${{ inputs.oracle_db_refresh_file }} dest=/tmp/${{ inputs.oracle_db_refresh_file }}" \
-#      #       ${{ inputs.target_ansible_group }}
-#      #   working-directory: configuration-management/ansible
-#      # - name: Cat control file
-#      #   run: |
-#      #     cat ${{ inputs.oracle_db_refresh_file }}
+  run_target_ansible:
+    name: Run ansible against target database EC2
+    runs-on: ubuntu-latest
+    needs: run_source_ansible
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: "arn:aws:iam::${{ env.TARGET_DB_ACCOUNT_NUMBER }}:role/modernisation-platform-oidc-cicd"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-2"
+          aws-region: eu-west-2
+      - name: Checkout MP Configuration Management Repo
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          token: ${{ secrets.dso_github_pat }}
+          ref: main
+          path: configuration-management
+          fetch-depth: 1
+      - name: Setup Ansible
+        run: |
+          DEPENDENCIES=`cat requirements.txt | tr '\n' ' '`
+          pipx inject ansible-core $DEPENDENCIES
+          ansible-galaxy role install -r requirements.yml
+          ansible-galaxy collection install -r requirements.yml
+        working-directory: configuration-management/ansible
+      - name: Run Ansible Graph
+        run: |
+          ansible-inventory --graph
+        working-directory: configuration-management/ansible
+      - name: Run Ansible Ping
+        run: |
+          ansible -m ping ${{ inputs.target_db_hostname }}
+        working-directory: configuration-management/ansible
+      - name: Run Ansible Playbook against target database
+        run: |
+          ansible-playbook site.yml -e role=ansible-script --tags ec2patch --limit ${{ inputs.target_db_hostname }}
+        working-directory: configuration-management/ansible
+      # - name: Download control file
+      #   uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+      #   with:
+      #     name: control_file
+      # - name: Copy control file to target
+      #   run: |
+      #     ansible -i hosts/instance_aws_ec2.yml \
+      #       --module-name copy \
+      #       --args "src=${GITHUB_WORKSPACE}/${{ inputs.oracle_db_refresh_file }} dest=/tmp/${{ inputs.oracle_db_refresh_file }}" \
+      #       ${{ inputs.target_ansible_group }}
+      #   working-directory: configuration-management/ansible
+      # - name: Cat control file
+      #   run: |
+      #     cat ${{ inputs.oracle_db_refresh_file }}
