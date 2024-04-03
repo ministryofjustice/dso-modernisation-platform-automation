@@ -55,25 +55,25 @@ jobs:
           role-to-assume: "arn:aws:iam::${{ env.SOURCE_OEM_ACCOUNT_NUMBER }}:role/modernisation-platform-oidc-cicd"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
-      # - name: Checkout MP Configuration Management Repo
-      #   uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
-      #   with:
-      #     repository: ministryofjustice/modernisation-platform-configuration-management
-      #     token: ${{ secrets.dso_github_pat }}
-      #     ref: main
-      #     path: configuration-management
-      #     fetch-depth: 1
-      # - name: Setup Ansible
-      #   run: |
-      #     DEPENDENCIES=`cat requirements.txt | tr '\n' ' '`
-      #     pipx inject ansible-core $DEPENDENCIES
-      #     ansible-galaxy role install -r requirements.yml
-      #     ansible-galaxy collection install -r requirements.yml
-      #   working-directory: configuration-management/ansible
-      # - name: Run Ansible Graph
-      #   run: |
-      #     ansible-inventory --graph
-      #   working-directory: configuration-management/ansible
+      - name: Checkout MP Configuration Management Repo
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          token: ${{ secrets.dso_github_pat }}
+          ref: main
+          path: configuration-management
+          fetch-depth: 1
+      - name: Setup Ansible
+        run: |
+          DEPENDENCIES=`cat requirements.txt | tr '\n' ' '`
+          pipx inject ansible-core $DEPENDENCIES
+          ansible-galaxy role install -r requirements.yml
+          ansible-galaxy collection install -r requirements.yml
+        working-directory: configuration-management/ansible
+      - name: Run Ansible Graph
+        run: |
+          ansible-inventory --graph
+        working-directory: configuration-management/ansible
       # - name: Run Ansible Ping
       #   run: |
       #     ansible -i hosts/instance_aws_ec2.yml -m ping ${{ inputs.source_ansible_group }}
