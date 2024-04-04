@@ -82,6 +82,9 @@ jobs:
         run: |
           ansible-playbook site.yml -e role=oracle-db-refresh --tags oracle_db_refresh_get_latest_backup_control_file --limit ${{ inputs.source_oem_hostname }} --extra-vars "ORACLE_DB_REFRESH_DB_NAME=${{ inputs.source_db_name }}"
         working-directory: configuration-management/ansible
+      - name: Cat control file
+        run: |
+          cat ${{ inputs.oracle_db_refresh_file }}
       # - name: Get Oracle Control File Name
       #   id: get_control_file_name
       #   run: |
