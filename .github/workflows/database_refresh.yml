@@ -80,7 +80,7 @@ jobs:
         working-directory: configuration-management/ansible
       - name: Run Ansible Playbook against source OEM
         run: |
-          ansible-playbook site.yml -e role=ansible-script --tags ec2patch --limit ${{ inputs.source_oem_hostname }}
+          ansible-playbook site.yml -e role=oasys-db-refresh --tags ec2patch --limit ${{ inputs.source_oem_hostname }}
         working-directory: configuration-management/ansible
       # - name: Get Oracle Control File Name
       #   id: get_control_file_name
