@@ -7,6 +7,19 @@ name: OASYS Database Refresh
 
 on:
   workflow_dispatch:
+    inputs:
+      source_db_name:
+        description: 'Source database name'
+        required: true
+        type: string
+      target_db_hostname:
+        description: 'Target database hostname or ansible group'
+        required: true
+        type: string
+      target_db_name:
+        description: 'Target database name'
+        required: true
+        type: string
 
 jobs:
   refresh_db:
