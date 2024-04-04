@@ -80,7 +80,7 @@ jobs:
         working-directory: configuration-management/ansible
       - name: Run Ansible Playbook against source OEM
         run: |
-          ansible-playbook site.yml -e role=oracle-db-refresh --tags ec2patch --limit ${{ inputs.source_oem_hostname }}
+          ansible-playbook site.yml -e role=oracle-db-refresh --tags oracle_db_refresh_get_latest_backup_control_file --limit ${{ inputs.source_oem_hostname }} --extra_vars="ORACLE_DB_REFRESH_DB_NAME=${{ inputs.source_db_name }} RCVCAT_DB_NAME=${{ inputs.source_db_name }}"
         working-directory: configuration-management/ansible
       # - name: Get Oracle Control File Name
       #   id: get_control_file_name
