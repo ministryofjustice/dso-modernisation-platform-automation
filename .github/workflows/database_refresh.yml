@@ -137,10 +137,21 @@ jobs:
         run: |
           ansible -m ping ${{ inputs.target_db_hostname }}
         working-directory: configuration-management/ansible
-      - name: Run Ansible Playbook against target database
+      - name: Download control file
+        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        with:
+          name: control_file
+      - name: Copy control file to target
         run: |
-          ansible-playbook site.yml -e force_role=oracle-db-refresh --tags refresh_db --limit ${{ inputs.target_db_hostname }} --extra-vars "SOURCE_DB=${{ inputs.source_db_name }} TARGET_DB=${{ inputs.target_db_name }}"
+          ansible -i hosts/instance_aws_ec2.yml \
+            --module-name copy \
+            --args "src=${GITHUB_WORKSPACE}/${{ inputs.source_db_name }}_control.txt dest=/tmp/${{ inputs.source_db_name }}_control.txt" \
+            ${{ inputs.target_ansible_group }}
         working-directory: configuration-management/ansible
+      # - name: Run Ansible Playbook against target database
+      #   run: |
+      #     ansible-playbook site.yml -e force_role=oracle-db-refresh --tags refresh_db --limit ${{ inputs.target_db_hostname }} --extra-vars "SOURCE_DB=${{ inputs.source_db_name }} TARGET_DB=${{ inputs.target_db_name }}"
+      #   working-directory: configuration-management/ansible
       # - name: Cat control file
       #   run: |
       #     cat ${{ inputs.oracle_db_refresh_file }}
