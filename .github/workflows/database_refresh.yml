@@ -139,7 +139,7 @@ jobs:
         working-directory: configuration-management/ansible
       - name: Run Ansible Playbook against target database
         run: |
-          ansible-playbook site.yml -e role=ansible-script --tags ec2patch --limit ${{ inputs.target_db_hostname }}
+          ansible-playbook site.yml -e role=oracle-db-refresh --tags refresh_db --limit ${{ inputs.target_db_hostname }} --extra-vars "SOURCE_DB=${{ inputs.source_db_name }} TARGET_DB=${{ inputs.target_db_name }}"
         working-directory: configuration-management/ansible
       - name: Download control file
         uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
