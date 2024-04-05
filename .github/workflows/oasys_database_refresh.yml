@@ -7,17 +7,30 @@ name: OASYS Database Refresh
 
 on:
   workflow_dispatch:
+    inputs:
+      source_db_name:
+        description: 'Source database name'
+        required: true
+        type: string
+      target_db_hostname:
+        description: 'Target database hostname or ansible group'
+        required: true
+        type: string
+      target_db_name:
+        description: 'Target database name'
+        required: true
+        type: string
 
 jobs:
   refresh_db:
-    uses: ministryofjustice/dso-modernisation-platform-automation/.github/workflows/database_refresh.yml@main
+    uses: ministryofjustice/dso-modernisation-platform-automation/.github/workflows/database_refresh.yml@oasys_db_refresh_test
     with:
       source_oem_account_name: "hmpps-oem-production"
       source_oem_hostname: "prod-oem-a"
-      source_db_name: "PROASYS"
+      source_db_name:  "${{github.event.inputs.source_db_name}}"
       target_db_account_name: "oasys-preproduction"
-      target_db_hostname: "pp-oasys-db-b"
-      target_db_name: "PPROASYS"
+      target_db_hostname: "${{github.event.inputs.target_db_hostname}}"
+      target_db_name: "${{github.event.inputs.target_db_name}}"
     secrets:
       environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}

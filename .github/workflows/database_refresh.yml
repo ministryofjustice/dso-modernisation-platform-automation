@@ -79,9 +79,15 @@ jobs:
           ansible -m ping ${{ inputs.source_oem_hostname }}
         working-directory: configuration-management/ansible
       - name: Run Ansible Playbook against source OEM
+        id: get_control_file_name
         run: |
-          ansible-playbook site.yml -e role=ansible-script --tags ec2patch --limit ${{ inputs.source_oem_hostname }}
+          ansible-playbook site.yml -e role=oracle-db-refresh --tags get_latest_backup_control_file --limit ${{ inputs.source_oem_hostname }} --extra-vars "SOURCE_DB=${{ inputs.source_db_name }}"
         working-directory: configuration-management/ansible
+      - name: Upload control file
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: control_file
+          path: "${{ inputs.source_db_name }}_control.txt"
       # - name: Get Oracle Control File Name
       #   id: get_control_file_name
       #   run: |
@@ -131,20 +137,20 @@ jobs:
         run: |
           ansible -m ping ${{ inputs.target_db_hostname }}
         working-directory: configuration-management/ansible
-      - name: Run Ansible Playbook against target database
+      - name: Download control file
+        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        with:
+          name: control_file
+      - name: Copy control file to target
         run: |
-          ansible-playbook site.yml -e role=ansible-script --tags ec2patch --limit ${{ inputs.target_db_hostname }}
+          ansible ${{ inputs.target_db_hostname }} \
+            --module-name copy \
+            --args "src=${GITHUB_WORKSPACE}/${{ inputs.source_db_name }}_control.txt dest=/tmp/${{ inputs.source_db_name }}_control.txt" \
+            ${{ inputs.target_ansible_group }}
         working-directory: configuration-management/ansible
-      # - name: Download control file
-      #   uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
-      #   with:
-      #     name: control_file
-      # - name: Copy control file to target
+      # - name: Run Ansible Playbook against target database
       #   run: |
-      #     ansible -i hosts/instance_aws_ec2.yml \
-      #       --module-name copy \
-      #       --args "src=${GITHUB_WORKSPACE}/${{ inputs.oracle_db_refresh_file }} dest=/tmp/${{ inputs.oracle_db_refresh_file }}" \
-      #       ${{ inputs.target_ansible_group }}
+      #     ansible-playbook site.yml -e force_role=oracle-db-refresh --tags refresh_db --limit ${{ inputs.target_db_hostname }} --extra-vars "SOURCE_DB=${{ inputs.source_db_name }} TARGET_DB=${{ inputs.target_db_name }}"
       #   working-directory: configuration-management/ansible
       # - name: Cat control file
       #   run: |
