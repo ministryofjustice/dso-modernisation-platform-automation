@@ -3,7 +3,7 @@ name: OASYS Database Refresh
 # NOTE: MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT secret is
 # exact copy of the modernisation-platform environment_management
 # secret. You can retrieve via AWS CLI like this:
-#   aws secretsmanager get-secret-value --secret-id arn:aws:secretsmanager:eu-west-2:{{ modernisation-platform account id }}:secret:environment_management --output text --query SecretString --profile oassys-development
+#   aws secretsmanager get-secret-value --secret-id arn:aws:secretsmanager:eu-west-2:{{ modernisation-platform account id }}:secret:environment_management --output text --query SecretString --profile oasys-development
 
 on:
   workflow_dispatch:
@@ -23,7 +23,7 @@ on:
 
 jobs:
   refresh_db:
-    uses: ministryofjustice/dso-modernisation-platform-automation/.github/workflows/database_refresh.yml@oasys_db_refresh_test
+    uses: ./.github/workflows/database_refresh.yml
     with:
       source_oem_account_name: "hmpps-oem-production"
       source_oem_hostname: "prod-oem-a"
