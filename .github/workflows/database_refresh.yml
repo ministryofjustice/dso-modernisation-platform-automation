@@ -72,7 +72,10 @@ jobs:
         working-directory: configuration-management/ansible
       - name: Run Ansible Graph
         run: |
-          ansible-inventory --graph
+          echo "Checking ansible-inventory --graph"
+          ansible-inventory --graph > /dev/null
+          echo "Checking ansible-inventory --host ${{ inputs.source_oem_hostname }}"
+          ansible-inventory --host ${{ inputs.source_oem_hostname }} > /dev/null
         working-directory: configuration-management/ansible
       - name: Run Ansible Ping
         run: |
@@ -117,7 +120,10 @@ jobs:
         working-directory: configuration-management/ansible
       - name: Run Ansible Graph
         run: |
-          ansible-inventory --graph
+          echo "Checking ansible-inventory --graph"
+          ansible-inventory --graph > /dev/null
+          echo "Checking ansible-inventory --host ${{ inputs.target_db_hostname }}"
+          ansible-inventory --host ${{ inputs.target_db_hostname }} > /dev/null
         working-directory: configuration-management/ansible
       - name: Run Ansible Ping
         run: |
