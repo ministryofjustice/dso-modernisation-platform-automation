@@ -1,20 +1,36 @@
 name: NOMIS Database Refresh
 
+# NOTE: MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT secret is
+# exact copy of the modernisation-platform environment_management
+# secret. You can retrieve via AWS CLI like this:
+#   aws secretsmanager get-secret-value --secret-id arn:aws:secretsmanager:eu-west-2:{{ modernisation-platform account id }}:secret:environment_management --output text --query SecretString --profile nomis-development
+
 on:
   workflow_dispatch:
+    inputs:
+      source_db_name:
+        description: 'Source database name'
+        required: true
+        type: string
+      target_db_hostname:
+        description: 'Target database hostname or ansible group'
+        required: true
+        type: string
+      target_db_name:
+        description: 'Target database name'
+        required: true
+        type: string
 
 jobs:
   refresh_db:
-    uses: ministryofjustice/dso-modernisation-platform-automation/.github/workflows/database_refresh.yml@main
+    uses: ./.github/workflows/database_refresh.yml
     with:
-      oracle_db_refresh_db_name: 'CNOMT1'
-      oracle_db_refresh_file: 'CNOMT1.txt'
-      source_account_role: "DBRefresherRole"
-      source_ansible_group: "server_type_hmpps_oem"
-      target_account_role: "DBRefresherRole"
-      target_ansible_group: "server_type_nomis_db"
+      source_oem_account_name: "hmpps-oem-production"
+      source_oem_hostname: "prod-oem-a"
+      source_db_name:  "${{github.event.inputs.source_db_name}}"
+      target_db_account_name: "nomis-preproduction"
+      target_db_hostname: "${{github.event.inputs.target_db_hostname}}"
+      target_db_name: "${{github.event.inputs.target_db_name}}"
     secrets:
+      environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
-      source_account_id: ${{ secrets.MODERNISATION_PLATFORM_OEM_TEST_ACCOUNT_ID }}
-      target_account_id: ${{ secrets.MODERNISATION_PLATFORM_NOMIS_TEST_ACCOUNT_ID }}
-
