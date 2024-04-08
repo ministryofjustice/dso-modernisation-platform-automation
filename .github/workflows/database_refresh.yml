@@ -60,7 +60,7 @@ jobs:
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           token: ${{ secrets.dso_github_pat }}
-          ref: DSOS-2668/db-refresh-error-checking
+          ref: main
           path: configuration-management
           fetch-depth: 1
       - name: Setup Ansible
