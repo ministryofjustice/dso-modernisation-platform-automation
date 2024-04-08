@@ -70,7 +70,7 @@ jobs:
           ansible-galaxy role install -r requirements.yml
           ansible-galaxy collection install -r requirements.yml
         working-directory: configuration-management/ansible
-      - name: Run Ansible Graph
+      - name: Check Ansible Inventory
         run: |
           echo "Checking ansible-inventory --graph"
           ansible-inventory --graph > /dev/null
@@ -118,7 +118,7 @@ jobs:
           ansible-galaxy role install -r requirements.yml
           ansible-galaxy collection install -r requirements.yml
         working-directory: configuration-management/ansible
-      - name: Run Ansible Graph
+      - name: Check Ansible Inventory
         run: |
           echo "Checking ansible-inventory --graph"
           ansible-inventory --graph > /dev/null
