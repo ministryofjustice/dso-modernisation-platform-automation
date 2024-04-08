@@ -70,9 +70,12 @@ jobs:
           ansible-galaxy role install -r requirements.yml
           ansible-galaxy collection install -r requirements.yml
         working-directory: configuration-management/ansible
-      - name: Run Ansible Graph
+      - name: Check Ansible Inventory
         run: |
-          ansible-inventory --graph
+          echo "Checking ansible-inventory --graph"
+          ansible-inventory --graph > /dev/null
+          echo "Checking ansible-inventory --host ${{ inputs.source_oem_hostname }}"
+          ansible-inventory --host ${{ inputs.source_oem_hostname }} > /dev/null
         working-directory: configuration-management/ansible
       - name: Run Ansible Ping
         run: |
@@ -88,20 +91,6 @@ jobs:
         with:
           name: control_file
           path: "${{ inputs.source_db_name }}_control.txt"
-      # - name: Get Oracle Control File Name
-      #   id: get_control_file_name
-      #   run: |
-      #     ansible -i hosts/instance_aws_ec2.yml \
-      #       --module-name include_role \
-      #       --args name=oracle-db-refresh \
-      #       --extra-vars='ORACLE_DB_REFRESH_DB_NAME=${{ inputs.oracle_db_refresh_db_name }} ORACLE_DB_REFRESH_FILE=${{ inputs.oracle_db_refresh_file }}' \
-      #       ${{ inputs.source_ansible_group }}
-      #   working-directory: configuration-management/ansible
-      # - name: Upload control file
-      #   uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
-      #   with:
-      #     name: control_file
-      #     path: ${{ inputs.oracle_db_refresh_file }}
 
   run_target_ansible:
     name: Run ansible against target database EC2
@@ -129,9 +118,12 @@ jobs:
           ansible-galaxy role install -r requirements.yml
           ansible-galaxy collection install -r requirements.yml
         working-directory: configuration-management/ansible
-      - name: Run Ansible Graph
+      - name: Check Ansible Inventory
         run: |
-          ansible-inventory --graph
+          echo "Checking ansible-inventory --graph"
+          ansible-inventory --graph > /dev/null
+          echo "Checking ansible-inventory --host ${{ inputs.target_db_hostname }}"
+          ansible-inventory --host ${{ inputs.target_db_hostname }} > /dev/null
         working-directory: configuration-management/ansible
       - name: Run Ansible Ping
         run: |
