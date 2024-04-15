@@ -18,9 +18,15 @@ jobs:
           - 'dso-infra-azure-ad'
     runs-on: ubuntu-latest
     steps:
-      - name: Setup GitHub API
+      - name: Get Workflow Runs
         id: get_failed_workflow_runs
         run: |
           DATE=$(date -d '1 day ago' '+%Y-%m-%d')   
-          curl -s -H "Authorization: Bearer ${{ secrets.DSO_GITHUB_PAT }}" 'https://api.github.com/repos/ministryofjustice/${{ matrix.repository }}/actions/runs?event=schedule&status=completed&created=>='"$DATE"
+          WORKFLOW_RUNS=`curl -s -H "Authorization: Bearer ${{ secrets.DSO_GITHUB_PAT }}" 'https://api.github.com/repos/ministryofjustice/${{ matrix.repository }}/actions/runs?event=schedule&status=completed&created=>='"$DATE"`
+          echo "WORKFLOW_RUNS=$WORKFLOW_RUNS" >> $GITHUB_OUTPUT
+      - name: Parse Failed Workflow Runs
+        run:
+          WORKFLOW_FAILS=$("${{ steps.get_failed_workflow_runs.outputs.WORKFLOW_RUNS }}" | jq '.workflow_runs[] | select(.conclusion == "failure") | .id')
+          echo $WORKFLOW_FAILS
+
 
