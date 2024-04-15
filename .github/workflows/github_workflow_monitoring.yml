@@ -21,4 +21,4 @@ jobs:
       - name: Setup GitHub API
         id: get_failed_workflow_runs
         run: |
-          curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ matrix.repository }}/actions/runs?status=completed&conclusion=failure
+          curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/ministryofjustice/${{ matrix.repository }}/actions/runs?event=schedule&status=completed&conclusion=failure
