@@ -22,5 +22,5 @@ jobs:
         id: get_failed_workflow_runs
         run: |
           DATE=$(date -d '1 day ago' '+%Y-%m-%d')   
-          curl -s -H "Authorization: Bearer ${{ secrets.DSO_GITHUB_PAT }}" https://api.github.com/repos/ministryofjustice/${{ matrix.repository }}/actions/runs?event=schedule&status=completed&created=>=$DATE
+          curl -s -H "Authorization: Bearer ${{ secrets.DSO_GITHUB_PAT }}" 'https://api.github.com/repos/ministryofjustice/${{ matrix.repository }}/actions/runs?event=schedule&status=completed&created=>='"$DATE"
 
