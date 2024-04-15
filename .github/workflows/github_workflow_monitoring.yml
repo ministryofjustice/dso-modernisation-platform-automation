@@ -21,7 +21,4 @@ jobs:
       - name: Setup GitHub API
         id: get_failed_workflow_runs
         run: |
-          echo "::set-output name=failed_workflow_runs::$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ matrix.repository }}/actions/runs?status=completed&conclusion=failure)"
-      - name: Print Failed Workflow Runs
-        run: |
-          echo "${{ steps.get_failed_workflow_runs.outputs.failed_workflow_runs }}"
+          curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ matrix.repository }}/actions/runs?status=completed&conclusion=failure
