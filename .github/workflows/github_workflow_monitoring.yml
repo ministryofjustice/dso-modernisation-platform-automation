@@ -5,15 +5,12 @@ permissions:
   contents: read
 
 on:
-  push:
-    branches:
-      - '*'
-env:
-  AWS_ACCOUNT_ID: ${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['hmpps-oem-test'] }}
+  schedule:
+    - cron: '0 */12 * * *'
 
 jobs:
   get_workflow_runs:
-    name: Get Failed Workflow Runs
+    name: Get Failed Workflow Runs and Update CloudMetric
     strategy:
       matrix:
         repository:
@@ -23,16 +20,17 @@ jobs:
       - name: Setup AWS Credemtials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          role-to-assume: "arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd"
+          role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['hmpps-oem-test'] }}:role/modernisation-platform-oidc-cicd"
           aws-region: eu-west-2
       - name: Get Workflow Runs
         id: get_failed_workflow_runs
         run: |
-          DATE=$(date -d '1 day ago' '+%Y-%m-%d')
+          DATE=$(date -d '1 day ago' '+%Y-%m-%dT%H:%M:%SZ')
           WORKFLOW_RUNS=$(curl -s -H "Authorization: Bearer ${{ secrets.DSO_GITHUB_PAT }}" \
-            'https://api.github.com/repos/ministryofjustice/${{ matrix.repository }}/actions/runs?event=schedule&status=completed&created=>='"$DATE")
+            'https://api.github.com/repos/ministryofjustice/${{ matrix.repository }}/actions/runs?event=schedule&created=>='"$DATE")
           FAILED_WORKFLOW_RUNS=$(echo $WORKFLOW_RUNS | jq '[.workflow_runs[] | select(.conclusion == "failure") | .id] | length')
           if [ $FAILED_WORKFLOW_RUNS -gt 0 ]; then
+            echo "${{ matrix.repository }} has ${FAILED_WORKFLOW_RUNS} failed workflow runs"
             echo "FAILED_WORKFLOW_RUNS=1" >> $GITHUB_OUTPUT
           else
             echo "FAILED_WORKFLOW_RUNS=0" >> $GITHUB_OUTPUT
@@ -41,7 +39,7 @@ jobs:
         run: |
           aws cloudwatch put-metric-data \
             --metric-name FailedWorkflowRuns \
-            --namespace GitHubWorkflow \
+            --namespace CustomMetrics \
             --value ${{ steps.get_failed_workflow_runs.outputs.FAILED_WORKFLOW_RUNS }} \
             --dimensions Repository=${{ matrix.repository }} \
             --region eu-west-2
