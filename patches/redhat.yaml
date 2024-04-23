@@ -1,0 +1,7 @@
+patches:
+  -
+    id: 'xz.x86_64'
+    title: '*0:5.2.4-3.el8_6'
+  -
+    id: 'jq.x86_64'
+    title: '*0:1.6-7.el8'
