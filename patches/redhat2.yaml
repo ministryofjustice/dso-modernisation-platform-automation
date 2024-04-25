@@ -1,7 +1,7 @@
 patches:
   -
     id: 'xz.x86_64'
-    title: 'xz.x86_64:0:5.2.4-3.el8_6'
+    title: 'xz.x86_64:0:5.2.4-3.el8'
   -
     id: 'jq.x86_64'
     title: 'jq.x86_64:0:1.6-7.el8'
