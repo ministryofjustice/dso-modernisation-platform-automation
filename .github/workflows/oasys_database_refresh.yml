@@ -95,6 +95,7 @@ jobs:
 
   test:
     needs: parse_input 
+    runs-on: ubuntu-latest
     steps:
       - name: Debug 
         run: |
