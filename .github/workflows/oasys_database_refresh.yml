@@ -38,9 +38,9 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      target_db_hostname: ${{ steps.parseinput.outputs.action }}
-      target_db_name: ${{ steps.parseinput.outputs.plan_args }}
-      source_db_name: ${{ steps.parseinput.outputs.apply_args }}
+      target_db_hostname: ${{ steps.parseinput.outputs.target_db_hostname }}
+      target_db_name: ${{ steps.parseinput.outputs.target_db_name }}
+      source_db_name: ${{ steps.parseinput.outputs.source_db_name }}
 
     parse_input:
       name: Parse input
