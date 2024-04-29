@@ -76,7 +76,7 @@ jobs:
               target_db_hostname="pp-onr-db-a"
               source_db_name="MISTRANS"
               target_db_name="PPMISTRN2"
-            elif [[ "${cron_time}" == '00 14 * * 0' ]]; then
+            elif [[ "${cron_time}" == '00 14 * * *' ]]; then
               target_db_hostname="pp-oasys-db-b"
               source_db_name="OASPROD"
               target_db_name="PPOASYS"
