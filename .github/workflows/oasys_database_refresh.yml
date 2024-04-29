@@ -34,7 +34,7 @@ env:
   ALLOWED_PARAMS: "pp-oasys-db-a:OASPROD:PPOASYS pp-onr-db-a:MISTRANS:PPMISTRN pp-onr-db-a:MISTRANS:PPMISTN2 pp-onr-db-a:OASREP:PPOASREP pp-onr-db-a:OASREP:PPOASRP2 pp-oasys-db-b:OASPROD:PPOASYS"
 
 jobs:
-  prepare-ansible:
+  parse_input:
     name: Parse input
     runs-on: ubuntu-latest
     steps:
@@ -82,6 +82,7 @@ jobs:
             fi
 
   refresh_db:
+    needs: parse_input
     uses: ./.github/workflows/database_refresh.yml
     with:
       source_oem_account_name: "hmpps-oem-production"
