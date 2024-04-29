@@ -80,6 +80,7 @@ jobs:
               echo "Github Event ${GITHUB_EVENT_NAME} unsupported"
               exit 1
             fi
+          fi
 
   refresh_db:
     needs: parse_input
