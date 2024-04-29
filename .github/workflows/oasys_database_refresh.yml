@@ -88,10 +88,10 @@ jobs:
     with:
       source_oem_account_name: "hmpps-oem-production"
       source_oem_hostname: "prod-oem-a"
-      source_db_name:  "${{source_db_name}}"
+      source_db_name:  "${source_db_name}"
       target_db_account_name: "oasys-preproduction"
-      target_db_hostname: "${{target_db_hostname}}"
-      target_db_name: "${{target_db_name}}"
+      target_db_hostname: "${target_db_hostname}"
+      target_db_name: "${target_db_name}"
     secrets:
       environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
