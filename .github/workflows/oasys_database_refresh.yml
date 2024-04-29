@@ -41,9 +41,9 @@ jobs:
       - name: Parse Inputs
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            source_db_name:  "${{github.event.inputs.source_db_name}}"
-            target_db_hostname: "${{github.event.inputs.target_db_hostname}}"
-            target_db_name: "${{github.event.inputs.target_db_name}}"
+            source_db_name="${{github.event.inputs.source_db_name}}"
+            target_db_hostname="${{github.event.inputs.target_db_hostname}}"
+            target_db_name="${{github.event.inputs.target_db_name}}"
             echo "Restoring ${target_db_name} database on ${target_db_hostname}"
             if [[ -z "${target_db_hostname }" || -z "${source_db_name}"  || -z "{target_db_name}" ]]; then
               echo "Error, target host name, source database and target database name must all be specified"
@@ -88,10 +88,10 @@ jobs:
     with:
       source_oem_account_name: "hmpps-oem-production"
       source_oem_hostname: "prod-oem-a"
-      source_db_name:  "${{github.event.inputs.source_db_name}}"
+      source_db_name:  "${{source_db_name}}"
       target_db_account_name: "oasys-preproduction"
-      target_db_hostname: "${{github.event.inputs.target_db_hostname}}"
-      target_db_name: "${{github.event.inputs.target_db_name}}"
+      target_db_hostname: "${{target_db_hostname}}"
+      target_db_name: "${{target_db_name}}"
     secrets:
       environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
