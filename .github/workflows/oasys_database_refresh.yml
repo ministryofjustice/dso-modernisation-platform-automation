@@ -38,9 +38,9 @@ jobs:
     name: Parse input
     runs-on: ubuntu-latest
     outputs:
-      target_host: ${{ steps.parseinput.outputs.target_db_hostname }}
-      target_db: ${{ steps.parseinput.outputs.target_db_name }}
-      source_db: ${{ steps.parseinput.outputs.source_db_name }}
+      target_db_hostname: ${{ steps.parseinput.outputs.target_db_hostname }}
+      target_db_name: ${{ steps.parseinput.outputs.target_db_name }}
+      source_db_name: ${{ steps.parseinput.outputs.source_db_name }}
     steps:
       - name: Parse Inputs
         run: |
@@ -89,9 +89,9 @@ jobs:
               exit 1
             fi
           fi
-          echo "target_host=${target_db_hostname}" >> $GITHUB_OUTPUT
-          echo "source_db=${source_db_name}" >> $GITHUB_OUTPUT
-          echo "target_db=${target_db_name}" >> $GITHUB_OUTPUT
+          echo "target_db_hostname=${target_db_hostname}" >> $GITHUB_OUTPUT
+          echo "source_db_name=${source_db_name}" >> $GITHUB_OUTPUT
+          echo "target_db_name=${target_db_name}" >> $GITHUB_OUTPUT
 
   test:
     needs: parse_input 
@@ -99,9 +99,9 @@ jobs:
     steps:
       - name: Debug 
         run: |
-          echo "${{ needs.init.outputs.source_db }}"
-          echo "${{ needs.init.outputs.target_host }}"
-          echo "${{ needs.init.outputs.target_db }}"
+          echo "${{ needs.init.outputs.source_db_name }}"
+          echo "${{ needs.init.outputs.target_db_hostname }}"
+          echo "${{ needs.init.outputs.target_db_name }}"
 
   refresh_db:
     needs: test
@@ -109,10 +109,10 @@ jobs:
     with:
       source_oem_account_name: "hmpps-oem-production"
       source_oem_hostname: "prod-oem-a"
-      source_db_name: "${{ needs.init.outputs.source_db }}"
+      source_db_name: "${{ needs.init.outputs.source_db_name }}"
       target_db_account_name: "oasys-preproduction"
-      target_db_hostname: "${{ needs.init.outputs.target_host }}"
-      target_db_name: "${{ needs.init.outputs.target_db }}"
+      target_db_hostname: "${{ needs.init.outputs.target_db_hostname }}"
+      target_db_name: "${{ needs.init.outputs.target_db_name }}"
     secrets:
       environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
