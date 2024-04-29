@@ -34,15 +34,16 @@ env:
   ALLOWED_PARAMS: "pp-oasys-db-a:OASPROD:PPOASYS pp-onr-db-a:MISTRANS:PPMISTRN pp-onr-db-a:MISTRANS:PPMISTN2 pp-onr-db-a:OASREP:PPOASREP pp-onr-db-a:OASREP:PPOASRP2 pp-oasys-db-b:OASPROD:PPOASYS"
 
 jobs:
-  parse_input:
-    name: Parse input
-    runs-on: ubuntu-latest
-    outputs:
+      outputs:
       target_db_hostname: ${{ steps.parseinput.outputs.target_db_hostname }}
       target_db_name: ${{ steps.parseinput.outputs.target_db_name }}
       source_db_name: ${{ steps.parseinput.outputs.source_db_name }}
+  parse_input:
+    name: Parse input
+    runs-on: ubuntu-latest
     steps:
       - name: Parse Inputs
+        id: parseinput
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             source_db_name="${{github.event.inputs.source_db_name}}"
