@@ -34,64 +34,64 @@ env:
   ALLOWED_PARAMS: "pp-oasys-db-a:OASPROD:PPOASYS pp-onr-db-a:MISTRANS:PPMISTRN pp-onr-db-a:MISTRANS:PPMISTN2 pp-onr-db-a:OASREP:PPOASREP pp-onr-db-a:OASREP:PPOASRP2 pp-oasys-db-b:OASPROD:PPOASYS"
 
 jobs:
-    parse_input:
-      name: Parse input
-      runs-on: ubuntu-latest
-      outputs:
-        target_db_hostname: ${{ steps.parseinput.outputs.target_db_hostname }}
-        target_db_name: ${{ steps.parseinput.outputs.target_db_name }}
-        source_db_name: ${{ steps.parseinput.outputs.source_db_name }}
-      steps:
-        - name: Parse Inputs
-          run: |
-            if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-              source_db_name="${{github.event.inputs.source_db_name}}"
-              target_db_hostname="${{github.event.inputs.target_db_hostname}}"
-              target_db_name="${{github.event.inputs.target_db_name}}"
-              echo "Restoring ${target_db_name} database on ${target_db_hostname}"
-              if [[ -z "${target_db_hostname}" || -z "${source_db_name}"  || -z "{target_db_name}" ]]; then
-                echo "Error, target host name, source database and target database name must all be specified"
-                exit 1
-              fi
-              if ! (echo "${ALLOWED_PARAMS}" | grep -w "${target_db_hostname}:${source_db_name}:${target_db_name}" > /dev/null); then
-                echo "Unsupported target_db_hostname / source_db_name / target_db_name combination"
-                echo "[${target_db_hostname}:${source_db_name}:${target_db_name}] not in [${ALLOWED_PARAMS}]"
-                exit 1
-              fi
-            elif  [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-              cron_time="${{github.event.schedule}}"
-              if [[ "${cron_time}" == '00 07 * * 0' ]]; then
-                target_db_hostname="pp-oasys-db-a"
-                source_db_name="OASPROD"
-                target_db_name="PPOASYS"
-              elif [[ "${cron_time}" == '00 08 * * 0' ]]; then
-                target_db_hostname="pp-onr-db-a"
-                source_db_name="OASREP"
-                target_db_name="PPOASREP"
-              elif [[ "${cron_time}" == '00 09 * * 0' ]]; then
-                target_db_hostname="pp-onr-db-a"
-                source_db_name="OASREP"
-                target_db_name="PPOASRP2"
-              elif [[ "${cron_time}" == '00 10 * * 0' ]]; then
-                target_db_hostname="pp-onr-db-a"
-                source_db_name="MISTRANS"
-                target_db_name="PPMISTRN"
-              elif [[ "${cron_time}" == '00 11 * * 0' ]]; then
-                target_db_hostname="pp-onr-db-a"
-                source_db_name="MISTRANS"
-                target_db_name="PPMISTRN2"
-              elif [[ "${cron_time}" == '00 15 * * *' ]]; then
-                target_db_hostname="pp-oasys-db-b"
-                source_db_name="OASPROD"
-                target_db_name="PPOASYS"
-              else
-                echo "Github Event ${GITHUB_EVENT_NAME} unsupported"
-                exit 1
-              fi
+  parse_input:
+    name: Parse input
+    runs-on: ubuntu-latest
+    outputs:
+      target_db_hostname: ${{ steps.parseinput.outputs.target_db_hostname }}
+      target_db_name: ${{ steps.parseinput.outputs.target_db_name }}
+      source_db_name: ${{ steps.parseinput.outputs.source_db_name }}
+    steps:
+      - name: Parse Inputs
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            source_db_name="${{github.event.inputs.source_db_name}}"
+            target_db_hostname="${{github.event.inputs.target_db_hostname}}"
+            target_db_name="${{github.event.inputs.target_db_name}}"
+            echo "Restoring ${target_db_name} database on ${target_db_hostname}"
+            if [[ -z "${target_db_hostname}" || -z "${source_db_name}"  || -z "{target_db_name}" ]]; then
+              echo "Error, target host name, source database and target database name must all be specified"
+              exit 1
             fi
-            echo "target_db_hostname=${target_db_hostname}" >> $GITHUB_OUTPUT
-            echo "source_db_name=${source_db_name}" >> $GITHUB_OUTPUT
-            echo "target_db_name=${target_db_name}" >> $GITHUB_OUTPUT
+            if ! (echo "${ALLOWED_PARAMS}" | grep -w "${target_db_hostname}:${source_db_name}:${target_db_name}" > /dev/null); then
+              echo "Unsupported target_db_hostname / source_db_name / target_db_name combination"
+              echo "[${target_db_hostname}:${source_db_name}:${target_db_name}] not in [${ALLOWED_PARAMS}]"
+              exit 1
+            fi
+          elif  [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            cron_time="${{github.event.schedule}}"
+            if [[ "${cron_time}" == '00 07 * * 0' ]]; then
+              target_db_hostname="pp-oasys-db-a"
+              source_db_name="OASPROD"
+              target_db_name="PPOASYS"
+            elif [[ "${cron_time}" == '00 08 * * 0' ]]; then
+              target_db_hostname="pp-onr-db-a"
+              source_db_name="OASREP"
+              target_db_name="PPOASREP"
+            elif [[ "${cron_time}" == '00 09 * * 0' ]]; then
+              target_db_hostname="pp-onr-db-a"
+              source_db_name="OASREP"
+              target_db_name="PPOASRP2"
+            elif [[ "${cron_time}" == '00 10 * * 0' ]]; then
+              target_db_hostname="pp-onr-db-a"
+              source_db_name="MISTRANS"
+              target_db_name="PPMISTRN"
+            elif [[ "${cron_time}" == '00 11 * * 0' ]]; then
+              target_db_hostname="pp-onr-db-a"
+              source_db_name="MISTRANS"
+              target_db_name="PPMISTRN2"
+            elif [[ "${cron_time}" == '00 15 * * *' ]]; then
+              target_db_hostname="pp-oasys-db-b"
+              source_db_name="OASPROD"
+              target_db_name="PPOASYS"
+            else
+              echo "Github Event ${GITHUB_EVENT_NAME} unsupported"
+              exit 1
+            fi
+          fi
+          echo "target_db_hostname=${target_db_hostname}" >> $GITHUB_OUTPUT
+          echo "source_db_name=${source_db_name}" >> $GITHUB_OUTPUT
+          echo "target_db_name=${target_db_name}" >> $GITHUB_OUTPUT
 
   refresh_db:
     needs: parse_input
