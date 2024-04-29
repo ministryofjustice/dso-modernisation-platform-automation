@@ -28,12 +28,20 @@ on:
     - cron: '00 09 * * 0' # pp-onr-db-a PPOASRP2
     - cron: '00 10 * * 0' # pp-onr-db-a PPMISTRN
     - cron: '00 11 * * 0' # pp-onr-db-a PPMISTN2
-    - cron: '30 12 * * *' # pp-onr-db-b PPOASYS
+    - cron: '00 15 * * *' # pp-onr-db-b PPOASYS
 
 env:
   ALLOWED_PARAMS: "pp-oasys-db-a:OASPROD:PPOASYS pp-onr-db-a:MISTRANS:PPMISTRN pp-onr-db-a:MISTRANS:PPMISTN2 pp-onr-db-a:OASREP:PPOASREP pp-onr-db-a:OASREP:PPOASRP2 pp-oasys-db-b:OASPROD:PPOASYS"
 
 jobs:
+  init:
+    runs-on: ubuntu-latest
+
+    outputs:
+      target_db_hostname: ${{ steps.parseinput.outputs.action }}
+      target_db_name: ${{ steps.parseinput.outputs.plan_args }}
+      source_db_name: ${{ steps.parseinput.outputs.apply_args }}
+
   parse_input:
     name: Parse input
     runs-on: ubuntu-latest
@@ -76,7 +84,7 @@ jobs:
               target_db_hostname="pp-onr-db-a"
               source_db_name="MISTRANS"
               target_db_name="PPMISTRN2"
-            elif [[ "${cron_time}" == '30 12 * * 0' ]]; then
+            elif [[ "${cron_time}" == '00 15 * * *' ]]; then
               target_db_hostname="pp-oasys-db-b"
               source_db_name="OASPROD"
               target_db_name="PPOASYS"
@@ -85,6 +93,9 @@ jobs:
               exit 1
             fi
           fi
+          echo "target_db_hostname=${target_db_hostname}" >> $GITHUB_OUTPUT
+          echo "source_db_name=${source_db_name}" >> $GITHUB_OUTPUT
+          echo "target_db_name=${target_db_name}" >> $GITHUB_OUTPUT
 
   refresh_db:
     needs: parse_input
@@ -92,10 +103,10 @@ jobs:
     with:
       source_oem_account_name: "hmpps-oem-production"
       source_oem_hostname: "prod-oem-a"
-      source_db_name:  "${source_db_name}"
+      source_db_name: "${{ needs.init.outputs.source_db_name }}"
       target_db_account_name: "oasys-preproduction"
-      target_db_hostname: "${target_db_hostname}"
-      target_db_name: "${target_db_name}"
+      target_db_hostname: "${{ needs.init.outputs.target_db_hostname }}"
+      target_db_name: "${{ needs.init.outputs.target_db_name }}"
     secrets:
       environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
