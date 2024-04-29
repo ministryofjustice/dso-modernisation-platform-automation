@@ -28,7 +28,7 @@ on:
     - cron: '00 09 * * 0' # pp-onr-db-a PPOASRP2
     - cron: '00 10 * * 0' # pp-onr-db-a PPMISTRN
     - cron: '00 11 * * 0' # pp-onr-db-a PPMISTN2
-    - cron: '00 12 * * *' # pp-onr-db-b PPOASYS
+    - cron: '30 12 * * *' # pp-onr-db-b PPOASYS
 
 env:
   ALLOWED_PARAMS: "pp-oasys-db-a:OASPROD:PPOASYS pp-onr-db-a:MISTRANS:PPMISTRN pp-onr-db-a:MISTRANS:PPMISTN2 pp-onr-db-a:OASREP:PPOASREP pp-onr-db-a:OASREP:PPOASRP2 pp-oasys-db-b:OASPROD:PPOASYS"
@@ -76,6 +76,10 @@ jobs:
               target_db_hostname="pp-onr-db-a"
               source_db_name="MISTRANS"
               target_db_name="PPMISTRN2"
+            elif [[ "${cron_time}" == '30 12 * * 0' ]]; then
+              target_db_hostname="pp-oasys-db-b"
+              source_db_name="OASPROD"
+              target_db_name="PPOASYS"
             else
               echo "Github Event ${GITHUB_EVENT_NAME} unsupported"
               exit 1
