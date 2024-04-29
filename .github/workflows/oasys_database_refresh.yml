@@ -34,7 +34,7 @@ env:
   ALLOWED_PARAMS: "pp-oasys-db-a:OASPROD:PPOASYS pp-onr-db-a:MISTRANS:PPMISTRN pp-onr-db-a:MISTRANS:PPMISTN2 pp-onr-db-a:OASREP:PPOASREP pp-onr-db-a:OASREP:PPOASRP2 pp-oasys-db-b:OASPROD:PPOASYS"
 
 jobs:
-  parseinput:
+  parse_input:
     name: Parse input
     runs-on: ubuntu-latest
     outputs:
@@ -95,7 +95,7 @@ jobs:
           echo "target_db_name=${target_db_name}" >> $GITHUB_OUTPUT
 
   test:
-    needs: parseinput 
+    needs: parse_input 
     runs-on: ubuntu-latest
     steps:
       - name: Debug 
