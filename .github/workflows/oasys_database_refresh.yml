@@ -34,13 +34,13 @@ env:
   ALLOWED_PARAMS: "pp-oasys-db-a:OASPROD:PPOASYS pp-onr-db-a:MISTRANS:PPMISTRN pp-onr-db-a:MISTRANS:PPMISTN2 pp-onr-db-a:OASREP:PPOASREP pp-onr-db-a:OASREP:PPOASRP2 pp-oasys-db-b:OASPROD:PPOASYS"
 
 jobs:
-      outputs:
-      target_db_hostname: ${{ steps.parseinput.outputs.target_db_hostname }}
-      target_db_name: ${{ steps.parseinput.outputs.target_db_name }}
-      source_db_name: ${{ steps.parseinput.outputs.source_db_name }}
   parseinput:
     name: Parse input
     runs-on: ubuntu-latest
+    outputs:
+      target_db_hostname: ${{ steps.parseinput.outputs.target_db_hostname }}
+      target_db_name: ${{ steps.parseinput.outputs.target_db_name }}
+      source_db_name: ${{ steps.parseinput.outputs.source_db_name }}
     steps:
       - name: Parse Inputs
         id: parseinput
