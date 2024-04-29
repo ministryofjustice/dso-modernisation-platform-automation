@@ -34,17 +34,13 @@ env:
   ALLOWED_PARAMS: "pp-oasys-db-a:OASPROD:PPOASYS pp-onr-db-a:MISTRANS:PPMISTRN pp-onr-db-a:MISTRANS:PPMISTN2 pp-onr-db-a:OASREP:PPOASREP pp-onr-db-a:OASREP:PPOASRP2 pp-oasys-db-b:OASPROD:PPOASYS"
 
 jobs:
-  init:
-    runs-on: ubuntu-latest
-
-    outputs:
-      target_db_hostname: ${{ steps.parseinput.outputs.target_db_hostname }}
-      target_db_name: ${{ steps.parseinput.outputs.target_db_name }}
-      source_db_name: ${{ steps.parseinput.outputs.source_db_name }}
-
     parse_input:
       name: Parse input
       runs-on: ubuntu-latest
+      outputs:
+        target_db_hostname: ${{ steps.parseinput.outputs.target_db_hostname }}
+        target_db_name: ${{ steps.parseinput.outputs.target_db_name }}
+        source_db_name: ${{ steps.parseinput.outputs.source_db_name }}
       steps:
         - name: Parse Inputs
           run: |
@@ -98,7 +94,7 @@ jobs:
             echo "target_db_name=${target_db_name}" >> $GITHUB_OUTPUT
 
   refresh_db:
-    needs: init
+    needs: parse_input
     uses: ./.github/workflows/database_refresh.yml
     with:
       source_oem_account_name: "hmpps-oem-production"
