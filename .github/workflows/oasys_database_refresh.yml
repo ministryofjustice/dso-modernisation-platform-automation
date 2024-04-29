@@ -28,14 +28,14 @@ on:
     - cron: '00 09 * * 0' # pp-onr-db-a PPOASRP2
     - cron: '00 10 * * 0' # pp-onr-db-a PPMISTRN
     - cron: '00 11 * * 0' # pp-onr-db-a PPMISTN2
-    - cron: '00 11 * * *' # pp-onr-db-b PPOASYS
+    - cron: '00 12 * * *' # pp-onr-db-b PPOASYS
 
 env:
   ALLOWED_PARAMS: "pp-oasys-db-a:OASPROD:PPOASYS pp-onr-db-a:MISTRANS:PPMISTRN pp-onr-db-a:MISTRANS:PPMISTN2 pp-onr-db-a:OASREP:PPOASREP pp-onr-db-a:OASREP:PPOASRP2 pp-oasys-db-b:OASPROD:PPOASYS"
 
 jobs:
   prepare-ansible:
-    name: Run ansible against OEM EC2
+    name: Parse input
     runs-on: ubuntu-latest
     steps:
       - name: Parse Inputs
