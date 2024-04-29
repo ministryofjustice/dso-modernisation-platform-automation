@@ -93,8 +93,17 @@ jobs:
           echo "source_db=${source_db_name}" >> $GITHUB_OUTPUT
           echo "target_db=${target_db_name}" >> $GITHUB_OUTPUT
 
+  test:
+    needs: parse_input 
+    steps:
+      - name: Debug 
+        run: |
+          echo "${{ needs.init.outputs.source_db }}"
+          echo "${{ needs.init.outputs.target_host }}"
+          echo "${{ needs.init.outputs.target_db }}"
+
   refresh_db:
-    needs: parse_input
+    needs: test
     uses: ./.github/workflows/database_refresh.yml
     with:
       source_oem_account_name: "hmpps-oem-production"
