@@ -44,7 +44,7 @@ jobs:
             source_db_name:  "${{github.event.inputs.source_db_name}}"
             target_db_hostname: "${{github.event.inputs.target_db_hostname}}"
             target_db_name: "${{github.event.inputs.target_db_name}}"
-            echo "Restoring ${source_database} database on ${target_host}"
+            echo "Restoring ${target_db_name} database on ${target_db_hostname}"
             if [[ -z "${target_db_hostname }" || -z "${source_db_name}"  || -z "{target_db_name}"]]; then
               echo "Error, target host name, source database and target database name must all be specified"
               exit 1
