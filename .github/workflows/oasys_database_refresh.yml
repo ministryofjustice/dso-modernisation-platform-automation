@@ -93,6 +93,9 @@ jobs:
           echo "target_db_hostname=${target_db_hostname}" >> $GITHUB_OUTPUT
           echo "source_db_name=${source_db_name}" >> $GITHUB_OUTPUT
           echo "target_db_name=${target_db_name}" >> $GITHUB_OUTPUT
+          echo "target_db_hostname=${target_db_hostname}"
+          echo "source_db_name=${source_db_name}"
+          echo "target_db_name=${target_db_name}"
 
   test:
     needs: parse_input 
@@ -100,9 +103,9 @@ jobs:
     steps:
       - name: Debug 
         run: |
-          echo "${{ needs.parseinput.outputs.source_db_name }}"
-          echo "${{ needs.parseinput.outputs.target_db_hostname }}"
-          echo "${{ needs.parseinput.outputs.target_db_name }}"
+          echo "${{ needs.parse_input.outputs.source_db_name }}"
+          echo "${{ needs.parse_input.outputs.target_db_hostname }}"
+          echo "${{ needs.parse_input.outputs.target_db_name }}"
 
   refresh_db:
     needs: test
@@ -110,10 +113,10 @@ jobs:
     with:
       source_oem_account_name: "hmpps-oem-production"
       source_oem_hostname: "prod-oem-a"
-      source_db_name: "${{ needs.parseinput.outputs.source_db_name }}"
+      source_db_name: "${{ needs.parse_input.outputs.source_db_name }}"
       target_db_account_name: "oasys-preproduction"
-      target_db_hostname: "${{ needs.parseinput.outputs.target_db_hostname }}"
-      target_db_name: "${{ needs.parseinput.outputs.target_db_name }}"
+      target_db_hostname: "${{ needs.parse_input.outputs.target_db_hostname }}"
+      target_db_name: "${{ needs.parse_input.outputs.target_db_name }}"
     secrets:
       environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
