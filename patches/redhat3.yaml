@@ -1,0 +1,5 @@
+patches:
+  -
+    id: 'xz.x86_64'
+  -
+    id: 'jq.x86_64'
