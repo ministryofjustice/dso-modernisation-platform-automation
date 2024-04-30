@@ -97,18 +97,8 @@ jobs:
           echo "source_db_name=${source_db_name}"
           echo "target_db_name=${target_db_name}"
 
-  test:
-    needs: parse_input 
-    runs-on: ubuntu-latest
-    steps:
-      - name: Debug 
-        run: |
-          echo "${{ needs.parse_input.outputs.source_db_name }}"
-          echo "${{ needs.parse_input.outputs.target_db_hostname }}"
-          echo "${{ needs.parse_input.outputs.target_db_name }}"
-
   refresh_db:
-    needs: test
+    needs: parse_input
     uses: ./.github/workflows/database_refresh.yml
     with:
       source_oem_account_name: "hmpps-oem-production"
