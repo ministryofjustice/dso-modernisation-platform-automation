@@ -6,7 +6,7 @@ permissions:
 
 on:
   schedule:
-    - cron: '0 */12 * * *'
+    - cron: '*/5 * * * *' # every 5 minutes
 
 jobs:
   get_workflow_runs:
@@ -15,6 +15,8 @@ jobs:
       matrix:
         repository:
           - 'dso-infra-azure-ad'
+          - 'dso-certificates'
+          - 'dso-infra-azure-fixngo'
     runs-on: ubuntu-latest
     steps:
       - name: Setup AWS Credemtials
