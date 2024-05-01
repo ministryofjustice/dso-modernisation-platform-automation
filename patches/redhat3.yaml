@@ -1,5 +1,7 @@
 patches:
   -
-    id: 'xz.x86_64'
+    id: 'telnet*.x86_64'
+    title: '*1:0.17-76.el8'
   -
-    id: 'jq.x86_64'
+    id: 'dhcp*.x86_64'
+    title: '*12:5.2.5-68.el7'
