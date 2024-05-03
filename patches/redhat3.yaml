@@ -7,4 +7,4 @@ patches:
     title: '*12:5.2.5-68.el7'
   -
     id: 'jq.x86_64'
-    title: 'jq.x86_64:0:1.6-7.el8'
+    title: 'jq.x86_64:0:1.6-6.el8'
