@@ -30,7 +30,7 @@ on:
     - cron: '00 11 * * 0' # pp-onr-db-a PPMISTN2
 
 env:
-  ALLOWED_PARAMS: "pp-oasys-db-a:OASPROD:PPOASYS pp-onr-db-a:MISTRANS:PPMISTRN pp-onr-db-a:MISTRANS:PPMISTN2 pp-onr-db-a:OASREP:PPOASREP pp-onr-db-a:OASREP:PPOASRP2 pp-oasys-db-b:OASPROD:PPOASYS"
+  ALLOWED_PARAMS: "pp-oasys-db-a:OASPROD:PPOASYS pp-onr-db-a:MISTRANS:PPMISTRN pp-onr-db-a:MISTRANS:PPMISTN2 pp-onr-db-a:OASYSREP:PPOASREP pp-onr-db-a:OASYSREP:PPOASRP2"
 
 jobs:
   parse_input:
@@ -66,11 +66,11 @@ jobs:
               target_db_name="PPOASYS"
             elif [[ "${cron_time}" == '00 08 * * 0' ]]; then
               target_db_hostname="pp-onr-db-a"
-              source_db_name="OASREP"
+              source_db_name="OASYSREP"
               target_db_name="PPOASREP"
             elif [[ "${cron_time}" == '00 09 * * 0' ]]; then
               target_db_hostname="pp-onr-db-a"
-              source_db_name="OASREP"
+              source_db_name="OASYSREP"
               target_db_name="PPOASRP2"
             elif [[ "${cron_time}" == '00 10 * * 0' ]]; then
               target_db_hostname="pp-onr-db-a"
@@ -79,7 +79,7 @@ jobs:
             elif [[ "${cron_time}" == '00 11 * * 0' ]]; then
               target_db_hostname="pp-onr-db-a"
               source_db_name="MISTRANS"
-              target_db_name="PPMISTRN2"
+              target_db_name="PPMISTN2"
             else
               echo "Github Event ${GITHUB_EVENT_NAME} unsupported"
               exit 1
