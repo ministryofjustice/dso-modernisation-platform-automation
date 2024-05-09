@@ -30,18 +30,26 @@ jobs:
           DATE=$(date -d '1 day ago' '+%Y-%m-%dT%H:%M:%SZ')
           WORKFLOW_RUNS=$(curl -s -H "Authorization: Bearer ${{ secrets.DSO_GITHUB_PAT }}" \
             'https://api.github.com/repos/ministryofjustice/${{ matrix.repository }}/actions/runs?event=schedule&created=>='"$DATE")
-          FAILED_WORKFLOW_RUNS=$(echo $WORKFLOW_RUNS | jq '[.workflow_runs[] | select(.conclusion == "failure") | .id] | length')
-          if [ $FAILED_WORKFLOW_RUNS -gt 0 ]; then
+          FAILED_WORKFLOW_RUN_COUNT=$(echo $WORKFLOW_RUNS | jq '[.workflow_runs[] | select(.conclusion == "failure") | .id] | length')
+          if [ $FAILED_WORKFLOW_RUN_COUNT -gt 0 ]; then
             echo "${{ matrix.repository }} has ${FAILED_WORKFLOW_RUNS} failed workflow runs"
             echo "FAILED_WORKFLOW_RUNS=1" >> $GITHUB_OUTPUT
+            echo "FAILED_WORKFLOW_RUN_COUNT=${FAILED_WORKFLOW_RUN_COUNT}" >> $GITHUB_OUTPUT
           else
             echo "FAILED_WORKFLOW_RUNS=0" >> $GITHUB_OUTPUT
           fi
-      - name: Update CloudMetric with Failed Workflow Runs
+      - name: Update CloudMetric with Failed Workflow Runs - Per Repository
         run: |
           aws cloudwatch put-metric-data \
             --metric-name FailedWorkflowRuns \
             --namespace CustomMetrics \
             --value ${{ steps.get_failed_workflow_runs.outputs.FAILED_WORKFLOW_RUNS }} \
             --dimensions Repository=${{ matrix.repository }} \
+            --region eu-west-2
+      - name: Update CloudMetric with Failed Workflow Runs - Total
+        run: |
+          aws cloudwatch put-metric-data \
+            --metric-name FailedWorkflowRuns \
+            --namespace CustomMetrics \
+            --value ${{ steps.get_failed_workflow_runs.outputs.FAILED_WORKFLOW_RUN_COUNT }} \
             --region eu-west-2
