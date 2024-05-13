@@ -39,13 +39,14 @@ jobs:
             echo "FAILED_WORKFLOW_RUNS=0" >> $GITHUB_OUTPUT
           fi
       - name: Set Metric Timestamp
+        id: set_metric_timestamp
         run: echo "TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
       - name: Update CloudMetric with Failed Workflow Runs - Per Repository
         run: |
           aws cloudwatch put-metric-data \
             --metric-name FailedWorkflowRuns \
             --namespace CustomMetrics \
-            --value ${{ steps.get_failed_workflow_runs.outputs.FAILED_WORKFLOW_RUNS }} \
+            --value ${{ steps.set_metric_timestamp.outputs.FAILED_WORKFLOW_RUNS }} \
             --dimensions Repository=${{ matrix.repository }} \
             --timestamp ${{ steps.get_failed_workflow_runs.outputs.TIMESTAMP }} \
             --region eu-west-2
@@ -55,5 +56,5 @@ jobs:
             --metric-name FailedWorkflowRuns \
             --namespace CustomMetrics \
             --value ${{ steps.get_failed_workflow_runs.outputs.FAILED_WORKFLOW_RUNS }} \
-            --timestamp ${{ steps.get_failed_workflow_runs.outputs.TIMESTAMP }} \
+            --timestamp ${{ steps.set_metric_timestamp.outputs.TIMESTAMP }} \
             --region eu-west-2
