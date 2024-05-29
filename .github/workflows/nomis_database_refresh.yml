@@ -21,7 +21,69 @@ on:
         required: true
         type: string
 
+  # Each scheduled job requires a unique time
+  schedule:
+    - cron: '00 07 * * 0' # preprod-nomis-db-1-a PPCNOM
+    - cron: '00 10 * * 0' # preprod-nomis-db-2-a PPMIS
+    - cron: '00 11 * * 0' # lsast-nomis-db-1-a LSCNOM
+    - cron: '00 14 * * 0' # lsast-nomis-db-1-a LSMIS 
+
+env:
+  ALLOWED_PARAMS: "preprod-nomis-db-1-a:CNOMP:PPCNOM preprod-nomis-db-2-a:MISP:PPMIS lsast-nomis-db-1-a:CNOMP:LSCNOM lsast-nomis-db-1-a:MISP:LSMIS"
+
 jobs:
+  parse_input:
+    name: Parse input
+    runs-on: ubuntu-latest
+    outputs:
+      target_db_hostname: ${{ steps.parseinput.outputs.target_db_hostname }}
+      target_db_name: ${{ steps.parseinput.outputs.target_db_name }}
+      source_db_name: ${{ steps.parseinput.outputs.source_db_name }}
+    steps:
+      - name: Parse Inputs
+        id: parseinput
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            source_db_name="${{github.event.inputs.source_db_name}}"
+            target_db_hostname="${{github.event.inputs.target_db_hostname}}"
+            target_db_name="${{github.event.inputs.target_db_name}}"
+            echo "Restoring ${target_db_name} database on ${target_db_hostname}"
+            if [[ -z "${target_db_hostname}" || -z "${source_db_name}"  || -z "{target_db_name}" ]]; then
+              echo "Error, target host name, source database and target database name must all be specified"
+              exit 1
+            fi
+            if ! (echo "${ALLOWED_PARAMS}" | grep -w "${target_db_hostname}:${source_db_name}:${target_db_name}" > /dev/null); then
+              echo "Unsupported target_db_hostname / source_db_name / target_db_name combination"
+              echo "[${target_db_hostname}:${source_db_name}:${target_db_name}] not in [${ALLOWED_PARAMS}]"
+              exit 1
+            fi
+          elif  [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            cron_time="${{github.event.schedule}}"
+            if [[ "${cron_time}" == '00 07 * * 0' ]]; then
+              target_db_hostname="preprod-nomis-db-1-a"
+              source_db_name="CNOMP"
+              target_db_name="PPCNOM"
+            elif [[ "${cron_time}" == '00 10 * * 0' ]]; then
+              target_db_hostname="preprod-nomis-db-2-a"
+              source_db_name="MISP"
+              target_db_name="PPMIS"
+            elif [[ "${cron_time}" == '00 11 * * 0' ]]; then
+              target_db_hostname="lsast-nomis-db-1-a"
+              source_db_name="CNOMP"
+              target_db_name="LSCNOM"
+            elif [[ "${cron_time}" == '00 14 * * 0' ]]; then
+              target_db_hostname="lsast-nomis-db-1-a"
+              source_db_name="MISP"
+              target_db_name="LSMIS"
+            else
+              echo "Github Event ${GITHUB_EVENT_NAME} unsupported"
+              exit 1
+            fi
+          fi
+          echo "target_db_hostname=${target_db_hostname}" >> $GITHUB_OUTPUT
+          echo "source_db_name=${source_db_name}" >> $GITHUB_OUTPUT
+          echo "target_db_name=${target_db_name}" >> $GITHUB_OUTPUT
+
   refresh_db:
     uses: ./.github/workflows/database_refresh.yml
     with:
