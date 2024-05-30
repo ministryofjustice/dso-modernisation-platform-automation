@@ -108,7 +108,7 @@ jobs:
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           token: ${{ secrets.dso_github_pat }}
-          ref: main
+          ref: nomis_lsast_refresh
           path: configuration-management
           fetch-depth: 1
       - name: Setup Ansible
