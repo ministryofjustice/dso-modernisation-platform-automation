@@ -93,6 +93,7 @@ jobs:
       target_db_account_name: "nomis-preproduction"
       target_db_hostname: "${{github.event.inputs.target_db_hostname}}"
       target_db_name: "${{github.event.inputs.target_db_name}}"
+      alternate_week: 1
     secrets:
       environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
