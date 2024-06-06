@@ -99,7 +99,7 @@ jobs:
       target_db_account_name: "oasys-preproduction"
       target_db_hostname: "${{ needs.parse_input.outputs.target_db_hostname }}"
       target_db_name: "${{ needs.parse_input.outputs.target_db_name }}"
-      altername_week: 0
+      alternate_week: 0
     secrets:
       environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
