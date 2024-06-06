@@ -142,7 +142,7 @@ jobs:
         working-directory: configuration-management/ansible
       - name: Run Ansible Playbook against target database
         run: |
-          ansible-playbook site.yml -e force_role=oracle-db-refresh --tags refresh_db --limit ${{ inputs.target_db_hostname }} --extra-vars "TARGET_DB=${{ inputs.target_db_name }} ALTERNATE_WEEK=0"
+          ansible-playbook site.yml -e force_role=oracle-db-refresh --tags refresh_db --limit ${{ inputs.target_db_hostname }} --extra-vars "TARGET_DB=${{ inputs.target_db_name }} ALTERNATE_WEEK=${{ inputs.alternate_week }}"
         working-directory: configuration-management/ansible
         
       # - name: Cat control file
