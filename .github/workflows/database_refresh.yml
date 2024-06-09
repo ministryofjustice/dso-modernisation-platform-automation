@@ -31,6 +31,10 @@ on:
         description: 'Target database name'
         required: true
         type: string
+      alternate_week:
+        description: 'Alternate week refresh flag'
+        required: true
+        type: number
     secrets:
       environment_management:
         description: 'copy of environment_management secret'
