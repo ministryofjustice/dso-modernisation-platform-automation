@@ -89,10 +89,10 @@ jobs:
     with:
       source_oem_account_name: "hmpps-oem-production"
       source_oem_hostname: "prod-oem-a"
-      source_db_name:  "${{github.event.inputs.source_db_name}}"
+      source_db_name: "${{ needs.parse_input.outputs.source_db_name }}"
       target_db_account_name: "nomis-preproduction"
-      target_db_hostname: "${{github.event.inputs.target_db_hostname}}"
-      target_db_name: "${{github.event.inputs.target_db_name}}"
+      target_db_hostname: "${{ needs.parse_input.outputs.target_db_hostname }}"
+      target_db_name: "${{ needs.parse_input.outputs.target_db_name }}"
       alternate_week: 1
     secrets:
       environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
