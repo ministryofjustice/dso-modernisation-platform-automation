@@ -12,15 +12,15 @@ on:
         type: string
       action:
         description: 'Set either [list|delete]'
-        default: 'list'
         type: string
+        default: list
         options:
           - list
           - delete
       months:
         description: 'Only delete AMIs older than this number of month(s)'
         type: string
-        default: '3'
+        default: 3
 
 permissions:
   id-token: write
@@ -32,8 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
-      months: "${{ steps.strategy.outputs.months }}"
-      action: "${{ steps.strategy.outputs.action }}"
+      months: "${{ steps.options.outputs.months }}"
+      action: "${{ steps.options.outputs.action }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
@@ -103,9 +103,5 @@ jobs:
 
       - name: Cleanup AMIs
         run: |
-          pwd
-          ls -la
-          echo "debug" 
-          ls -la src/  || true
           echo src/ami_cleanup.sh ${{ needs.strategy.outputs.action }} ${{ needs.strategy.outputs.months }}
           src/ami_cleanup.sh ${{ needs.strategy.outputs.action }} ${{ needs.strategy.outputs.months }}
