@@ -37,6 +37,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
 
       - name: strategy
         id: strategy
@@ -99,7 +101,5 @@ jobs:
 
       - name: Cleanup AMIs
         run: |
-          pwd
-          ls -la
           echo src/ami_cleanup.sh ${{ needs.strategy.outputs.action }} ${{ needs.strategy.outputs.months }}
           src/ami_cleanup.sh ${{ needs.strategy.outputs.action }} ${{ needs.strategy.outputs.months }}
