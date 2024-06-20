@@ -1,0 +1,57 @@
+---
+name: ami_cleanup
+on:
+  workflow_dispatch:
+    inputs:
+      account:
+        description: 'e.g. nomis or leave blank for all'
+        type: string
+      environment:
+        description: 'e.g. development or leave blank for all'
+        type: string
+
+jobs:
+  strategy:
+    name: strategy
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+
+      - name: strategy
+        id: strategy
+        run: |
+          echo "Parsing input parameters event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            # src/gha_get_strategy.sh "${{ github.event.inputs.account }}" "${{ github.event.inputs.environment }}"
+            matrix=$(echo '{"include": []}' | jq -r)
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+          echo "{$matrix}"
+
+  ami_cleanup:
+    name: ami_cleanup
+    runs-on: ubuntu-latest
+    needs: strategy
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.strategy.outputs.matrix) }}
+    env:
+      AWS_ACCOUNT_ID: fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name]
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
