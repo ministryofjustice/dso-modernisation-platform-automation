@@ -1,5 +1,6 @@
 ---
 name: AMI Cleanup
+
 on:
   workflow_dispatch:
     inputs:
@@ -9,6 +10,10 @@ on:
       environments:
         description: 'e.g. development or leave blank for all'
         type: string
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   strategy:
