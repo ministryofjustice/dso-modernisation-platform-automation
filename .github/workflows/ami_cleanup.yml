@@ -99,5 +99,7 @@ jobs:
 
       - name: Cleanup AMIs
         run: |
+          pwd
+          ls -la
           echo src/ami_cleanup.sh ${{ needs.strategy.outputs.action }} ${{ needs.strategy.outputs.months }}
           src/ami_cleanup.sh ${{ needs.strategy.outputs.action }} ${{ needs.strategy.outputs.months }}
