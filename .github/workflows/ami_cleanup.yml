@@ -11,7 +11,7 @@ on:
         description: 'e.g. development or leave blank for all'
         type: string
       ami_cleanup_sh_args:
-        description: 'Command line options to ami_cleanup.sh script, e.g. "list 6"
+        description: 'Command line options to ami_cleanup.sh script, e.g. "list 6"'
         type: string
         default: "list 6"
 
