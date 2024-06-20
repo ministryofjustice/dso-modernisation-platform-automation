@@ -1,12 +1,12 @@
 ---
-name: ami_cleanup
+name: AMI Cleanup
 on:
   workflow_dispatch:
     inputs:
-      account:
+      applications:
         description: 'e.g. nomis or leave blank for all'
         type: string
-      environment:
+      environments:
         description: 'e.g. development or leave blank for all'
         type: string
 
@@ -25,8 +25,7 @@ jobs:
         run: |
           echo "Parsing input parameters event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            # src/gha_get_strategy.sh "${{ github.event.inputs.account }}" "${{ github.event.inputs.environment }}"
-            matrix=$(echo '{"include": []}' | jq -r)
+            matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
