@@ -107,7 +107,7 @@ jobs:
           repository: ministryofjustice/modernisation-platform-environments
 
       - name: Cleanup AMIs
+        working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
-          ls -la
           echo src/ami_cleanup.sh ${{ needs.strategy.outputs.action }} ${{ needs.strategy.outputs.months }}
           src/ami_cleanup.sh ${{ needs.strategy.outputs.action }} ${{ needs.strategy.outputs.months }}
