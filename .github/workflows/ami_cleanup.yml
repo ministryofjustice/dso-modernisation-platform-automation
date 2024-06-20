@@ -10,17 +10,10 @@ on:
       environments:
         description: 'e.g. development or leave blank for all'
         type: string
-      action:
-        description: 'Set either [list|delete]'
+      ami_cleanup_sh_args:
+        description: 'Command line options to ami_cleanup.sh script, e.g. "list 6"
         type: string
-        default: list
-        options:
-          - list
-          - delete
-      months:
-        description: 'Only delete AMIs older than this number of month(s)'
-        type: string
-        default: 3
+        default: "list 6"
 
 permissions:
   id-token: write
@@ -32,8 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
-      months: "${{ steps.options.outputs.months }}"
-      action: "${{ steps.options.outputs.action }}"
+      ami_cleanup_sh_args: "${{ steps.options.outputs.ami_cleanup_sh_args }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
@@ -60,15 +52,13 @@ jobs:
         run: |
           echo "Setting options event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            months="${{ github.event.inputs.months }}"
-            action="${{ github.event.inputs.action }}"
+            ami_cleanup_sh_args="${{ github.event.inputs.ami_cleanup_sh_args }}"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo "action=${action} months=${months}"
-          echo "action=${action}" >> $GITHUB_OUTPUT
-          echo "months=${months}" >> $GITHUB_OUTPUT
+          echo "ami_cleanup_sh_args=${ami_cleanup_sh_args}"
+          echo "ami_cleanup_sh_args=${ami_cleanup_sh_args}" >> $GITHUB_OUTPUT
 
   ami_cleanup:
     name: AMI Cleanup
@@ -111,5 +101,5 @@ jobs:
       - name: Cleanup AMIs
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
-          echo src/ami_cleanup.sh ${{ needs.strategy.outputs.action }} ${{ needs.strategy.outputs.months }}
-          src/ami_cleanup.sh ${{ needs.strategy.outputs.action }} ${{ needs.strategy.outputs.months }}
+          echo src/ami_cleanup.sh ${{ needs.strategy.outputs.ami_cleanup_sh_args }}
+          src/ami_cleanup.sh ${{ needs.strategy.outputs.ami_cleanup_sh_args }}
