@@ -49,13 +49,9 @@ on:
         required: true
         type: string
 
-    secrets:
-      environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
-      dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
-
 env:
-  PROD_CSR_ACCOUNT_NUMBER: "${{ fromJSON(secrets.environment_management).account_ids[prod_csr_account_name] }}"
-  PREPROD_CSR_ACCOUNT_NUMBER: "${{ fromJSON(secrets.environment_management).account_ids[preprod_csr_account_name] }}"
+  PROD_CSR_ACCOUNT_NUMBER: "${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[prod_csr_account_name] }}"
+  PREPROD_CSR_ACCOUNT_NUMBER: "${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[preprod_csr_account_name] }}"
 
 jobs:
 
