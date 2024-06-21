@@ -9,18 +9,34 @@ on:
     inputs:
       prod_csr_account_name: 
         description: CSR production account name
-        default: "corporate-staff-rostering-production"
+        required: true
+        type: choice
+        options: 
+          - "corporate-staff-rostering-production"
+
       prod_csr_hostname: 
         description: CSR production hostname
-        default: "pd-csr-db-a"
+        required: true
+        type: choice
+        options: 
+          - "pd-csr-db-a"
+
       preprod_csr_account_name: 
         description: CSR preproduction account name
-        default: "corporate-staff-rostering-preproduction"
+        required: true
+        type: choice
+        options: 
+          - "corporate-staff-rostering-preproduction"
+
       preprod_csr_hostname: 
         description: CSR preproduction hostname
-        default: "pp-csr-db-a"
+        required: true
+        type: choice
+        options: 
+          - "pp-csr-db-a"
+
       step_action:
-        description: Actions to do 
+        description: Actions to do
         required: true
         type: choice
         options: 
@@ -29,7 +45,7 @@ on:
           - both
 
       dump_file_string:
-        description: 'AWS account name of source OEM EC2'
+        description: 'Datapump file string for identification'
         required: true
         type: string
 
@@ -80,10 +96,10 @@ jobs:
         run: |
           ansible -m ping ${{ inputs.prod_csr_hostname }}
         working-directory: configuration-management/ansible
-      # - name: Run Ansible Playbook against Production CSR to take export of schemas
-      #   run: |
-      #     ansible-playbook site.yml -e role=csr-preprod-refresh --tags csr__adhoc_schema_export_prod --limit ${{ inputs.prod_csr_hostname }} --extra-vars "EXPDP_TAG=${{ inputs.dump_file_string }}"
-      #   working-directory: configuration-management/ansible
+      - name: Run Ansible Playbook against Production CSR to take export of schemas
+        run: |
+          ansible-playbook site.yml -e role=csr-preprod-refresh --tags csr_adhoc_schema_export_prod --limit ${{ inputs.prod_csr_hostname }} --extra-vars "EXPDP_TAG=${{ inputs.dump_file_string }}"
+        working-directory: configuration-management/ansible
 
   run_preprod_import_ansible:
     name: Run ansible against target database EC2
@@ -122,7 +138,7 @@ jobs:
         run: |
           ansible -m ping ${{ inputs.preprod_csr_hostname }}
         working-directory: configuration-management/ansible
-      # - name: Run Ansible Playbook against Production CSR to take export of schemas
-      #   run: |
-      #     ansible-playbook site.yml -e role=csr-preprod-refresh --tags csr_adhoc_schema_import_from_prod --limit ${{ inputs.preprod_csr_hostname }} --extra-vars "IMPDP_TAG=${{ inputs.dump_file_string }}"
-      #   working-directory: configuration-management/ansible
+      - name: Run Ansible Playbook against Production CSR to take export of schemas
+        run: |
+          ansible-playbook site.yml -e role=csr-preprod-refresh --tags csr_adhoc_schema_import_from_prod --limit ${{ inputs.preprod_csr_hostname }} --extra-vars "IMPDP_TAG=${{ inputs.dump_file_string }}"
+        working-directory: configuration-management/ansible
