@@ -50,8 +50,8 @@ on:
         type: string
 
 env:
-  PROD_CSR_ACCOUNT_NUMBER: "${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[prod_csr_account_name] }}"
-  PREPROD_CSR_ACCOUNT_NUMBER: "${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[preprod_csr_account_name] }}"
+  PROD_CSR_ACCOUNT_NUMBER: "${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[inputs.prod_csr_account_name] }}"
+  PREPROD_CSR_ACCOUNT_NUMBER: "${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[inputs.preprod_csr_account_name] }}"
 
 jobs:
 
