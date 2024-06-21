@@ -5,39 +5,28 @@
 set -eo pipefail
 
 usage() {
-  echo "Usage $0: ec2|ami|code|list|delete <months>
+  echo "Usage $0: [<opts>] used|account|code|delete
 
-$0 ec2
-  - list all AMIs referenced by EC2s
+Where <opts>:
+  -a <application>       Specify which application for images in code, e.g. nomis 
+  -b                     Optionally include AwsBackup images
+  -c                     Include images referenced in code
+  -d                     Dryrun for delete command
+  -e                     Include images referenced by ec2
+  -m <months>            Exclude images younger than this number of months
 
-$0 ami <months>
-  - list all AMIs in account older than <months>
-
-$0 code_names <application>
-  - list all AMI names found in the environments repo, optionally provide an application name, e.g. nomis
-
-$0 code <application>
-  - list all AMIs in account which are also referenced in the environments repo, optionally provide an application name, e.g. nomis
-
-$0 ec2_and_code <application>
-  - list all AMIs either referenced by EC2s or referenced in environments repo
-
-$0 list <months> [keep_ec2_and_code <application>]
-  - list all AMIs older than <months> that can be deleted. By default just check for AMIs referenced by running EC2s. But option to keep those referenced in code also
-
-$0 list_including_backup <months> [keep_ec2_and_code <application>]
-  - same as list except includes any AwsBackup AMIs found
-
-$0 delete <months> [keep_ec2_and_code <application>]
-  - delete all AMIs older than <months> that can be deleted. By default just check for AMIs referenced by running EC2s. But option to keep those referenced in code also
-
-$0 delete_including_backup <months> [keep_ec2_and_code <application>]
-  - same as delete except includes any AwsBackup AMIs found
+And:
+  used                   List all images in use (use -e and -c flags)
+  account                List all images in the current account
+  code                   List all image names referenced in code
+  delete                 Delete unused images
 "
 }
 
 date_minus_month() {
-  local month=$1
+  local month
+
+  month=$1
   shift
   if [[ "$(uname)" == "Darwin" ]]; then
      date -jv-"${month}"m "$@"
@@ -47,7 +36,9 @@ date_minus_month() {
 }
 
 date_minus_year() {
-  local year=$1
+  local year
+
+  year=$1
   shift
   if [[ "$(uname)" == "Darwin" ]]; then
      date -jv-"${year}"y "$@"
@@ -81,32 +72,38 @@ get_date_filter() {
   echo $date_filter
 }
 
-get_images_csv() {
-  # Input: <months_history>
-  # Output: ImageId,OwnerId,CreationDate,Public,Name
+get_account_images_csv() {
   local date_filter
   local json
+  local months
+  local include_backup
+  local this_account_id
 
-  set -e
+  set -eo pipefail
+  months=$1
+  include_backup=$2  
   echo aws sts get-caller-identity --query Account --output text >&2
   this_account_id=$(aws sts get-caller-identity --query Account --output text)
-  if [[ -z $1 ]]; then
+  if [[ -z $months ]]; then
     echo aws ec2 describe-images --owners "$this_account_id" >&2
     json=$(aws ec2 describe-images --owners "$this_account_id")
   else
-    date_filter=$(get_date_filter "$1")
+    date_filter=$(get_date_filter "$months")
     echo aws ec2 describe-images --filters "Name=creation-date,Values=$date_filter" --owners "$this_account_id" >&2
     json=$(aws ec2 describe-images --filters "Name=creation-date,Values=$date_filter" --owners "$this_account_id")
   fi
-  jq -r ".Images[] | [.ImageId, .OwnerId, .CreationDate, .Public, .Name] | @csv" <<< "$json" | sed 's/"//g'
+  if [[ $include_backup == 0 ]]; then
+    jq -r ".Images[] | [.ImageId, .OwnerId, .CreationDate, .Public, .Name] | @csv" <<< "$json" | sed 's/"//g' | grep -v AwsBackup 
+  else
+    jq -r ".Images[] | [.ImageId, .OwnerId, .CreationDate, .Public, .Name] | @csv" <<< "$json" | sed 's/"//g'
+  fi
 }
 
 get_ec2_instance_images_csv() {
-  # Output: ImageId,OwnerId,CreationDate,Public,Name
   local ids
   local json
 
-  set -e
+  set -eo pipefail
   echo aws ec2 describe-instances --query "Reservations[*].Instances[*].ImageId" >&2
   ids=($(aws ec2 describe-instances --query "Reservations[*].Instances[*].ImageId" --output text))
   echo aws ec2 describe-images --image-ids ... >&2
@@ -135,66 +132,140 @@ get_code_image_names() {
 }
 
 get_code_csv() {
-  ami=$(get_images_csv 0 | sort -t, -k5)
+  local ami
+  local code
+
+  ami=$(get_account_images_csv 0 | sort -t, -k5)
   code=$(get_code_image_names "$1")
   join -o 1.1,1.2,1.3,1.4,1.5  -t, -1 5 <(echo "$ami") <(echo "$code")
 }
 
 get_ec2_and_code_csv() {
-  ami=$(get_images_csv 0 | sort -t, -k5)
+  local ami
+  local code
+  local amicode
+  local ec2
+
+  ami=$(get_account_images_csv 0 | sort -t, -k5)
   code=$(get_code_image_names "$1")
   amicode=$(join -o 1.1,1.2,1.3,1.4,1.5  -t, -1 5 <(echo "$ami") <(echo "$code") | sort)
   ec2=$(get_ec2_instance_images_csv | sort)
   comm <(echo "$amicode") <(echo "$ec2") | tr -d ' ' | tr -d '\t'
 }
 
+get_in_use_images_csv() {
+  local ec2
+  local code
+  local application
+
+  ec2=$1
+  code=$2
+  application=$3
+  if [[ $ec2 == 1 ]]; then
+    if [[ $code == 1 ]]; then
+      get_ec2_and_code_csv "$application"
+    else
+      get_ec2_instance_images_csv
+    fi
+  elif [[ $code == 1 ]]; then
+    get_code_csv "$application"
+  else
+    echo "Need either include_images_in_code or include_images_in_ec2 to be set" >&2
+    return 1
+  fi
+}
+
 get_images_to_delete_csv() {
   local ami
   local ec2
 
-  ami=$(get_images_csv "$1" | sort)
-  if [[ $2 == "keep_ec2_and_code" ]]; then
-    ec2=$(get_ec2_and_code_csv "$3" | sort)
-  else
-    ec2=$(get_ec2_instance_images_csv | sort)
-  fi
+  set -eo pipefail
+  ec2=$(get_in_use_images_csv "$1" "$2" "$3" | sort)
+  ami=$(get_account_images_csv "$4" "$5" | sort)
   comm -23 <(echo "$ami") <(echo "$ec2")
 }
 
 delete_images() {
-  echo "DELETING FOLLOWING AMIS" >&2
-  echo "${@}" >&2
-  for id in $(echo "$@" | cut -d, -f1); do
-    echo "aws ec2 deregister-image --image-id $id" >&2
-    aws ec2 deregister-image --image-id "$id"
+  local dryrun
+  local i
+  local id
+  local ids
+  local n
+
+  dryrun=$1
+  shift
+  IFS=$'\n'
+  ids=($(echo "$@"))
+  unset IFS
+  n=${#ids[@]}
+  echo "$n AMI(s) to delete" >&2
+  for ((i=0;i<n;i++)); do
+    IFS=','
+    id=(${ids[i]})
+    unset IFS
+    echo "[$((i+1))/$n] aws ec2 deregister-image --image-id ${id[0]} # ${id[2]} ${id[4]} " >&2
+    if [[ $dryrun == 0 ]]; then
+      aws ec2 deregister-image --image-id "${id[0]}"
+    fi
   done
 }
 
 main() {
-  if [[ $1 == "ec2" ]]; then
-    get_ec2_instance_images_csv | sort -t, -k3
-  elif [[ $1 == "ami" ]]; then
-    get_images_csv "$2" | sort -t, -k3
-  elif [[ $1 == "code_names" ]]; then
-    get_code_image_names "$2"
+  months=0
+  application=
+  include_backup=0
+  include_images_in_code=0
+  include_images_on_ec2=0
+  dryrun=0
+  while getopts "a:bcdem:" opt; do
+      case $opt in
+          a)
+              application=${OPTARG}
+              ;;
+          b)
+              include_backup=1
+              ;;
+          c)
+              include_images_in_code=1
+              ;;
+          d)
+              dryrun=1
+              ;;
+          e)
+              include_images_on_ec2=1
+              ;;
+          m)
+              months=${OPTARG}
+              ;;
+          :)
+              echo "Error: option ${OPTARG} requires an argument" 
+              ;;
+          ?)
+              echo "Invalid option: ${OPTARG}" >&2
+              echo >&2
+              usage >&2
+              exit 1
+              ;;
+      esac
+  done
+
+  shift $((OPTIND-1))
+
+  if [[ -n $2 ]]; then  
+    echo "Unexpected argument: $1 $2"
+    usage >&2
+    exit 1
+  fi
+
+  if [[ $1 == "used" ]]; then
+    get_in_use_images_csv "$include_images_on_ec2" "$include_images_in_code" "$application"
+  elif [[ $1 == "account" ]]; then
+    get_account_images_csv "$months" "$include_backup" | sort -t, -k3
   elif [[ $1 == "code" ]]; then
-    get_code_csv "$2" | sort -t, -k3
-  elif [[ $1 == "ec2_and_code" ]]; then
-    get_ec2_and_code_csv "$2" | sort -t, -k3
-  elif [[ $1 == "list" ]]; then
-    shift
-    get_images_to_delete_csv "$@" | grep -v AwsBackup | sort -t, -k3
-  elif [[ $1 == "list_including_backup" ]]; then
-    shift
-    get_images_to_delete_csv "$@" | sort -t, -k3
+    get_code_image_names "$application"
   elif [[ $1 == "delete" ]]; then
-    shift
-    csv=$(get_images_to_delete_csv "$@" | grep -v AwsBackup |  sort -t, -k3)
-    delete_images "$csv"
-  elif [[ $1 == "delete_including_backup" ]]; then
-    shift
-    csv=$(get_images_to_delete_csv "$@" | sort -t, -k3)
-    delete_images "$csv"
+    csv=$(get_images_to_delete_csv "$include_images_on_ec2" "$include_images_in_code" "$application" "$months" "$include_backup" | sort -t, -k3)
+    delete_images "$dryrun" "$csv"
   else
     usage >&2
     exit 1
