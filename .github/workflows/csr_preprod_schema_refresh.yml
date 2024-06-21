@@ -42,7 +42,7 @@ on:
         options: 
           - prod-schema-export
           - preprod-schema-import
-          - both
+          # - both
 
       dump_file_string:
         description: 'Datapump file string for identification'
@@ -58,7 +58,7 @@ jobs:
   run_prod_export_ansible:
     name: Run ansible against CSR production 
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.step_action  != 'preprod-schema-import' }}
+    if: ${{ github.event.inputs.step_action  == 'prod-schema-export' }}
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
@@ -100,7 +100,7 @@ jobs:
   run_preprod_import_ansible:
     name: Run ansible against target database EC2
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.step_action  != 'prod-schema-export' }}
+    if: ${{ github.event.inputs.step_action  == 'preprod-schema-import' }}
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
