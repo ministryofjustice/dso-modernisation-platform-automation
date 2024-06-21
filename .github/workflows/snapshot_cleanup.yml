@@ -1,5 +1,5 @@
 ---
-name: AMI Cleanup
+name: Snapshot Cleanup
 
 on:
   workflow_dispatch:
@@ -10,10 +10,10 @@ on:
       environments:
         description: 'e.g. development or leave blank for all'
         type: string
-      ami_cleanup_sh_args:
-        description: 'Command line options to ami_cleanup.sh script, e.g. "-de -m 6 delete"'
+      snapshot_cleanup_sh_args:
+        description: 'Command line options to snapshot_cleanup.sh script, e.g. "-d delete"'
         type: string
-        default: "-de -m 6 delete"
+        default: "-d delete"
 
 permissions:
   id-token: write
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
-      ami_cleanup_sh_args: "${{ steps.options.outputs.ami_cleanup_sh_args }}"
+      snapshot_cleanup_sh_args: "${{ steps.options.outputs.snapshot_cleanup_sh_args }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
@@ -52,16 +52,16 @@ jobs:
         run: |
           echo "Setting options event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            ami_cleanup_sh_args="${{ github.event.inputs.ami_cleanup_sh_args }}"
+            snapshot_cleanup_sh_args="${{ github.event.inputs.snapshot_cleanup_sh_args }}"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo "ami_cleanup_sh_args=${ami_cleanup_sh_args}"
-          echo "ami_cleanup_sh_args=${ami_cleanup_sh_args}" >> $GITHUB_OUTPUT
+          echo "snapshot_cleanup_sh_args=${snapshot_cleanup_sh_args}"
+          echo "snapshot_cleanup_sh_args=${snapshot_cleanup_sh_args}" >> $GITHUB_OUTPUT
 
-  ami_cleanup:
-    name: AMI Cleanup
+  snapshot_cleanup:
+    name: Snapshot Cleanup
     runs-on: ubuntu-latest
     needs: strategy
     strategy:
@@ -96,8 +96,8 @@ jobs:
           repository: ministryofjustice/modernisation-platform-environments
           path: modernisation-platform-environments
 
-      - name: Cleanup AMIs
+      - name: Cleanup Snapshots
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
-          echo src/ami_cleanup.sh ${{ needs.strategy.outputs.ami_cleanup_sh_args }}
-          src/ami_cleanup.sh ${{ needs.strategy.outputs.ami_cleanup_sh_args }}
+          echo src/snapshot_cleanup.sh ${{ needs.strategy.outputs.snapshot_cleanup_sh_args }}
+          src/snapshot_cleanup.sh ${{ needs.strategy.outputs.snapshot_cleanup_sh_args }}
