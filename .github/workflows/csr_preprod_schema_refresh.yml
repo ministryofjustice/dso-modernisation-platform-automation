@@ -1,0 +1,128 @@
+name: CSR Preprod schema Refresh from Prod 
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      prod_csr_account_name: 
+        description: CSR production account name
+        default: "corporate-staff-rostering-production"
+      prod_csr_hostname: 
+        description: CSR production hostname
+        default: "pd-csr-db-a"
+      preprod_csr_account_name: 
+        description: CSR preproduction account name
+        default: "corporate-staff-rostering-preproduction"
+      preprod_csr_hostname: 
+        description: CSR preproduction hostname
+        default: "pp-csr-db-a"
+      step_action:
+        description: Actions to do 
+        required: true
+        type: choice
+        options: 
+          - prod-schema-export
+          - preprod-schema-import
+          - both
+
+      dump_file_string:
+        description: 'AWS account name of source OEM EC2'
+        required: true
+        type: string
+
+    secrets:
+      environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
+      dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
+
+env:
+  PROD_CSR_ACCOUNT_NUMBER: "${{ fromJSON(secrets.environment_management).account_ids[prod_csr_account_name] }}"
+  PREPROD_CSR_ACCOUNT_NUMBER: "${{ fromJSON(secrets.environment_management).account_ids[preprod_csr_account_name] }}"
+
+jobs:
+
+  run_prod_export_ansible:
+    name: Run ansible against CSR production 
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.step_action  != 'preprod-schema-import' }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: "arn:aws:iam::${{ env.PROD_CSR_ACCOUNT_NUMBER }}:role/modernisation-platform-oidc-cicd"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+      - name: Checkout MP Configuration Management Repo
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          token: ${{ secrets.DSO_GITHUB_PAT }}
+          ref: csr_adhoc_schema_refresh
+          path: configuration-management
+          fetch-depth: 1
+      - name: Setup Ansible
+        run: |
+          DEPENDENCIES=`cat requirements.txt | tr '\n' ' '`
+          pipx inject ansible-core $DEPENDENCIES
+          ansible-galaxy role install -r requirements.yml
+          ansible-galaxy collection install -r requirements.yml
+        working-directory: configuration-management/ansible
+      - name: Check Ansible Inventory
+        run: |
+          echo "Checking ansible-inventory --graph"
+          ansible-inventory --graph > /dev/null
+          echo "Checking ansible-inventory --host ${{ inputs.prod_csr_hostname }}"
+          ansible-inventory --host ${{ inputs.prod_csr_hostname }} > /dev/null
+        working-directory: configuration-management/ansible
+      - name: Run Ansible Ping
+        run: |
+          ansible -m ping ${{ inputs.prod_csr_hostname }}
+        working-directory: configuration-management/ansible
+      # - name: Run Ansible Playbook against Production CSR to take export of schemas
+      #   run: |
+      #     ansible-playbook site.yml -e role=csr-preprod-refresh --tags csr__adhoc_schema_export_prod --limit ${{ inputs.prod_csr_hostname }} --extra-vars "EXPDP_TAG=${{ inputs.dump_file_string }}"
+      #   working-directory: configuration-management/ansible
+
+  run_preprod_import_ansible:
+    name: Run ansible against target database EC2
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.step_action  != 'prod-schema-export' }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: "arn:aws:iam::${{ env.PREPROD_CSR_ACCOUNT_NUMBER }}:role/modernisation-platform-oidc-cicd"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+      - name: Checkout MP Configuration Management Repo
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          token: ${{ secrets.DSO_GITHUB_PAT }}
+          ref: csr_adhoc_schema_refresh
+          path: configuration-management
+          fetch-depth: 1
+      - name: Setup Ansible
+        run: |
+          DEPENDENCIES=`cat requirements.txt | tr '\n' ' '`
+          pipx inject ansible-core $DEPENDENCIES
+          ansible-galaxy role install -r requirements.yml
+          ansible-galaxy collection install -r requirements.yml
+        working-directory: configuration-management/ansible
+      - name: Check Ansible Inventory
+        run: |
+          echo "Checking ansible-inventory --graph"
+          ansible-inventory --graph > /dev/null
+          echo "Checking ansible-inventory --host ${{ inputs.preprod_csr_hostname }}"
+          ansible-inventory --host ${{ inputs.preprod_csr_hostname }} > /dev/null
+        working-directory: configuration-management/ansible
+      - name: Run Ansible Ping
+        run: |
+          ansible -m ping ${{ inputs.preprod_csr_hostname }}
+        working-directory: configuration-management/ansible
+      # - name: Run Ansible Playbook against Production CSR to take export of schemas
+      #   run: |
+      #     ansible-playbook site.yml -e role=csr-preprod-refresh --tags csr_adhoc_schema_import_from_prod --limit ${{ inputs.preprod_csr_hostname }} --extra-vars "IMPDP_TAG=${{ inputs.dump_file_string }}"
+      #   working-directory: configuration-management/ansible
