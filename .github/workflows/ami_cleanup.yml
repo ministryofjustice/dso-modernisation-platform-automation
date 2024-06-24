@@ -99,5 +99,6 @@ jobs:
       - name: Cleanup AMIs
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
-          echo src/ami_cleanup.sh ${{ needs.strategy.outputs.ami_cleanup_sh_args }}
-          src/ami_cleanup.sh ${{ needs.strategy.outputs.ami_cleanup_sh_args }}
+          application=$(echo "${{ matrix.account_name }}" | rev | cut -d- -f2- | rev)
+          echo src/ami_cleanup.sh -a "$application" ${{ needs.strategy.outputs.ami_cleanup_sh_args }}
+          src/ami_cleanup.sh -a "$application" ${{ needs.strategy.outputs.ami_cleanup_sh_args }}
