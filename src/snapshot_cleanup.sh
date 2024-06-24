@@ -116,7 +116,10 @@ delete_snapshots() {
     IFS=','
     snapshot=(${snapshots[i]})
     unset IFS
-    echo "[$((i+1))/$n] aws ec2 delete-snapshot --snapshot-id ${snapshot[0]} # ${snapshot[2]} ${snapshot[4]} ${snapshot[5]} ${snapshot[6]}" >&2
+    if [[ $dryrun == 0 ]]; then
+      echo -n "[$((i+1))/$n] " >&2
+    fi
+    echo "aws ec2 delete-snapshot --snapshot-id ${snapshot[0]} # ${snapshot[2]} ${snapshot[4]} ${snapshot[5]} ${snapshot[6]}" >&2
     if [[ $dryrun == 0 ]]; then
       aws ec2 delete-snapshot --snapshot-id "${snapshot[0]}" >&2
     fi

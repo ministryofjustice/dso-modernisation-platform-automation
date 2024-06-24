@@ -207,7 +207,10 @@ delete_images() {
     IFS=','
     id=(${ids[i]})
     unset IFS
-    echo "[$((i+1))/$n] aws ec2 deregister-image --image-id ${id[0]} # ${id[2]} ${id[4]}" >&2
+    if [[ $dryrun == 0 ]]; then
+      echo -n "[$((i+1))/$n] " >&2
+    fi
+    echo "aws ec2 deregister-image --image-id ${id[0]} # ${id[2]} ${id[4]}" >&2
     if [[ $dryrun == 0 ]]; then
       aws ec2 deregister-image --image-id "${id[0]}" >&2
     fi
