@@ -11,9 +11,9 @@ on:
         description: 'e.g. development or leave blank for all'
         type: string
       ami_cleanup_sh_args:
-        description: 'Command line options to ami_cleanup.sh script, e.g. "-de -m 6 delete"'
+        description: 'Command line options to ami_cleanup.sh script, e.g. "-d -m 6 delete"'
         type: string
-        default: "-de -m 6 delete"
+        default: "-d -m 6 delete"
 
 permissions:
   id-token: write
