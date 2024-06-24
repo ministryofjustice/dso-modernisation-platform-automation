@@ -107,14 +107,18 @@ delete_snapshots() {
   snapshots=($(echo "$@"))
   unset IFS
   n=${#snapshots[@]}
-  echo "$n snapshot(s) to delete" >&2
+  if [[ $dryrun == 0 ]]; then
+    echo "deleting $n snapshot(s)" >&2
+  else
+    echo "DRY RUN: would delete $n snapshot(s)" >&2
+  fi
   for ((i=0;i<n;i++)); do
     IFS=','
     snapshot=(${snapshots[i]})
     unset IFS
     echo "[$((i+1))/$n] aws ec2 delete-snapshot --snapshot-id ${snapshot[0]} # ${snapshot[2]} ${snapshot[4]} ${snapshot[5]} ${snapshot[6]}" >&2
     if [[ $dryrun == 0 ]]; then
-      aws ec2 delete-snapshot --snapshot-id "${snapshot[0]}"
+      aws ec2 delete-snapshot --snapshot-id "${snapshot[0]}" >&2
     fi
   done
 }
@@ -159,7 +163,7 @@ main() {
     append_image_csv "$snapshots"
   elif [[ $1 == "delete" ]]; then
     snapshots=$(parse_snapshot_description_csv "$(get_snapshots_csv)")
-    delete_snapshots_csv=$(append_image_csv "$snapshots" | grep ",NoAmi" | grep 'vol-ffffffff')
+    delete_snapshots_csv=$(append_image_csv "$snapshots" | grep ",NoAmi" | grep 'vol-ffffffff' || true)
     delete_snapshots "$dryrun" "$delete_snapshots_csv"
   else
     usage >&2

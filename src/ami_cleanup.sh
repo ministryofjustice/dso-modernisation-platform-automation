@@ -10,13 +10,12 @@ usage() {
 Where <opts>:
   -a <application>       Specify which application for images in code, e.g. nomis 
   -b                     Optionally include AwsBackup images
-  -c                     Include images referenced in code
+  -c                     Also include images referenced in code
   -d                     Dryrun for delete command
-  -e                     Include images referenced by ec2
   -m <months>            Exclude images younger than this number of months
 
 And:
-  used                   List all images in use (use -e and -c flags)
+  used                   List all images in use (and -c flag to include code)
   account                List all images in the current account
   code                   List all image names referenced in code
   delete                 Delete unused images
@@ -93,7 +92,8 @@ get_account_images_csv() {
     json=$(aws ec2 describe-images --filters "Name=creation-date,Values=$date_filter" --owners "$this_account_id")
   fi
   if [[ $include_backup == 0 ]]; then
-    jq -r ".Images[] | [.ImageId, .OwnerId, .CreationDate, .Public, .Name] | @csv" <<< "$json" | sed 's/"//g' | grep -v AwsBackup 
+    jq -r ".Images[] | [.ImageId, .OwnerId, .CreationDate, .Public, .Name] | @csv" <<< "$json" | sed 's/"//g' > /dev/null
+    jq -r ".Images[] | [.ImageId, .OwnerId, .CreationDate, .Public, .Name] | @csv" <<< "$json" | sed 's/"//g' | grep -v AwsBackup || true
   else
     jq -r ".Images[] | [.ImageId, .OwnerId, .CreationDate, .Public, .Name] | @csv" <<< "$json" | sed 's/"//g'
   fi
@@ -120,14 +120,14 @@ get_code_image_names() {
       echo "Cannot find $envdir" >&2
       exit 1
     fi
-    grep -Eo 'ami_name[[:space:]]*=[[:space:]]*"[^"]*"' "$envdir"/*/*.tf | cut -d\" -f2 | sort -u | grep -vF '*' | sort -u
+    grep -Eo 'ami_name[[:space:]]*=[[:space:]]*"[^"]*"' "$envdir"/*/*.tf | cut -d\" -f2 | sort -u | grep -vF '*' | sort -u || true
   else
     envdir=$(dirname "$0")/../../modernisation-platform-environments/terraform/environments/"$1"
     if [[ ! -d "$envdir" ]]; then
       echo "Cannot find $envdir" >&2
       exit 1
     fi
-    grep -Eo 'ami_name[[:space:]]*=[[:space:]]*"[^"]*"' "$envdir"/*.tf | cut -d\" -f2 | sort -u | grep -vF '*' | sort -u
+    grep -Eo 'ami_name[[:space:]]*=[[:space:]]*"[^"]*"' "$envdir"/*.tf | cut -d\" -f2 | sort -u | grep -vF '*' | sort -u || true
   fi
 }
 
@@ -198,26 +198,30 @@ delete_images() {
   ids=($(echo "$@"))
   unset IFS
   n=${#ids[@]}
-  echo "$n AMI(s) to delete" >&2
+  if [[ $dryrun == 0 ]]; then
+    echo "deleting $n AMI(s)" >&2
+  else
+    echo "DRY RUN: would delete $n AMI(s)" >&2
+  fi
   for ((i=0;i<n;i++)); do
     IFS=','
     id=(${ids[i]})
     unset IFS
-    echo "[$((i+1))/$n] aws ec2 deregister-image --image-id ${id[0]} # ${id[2]} ${id[4]} " >&2
+    echo "[$((i+1))/$n] aws ec2 deregister-image --image-id ${id[0]} # ${id[2]} ${id[4]}" >&2
     if [[ $dryrun == 0 ]]; then
-      aws ec2 deregister-image --image-id "${id[0]}"
+      aws ec2 deregister-image --image-id "${id[0]}" >&2
     fi
   done
 }
 
 main() {
-  months=0
+  months=
   application=
   include_backup=0
   include_images_in_code=0
-  include_images_on_ec2=0
+  include_images_on_ec2=1
   dryrun=0
-  while getopts "a:bcdem:" opt; do
+  while getopts "a:bcdxm:" opt; do
       case $opt in
           a)
               application=${OPTARG}
@@ -231,8 +235,8 @@ main() {
           d)
               dryrun=1
               ;;
-          e)
-              include_images_on_ec2=1
+          x)
+              include_images_on_ec2=0 # for testing
               ;;
           m)
               months=${OPTARG}
