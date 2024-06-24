@@ -13,7 +13,7 @@ on:
       ami_cleanup_sh_args:
         description: 'Command line options to ami_cleanup.sh script, e.g. "-d -m 6 delete"'
         type: string
-        default: "-d -m 6 delete"
+        default: "-d -c -m 3 delete"
 
 permissions:
   id-token: write
