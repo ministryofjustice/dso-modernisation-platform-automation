@@ -1,0 +1,72 @@
+---
+name: NOMIS Environment Start
+
+on:
+  workflow_dispatch:
+    inputs:
+      nomis_environment:
+        description: 'e.g. t1, t2, t3, lsast'
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  start:
+    name: nomis environment start
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+      ami_cleanup_sh_args: "${{ steps.options.outputs.ami_cleanup_sh_args }}"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Parse Inputs
+        id: parseinput
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            nomis_environment="${{ github.event.inputs.nomis_environment }}"
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            nomis_environment="TODO"
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          account_name=$(src/nomis/get_nomis_environment.sh -a "$nomis_environment")
+          echo "account_name=${account_name} nomis_environment=${nomis_environment}"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+          echo "nomis_environment=${nomis_environment}" >> $GITHUB_OUTPUT
+
+      - name: Get Account Details
+        id: account
+        run: |
+          echo "account name: ${{ steps.parseinput.outputs.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.parseinput.outputs.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Get Nomis Environment Info
+        id: nomis_environment
+        run: |
+          nomis_environment="${{ steps.parseinput.outputs.nomis_environment }}"
+          asg=$(src/nomis/get_nomis_environment.sh -w "$nomis_environment")
+          echo "asg=${asg}"
+          echo "asg=${asg}" >> $GITHUB_OUTPUT
+
+      - name: Set Maintenance Mode
+        run: |
+          asg="${{ steps.nomis_environment.outputs.asg }}"
+          echo "src/run_script_on_ec2.sh first ${asg} lb_maintenance_mode.sh '/home/oracle/admin/scripts/lb_maintenance_mode.sh check'"
+          src/run_script_on_ec2.sh first ${asg} lb_maintenance_mode.sh "/home/oracle/admin/scripts/lb_maintenance_mode.sh check"
