@@ -24,9 +24,9 @@ jobs:
     name: Setup
     runs-on: ubuntu-latest
     outputs:
-      account_name: "{{ steps.parseinput.outputs.account_name }}"
-      nomis_environment: "{{ steps.parseinput.outputs.nomis_environment }}"
-      role_arn: "{{ steps.account.outputs.role_arn }}"
+      account_name: "${{ steps.parseinput.outputs.account_name }}"
+      nomis_environment: "${{ steps.parseinput.outputs.nomis_environment }}"
+      role_arn: "${{ steps.account.outputs.role_arn }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
@@ -63,10 +63,10 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     outputs:
-      asg_name: "{{ steps.active_asg_stats.outputs.asg_name }}"
-      desired_count: "{{ steps.active_asg_stats.outputs.desired_count }}"
-      healthy_instance_count: "{{ steps.active_asg_stats.outputs.healthy_instance_count }}"
-      maintenance_mode: "{{ steps.active_asg_stats.outputs.maintenance_mode }}"
+      asg_name: "${{ steps.active_asg_stats.outputs.asg_name }}"
+      desired_count: "${{ steps.active_asg_stats.outputs.desired_count }}"
+      healthy_instance_count: "${{ steps.active_asg_stats.outputs.healthy_instance_count }}"
+      maintenance_mode: "${{ steps.active_asg_stats.outputs.maintenance_mode }}"
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
