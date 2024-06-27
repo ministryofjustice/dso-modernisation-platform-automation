@@ -35,7 +35,7 @@ permissions:
   id-token: write
   contents: read
 
-run-name: "NOMIS ${{ inputs.nomis_environment }} ${{ inputs.weblogic_deployment }} Environment ${{ inputs.dryrun == 'true' && 'Dryrun Start' || 'Start' }}"
+run-name: "NOMIS Environment Start (${{ inputs.nomis_environment }}${{ inputs.weblogic_deployment == 'auto' && '' || inputs.weblogic_deployment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
 
 jobs:
   setup:
