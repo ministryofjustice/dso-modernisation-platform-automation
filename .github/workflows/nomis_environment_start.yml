@@ -99,7 +99,7 @@ jobs:
 
   start_weblogic_instance:
     name: Start Weblogic Instance
-    needs: get_nomis_environment_status
+    needs: [setup, get_nomis_environment_status]
     runs-on: ubuntu-latest
     if: needs.get_nomis_environment_status.output.desired_count == '0'
     steps:
