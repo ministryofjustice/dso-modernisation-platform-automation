@@ -2,13 +2,17 @@
 LBNAME="private-lb"
 MAINTENANCE_PRIORITY=999
 PORT=443
+DRYRUN=0
 
 usage() {
   echo "Usage $0: <opts> <nomis_environment>
 
 Where <opts>:
+  -0                     Enable maintenance mode
+  -1                     Disable maintenance mode
   -a                     Print account name
-  -d                     Print active weblogic target group desired count
+  -c                     Print active weblogic target group desired count
+  -d                     Enable dryrun for maintenance mode commands
   -h                     Print active number of healthy weblogic targets
   -t                     Print active weblogic target group arn
   -m                     Print whether maintenance mode enabled or not
@@ -53,7 +57,7 @@ get_desired_count() {
   if ! targetgroup=$(get_target_group_name "$1"); then
     return 1
   fi
-  asgjson=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$targetgroup") 
+  asgjson=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$targetgroup")
   if (($(jq -r '.AutoScalingGroups | length' <<< "$asgjson") != 1)); then
     echo "$asgjson" >&2
     echo "Can't find ASG" >&2
@@ -93,8 +97,71 @@ get_lb_rule_json() {
   echo "$rulejson"
 }
 
+disable_maintenance_mode() {
+  local lbrulejson
+  local priority
+  local num_priorities
+  local rulearn
+
+  if ! lbrulejson=$(get_lb_rule_json "$1"); then
+    return 1
+  fi
+  rulearn=$(jq -r '.RuleArn' <<< "$lbrulejson")
+  priority=$(jq -r '.Priority' <<< "$lbrulejson")
+  num_priorities=$(wc -l <<< "$priority" | tr -d "[:space:]")
+  if [[ -z $priority || $num_priorities != "1" ]]; then
+    echo "$lbrulejson" >&2
+    echo "Error detecting weblogic lb rule priority" >&2
+    return 1
+  fi
+  if ((priority > MAINTENANCE_PRIORITY)); then
+    newpriority=$((priority - 1000))
+    echo aws elbv2 set-rule-priorities --rule-priorities "RuleArn=$rulearn,Priority=$newpriority" >&2
+    if (( DRYRUN == 0 )); then
+      echo "aws elbv2 set-rule-priorities --rule-priorities 'RuleArn=$rulearn,Priority=$newpriority'" >&2
+      echo aws elbv2 set-rule-priorities --rule-priorities "RuleArn=$rulearn,Priority=$newpriority"
+    else
+      echo "Dry Run: aws elbv2 set-rule-priorities --rule-priorities 'RuleArn=$rulearn,Priority=$newpriority'" >&2
+    fi
+  else
+    echo "maintenance mode already disabled" >&2
+  fi
+}
+
+enable_maintenance_mode() {
+  local lbrulejson
+  local priority
+  local num_priorities
+  local rulearn
+
+  if ! lbrulejson=$(get_lb_rule_json "$1"); then
+    return 1
+  fi
+  rulearn=$(jq -r '.RuleArn' <<< "$lbrulejson")
+  priority=$(jq -r '.Priority' <<< "$lbrulejson")
+  num_priorities=$(wc -l <<< "$priority" | tr -d "[:space:]")
+  if [[ -z $priority || $num_priorities != "1" ]]; then
+    echo "$lbrulejson" >&2
+    echo "Error detecting weblogic lb rule priority" >&2
+    return 1
+  fi
+  if ((priority < MAINTENANCE_PRIORITY)); then
+    newpriority=$((priority + 1000))
+    if (( DRYRUN == 0 )); then
+      echo "aws elbv2 set-rule-priorities --rule-priorities 'RuleArn=$rulearn,Priority=$newpriority'" >&2
+      aws elbv2 set-rule-priorities --rule-priorities "RuleArn=$rulearn,Priority=$newpriority"
+    else
+      echo "Dry Run: aws elbv2 set-rule-priorities --rule-priorities 'RuleArn=$rulearn,Priority=$newpriority'" >&2
+    fi
+  else
+    echo "maintenance mode already enabled" >&2
+  fi
+}
+
 get_maintenance_mode() {
   local lbrulejson
+  local priority
+  local num_priorities
 
   if ! lbrulejson=$(get_lb_rule_json "$1"); then
     return 1
@@ -122,7 +189,7 @@ get_target_group_arn() {
   fi
   targetgrouparns=$(jq -r '.Actions[] | select(.Type == "forward").TargetGroupArn' <<< "$lbrulejson")
   num_targetgrouparns=$(wc -l <<< "$targetgrouparns" | tr -d "[:space:]")
-  if [[ -z $targetgrouparns || $num_targetgrouparns != "1" ]]; then   
+  if [[ -z $targetgrouparns || $num_targetgrouparns != "1" ]]; then
     echo "$lbrulejson" >&2
     echo "Error detecting weblogic target group arn" >&2
     return 1
@@ -192,20 +259,33 @@ main() {
   option_set=0
   account_name=0
   desired_count=0
-  maintenance_mode=0
+  maintenance_mode_enable=0
+  maintenance_mode_disable=0
+  maintenance_mode_get=0
   target_group_arn=0
   target_group_health=0
   target_group_name=0
   url=0
-  while getopts "adhmntu" opt; do
+  while getopts "01acdhmntu" opt; do
       case $opt in
+          0)
+              option_set=$((option_set + 1))
+              maintenance_mode_enable=1
+              ;;
+          1)
+              option_set=$((option_set + 1))
+              maintenance_mode_disable=1
+              ;;
           a)
               option_set=$((option_set + 1))
               account_name=1
               ;;
-          d)
+          c)
               option_set=$((option_set + 1))
               desired_count=1
+              ;;
+          d)
+              DRYRUN=1
               ;;
           h)
               option_set=$((option_set + 1))
@@ -213,7 +293,7 @@ main() {
               ;;
           m)
               option_set=$((option_set + 1))
-              maintenance_mode=1
+              maintenance_mode_get=1
               ;;
           n)
               option_set=$((option_set + 1))
@@ -257,7 +337,17 @@ main() {
       exit 1
     fi
   fi
-  if (( maintenance_mode == 1 )); then
+  if (( maintenance_mode_disable == 1 )); then
+    if ! disable_maintenance_mode "$1"; then
+      exit 1
+    fi
+  fi
+  if (( maintenance_mode_enable == 1 )); then
+    if ! enable_maintenance_mode "$1"; then
+      exit 1
+    fi
+  fi
+  if (( maintenance_mode_get == 1 )); then
     if ! get_maintenance_mode "$1"; then
       exit 1
     fi
