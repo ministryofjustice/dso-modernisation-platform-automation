@@ -3,6 +3,7 @@ LBNAME="private-lb"
 MAINTENANCE_PRIORITY=999
 PORT=443
 DRYRUN=0
+DEPLOYMENT=enduser
 
 usage() {
   echo "Usage $0: <opts> <nomis_environment>
@@ -10,7 +11,8 @@ usage() {
 Where <opts>:
   -0                     Disable maintenance mode
   -1                     Enable maintenance mode
-  -a                     Print account name
+  -a                     Force weblogic-a deployment
+  -b                     Force weblogic-b deployment
   -c                     Print active weblogic target group desired count
   -d                     Enable dryrun for maintenance mode commands
   -h                     Print active number of healthy weblogic targets
@@ -18,6 +20,7 @@ Where <opts>:
   -m                     Print whether maintenance mode enabled or not
   -n                     Print active weblogic target group name
   -u                     Print customer facing URL
+  -z                     Print account name
 "
 }
 
@@ -229,27 +232,62 @@ get_url() {
   local nomis_environment
 
   nomis_environment=$1
-  if [[ $nomis_environment == "dev" ]]; then
-    url="c-dev.development.nomis.service.justice.gov.uk"
-  elif [[ $nomis_environment == "qa11r" ]]; then
-    url="c-qa11r.development.nomis.service.justice.gov.uk"
-  elif [[ $nomis_environment == "qa11g" ]]; then
-    url="c-qa11g.development.nomis.service.justice.gov.uk"
-  elif [[ $nomis_environment == "t1" ]]; then
-    url="c-t1.test.nomis.service.justice.gov.uk"
-  elif [[ $nomis_environment == "t2" ]]; then
-    url="c-t2.test.nomis.service.justice.gov.uk"
-  elif [[ $nomis_environment == "t3" ]]; then
-    url="c-t3.test.nomis.service.justice.gov.uk"
-  elif [[ $nomis_environment == "lsast" ]]; then
-    url="c-lsast.preproduction.nomis.service.justice.gov.uk"
-  elif [[ $nomis_environment == "preprod" ]]; then
-    url="c.preproduction.nomis.service.justice.gov.uk"
-  elif [[ $nomis_environment == "prod" ]]; then
-    url="c.nomis.service.justice.gov.uk"
+  if [[ $DEPLOYMENT == "a" ]]; then
+    if [[ $nomis_environment == "t1" ]]; then
+      url="t1-nomis-web-a.test.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "t2" ]]; then
+      url="t2-nomis-web-a.test.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "t3" ]]; then
+      url="t3-nomis-web-a.test.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "preprod" ]]; then
+      url="preprod-nomis-web-a.preproduction.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "prod" ]]; then
+      url="prod-nomis-web-a.production.nomis.service.justice.gov.uk"
+    else
+      echo "Unsupported nomis_environment $nomis_environment for A deployment" >&2
+      return 1
+    fi
+  elif [[ $DEPLOYMENT == "b" ]]; then
+    if [[ $nomis_environment == "t1" ]]; then
+      url="t1-nomis-web-b.test.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "t2" ]]; then
+      url="t2-nomis-web-b.test.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "t3" ]]; then
+      url="t3-nomis-web-b.test.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "preprod" ]]; then
+      url="preprod-nomis-web-b.preproduction.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "prod" ]]; then
+      url="prod-nomis-web-b.production.nomis.service.justice.gov.uk"
+    else
+      echo "Unsupported nomis_environment $nomis_environment for B deployment" >&2
+      return 1
+    fi
+  elif [[ $DEPLOYMENT == "enduser" ]]; then
+    if [[ $nomis_environment == "dev" ]]; then
+      url="c-dev.development.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "qa11r" ]]; then
+      url="c-qa11r.development.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "qa11g" ]]; then
+      url="c-qa11g.development.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "t1" ]]; then
+      url="c-t1.test.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "t2" ]]; then
+      url="c-t2.test.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "t3" ]]; then
+      url="c-t3.test.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "lsast" ]]; then
+      url="c-lsast.preproduction.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "preprod" ]]; then
+      url="c.preproduction.nomis.service.justice.gov.uk"
+    elif [[ $nomis_environment == "prod" ]]; then
+      url="c.nomis.service.justice.gov.uk"
+    else
+      echo "Unsupported nomis_environment $nomis_environment" >&2
+      return 1
+    fi
   else
-    echo "Unsupported nomis_environment $nomis_environment" >&2
-    return 1
+      echo "Unsupported deployment $DEPLOYMENT" >&2
+      return 1
   fi
   echo "$url"
 }
@@ -266,7 +304,7 @@ main() {
   target_group_health=0
   target_group_name=0
   url=0
-  while getopts "01acdhmntu" opt; do
+  while getopts "01abcdhmntuz" opt; do
       case $opt in
           0)
               option_set=$((option_set + 1))
@@ -277,12 +315,14 @@ main() {
               maintenance_mode_enable=1
               ;;
           a)
-              option_set=$((option_set + 1))
-              account_name=1
+              DEPLOYMENT="a"
+              ;;
+          b)
+              DEPLOYMENT="b"
               ;;
           c)
               option_set=$((option_set + 1))
-              desired_count=1
+              desired_count=1i
               ;;
           d)
               DRYRUN=1
@@ -306,6 +346,10 @@ main() {
           u)
               option_set=$((option_set + 1))
               url=1
+              ;;
+          z)
+              option_set=$((option_set + 1))
+              account_name=1
               ;;
           :)
               echo "Error: option ${OPTARG} requires an argument" >&2

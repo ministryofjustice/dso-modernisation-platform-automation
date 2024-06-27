@@ -7,6 +7,7 @@ on:
       nomis_environment:
         type: choice
         description: Which nomis environment to start
+        default: t1
         options:
           - t1
           - t2
@@ -14,12 +15,29 @@ on:
           - lsast
           - preprod
           - prod
+      weblogic_deployment:
+        type: choice
+        description: Which nomis environment to start
+        default: enduser
+        options:
+          - enduser
+          - a
+          - b
+      dryrun:
+        type: choice
+        description: Set to true to test
+        default: false
+        options:
+          - true
+          - false
+    inputs:
+      nomis_environment:
 
 permissions:
   id-token: write
   contents: read
 
-run-name: "NOMIS ${{ inputs.nomis_environment }} Environment Start"
+run-name: "NOMIS ${{ inputs.nomis_environment }} ${{ inputs.weblogic_deployment }} Environment ${{ inputs.dryrun == 'true' && 'Dryrun Start' || 'Start' }}"
 
 jobs:
   setup:
@@ -27,8 +45,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       account_name: "${{ steps.parseinput.outputs.account_name }}"
+      dryrun: "${{ steps.parseinput.outputs.dryrun }}"
       nomis_environment: "${{ steps.parseinput.outputs.nomis_environment }}"
       role_arn: "${{ steps.account.outputs.role_arn }}"
+      script_flags: "${{ steps.parseinput.outputs.script_flags }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
@@ -38,18 +58,29 @@ jobs:
       - name: Parse Workflow Inputs
         id: parseinput
         run: |
+          script_flags=
+          dryrun=0
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             nomis_environment="${{ github.event.inputs.nomis_environment }}"
+            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+              script_flags="$script_flags -d"
+              dryrun=1
+            fi
+            if [[ "${{ github.event.inputs.weblogic_deployment }}" != "enduser" ]]; then
+              script_flags="$script_flags -${{ github.event.inputs.weblogic_deployment }}"
+            fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             nomis_environment="TODO"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          account_name=$(src/nomis/nomis_control.sh -a "$nomis_environment")
-          echo "account_name=${account_name} nomis_environment=${nomis_environment}"
+          account_name=$(src/nomis/nomis_control.sh -z "$nomis_environment")
+          echo "account_name=${account_name} nomis_environment=${nomis_environment} script_flags=${script_flags} dryrun=${dryrun}"
           echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
           echo "nomis_environment=${nomis_environment}" >> $GITHUB_OUTPUT
+          echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT
 
       - name: Get AWS Account Details
         id: account
@@ -85,13 +116,11 @@ jobs:
         id: active_asg_stats
         env:
           nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
+          script_flags: "${{ needs.setup.outputs.script_flags }}" 
         run: |
-          asg_name=$(src/nomis/nomis_control.sh -n "$nomis_environment")
-          desired_count=$(src/nomis/nomis_control.sh -c "$nomis_environment")
-          maintenance_mode=$(src/nomis/nomis_control.sh -m "$nomis_environment")
-          asg_name=t1-nomis-web-a
-          desired_count=0
-          maintenance_mode=enabled
+          asg_name=$(src/nomis/nomis_control.sh -n $script_flags "$nomis_environment")
+          desired_count=$(src/nomis/nomis_control.sh -c $script_flags "$nomis_environment")
+          maintenance_mode=$(src/nomis/nomis_control.sh -m $script_flags "$nomis_environment")
           echo "asg_name=${asg_name} desired_count=${desired_count} maintenance_mode=${maintenance_mode}"
           echo "asg_name=${asg_name}" >> $GITHUB_OUTPUT
           echo "desired_count=${desired_count}" >> $GITHUB_OUTPUT
@@ -113,9 +142,14 @@ jobs:
       - name: Set ASG Desired Count
         env:
           asg_name: "${{ needs.get_nomis_environment_status.outputs.asg_name }}"
+          dryrun: "${{ needs.setup.outputs.dryrun }}" 
         run: |
-          echo aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name" >&2
-          aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name"
+          if [[ $dryrun == '0' ]]; then
+            echo "aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name '$asg_name'" >&2
+            aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name"
+          else
+            echo "Dry Run: aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name '$asg_name'" >&2
+          fi
 
   wait_for_healthy_instance:
     name: Wait for healthy Weblogic Instance
@@ -136,13 +170,20 @@ jobs:
 
       - name: Wait for healthy Weblogic Instance
         env:
+          dryrun: "${{ needs.setup.outputs.dryrun }}" 
+          script_flags: "${{ needs.setup.outputs.script_flags }}" 
           nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
         run: |
           healthy_instance_count=0
           n=2
           for i in $(seq 1 $n); do
-            healthy_instance_count=$(src/nomis/nomis_control.sh -h "$nomis_environment")
+            healthy_instance_count=$(src/nomis/nomis_control.sh -h $script_flags "$nomis_environment")
             if (( healthy_instance_count > 0 )); then
+              echo "healthy_instance_count=${healthy_instance_count}"
+              echo "healthy_instance_count=${healthy_instance_count}" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            if [[ $dryrun != '0' ]]; then
               echo "healthy_instance_count=${healthy_instance_count}"
               echo "healthy_instance_count=${healthy_instance_count}" >> $GITHUB_OUTPUT
               exit 0
@@ -155,7 +196,7 @@ jobs:
 
   disable_maintenance_mode:
     name: Disable Maintenance Mode
-    needs: [setup, wait_for_healthy_instance]
+    needs: [setup, get_nomis_environment_status, wait_for_healthy_instance]
     runs-on: ubuntu-latest
     if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'enabled'
     steps:
@@ -173,9 +214,10 @@ jobs:
 
       - name: Disable Maintenance Mode
         env:
+          script_flags: "${{ needs.setup.outputs.script_flags }}" 
           nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
         run: |
-          src/nomis/nomis_control.sh -0 "$nomis_environment"
+          src/nomis/nomis_control.sh -0 $script_flags "$nomis_environment"
 
       - name: Get Maintenance Mode Weblogic Status
         id: asg_current_asg_desired_count
