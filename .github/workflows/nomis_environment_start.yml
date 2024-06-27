@@ -5,8 +5,15 @@ on:
   workflow_dispatch:
     inputs:
       nomis_environment:
-        description: 'e.g. t1, t2, t3, lsast'
-        type: string
+        type: choice
+        description: Which nomis environment to start
+        options:
+          - t1
+          - t2
+          - t3
+          - lsast
+          - preprod
+          - prod
 
 permissions:
   id-token: write
