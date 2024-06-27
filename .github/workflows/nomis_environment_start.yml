@@ -17,15 +17,15 @@ on:
           - prod
       weblogic_deployment:
         type: choice
-        description: Which nomis environment to start
-        default: enduser
+        description: Which weblogic deployment to use
+        default: auto
         options:
-          - enduser
+          - auto
           - a
           - b
       dryrun:
         type: choice
-        description: Set to true to test
+        description: Dryrun mode
         default: false
         options:
           - true
@@ -64,7 +64,7 @@ jobs:
               script_flags="$script_flags -d"
               dryrun=1
             fi
-            if [[ "${{ github.event.inputs.weblogic_deployment }}" != "enduser" ]]; then
+            if [[ "${{ github.event.inputs.weblogic_deployment }}" != "auto" ]]; then
               script_flags="$script_flags -${{ github.event.inputs.weblogic_deployment }}"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then

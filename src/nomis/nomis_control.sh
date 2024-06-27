@@ -322,7 +322,7 @@ main() {
               ;;
           c)
               option_set=$((option_set + 1))
-              desired_count=1i
+              desired_count=1
               ;;
           d)
               DRYRUN=1
