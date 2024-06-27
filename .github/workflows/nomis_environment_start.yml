@@ -30,8 +30,6 @@ on:
         options:
           - true
           - false
-    inputs:
-      nomis_environment:
 
 permissions:
   id-token: write
@@ -116,7 +114,7 @@ jobs:
         id: active_asg_stats
         env:
           nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
-          script_flags: "${{ needs.setup.outputs.script_flags }}" 
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
         run: |
           asg_name=$(src/nomis/nomis_control.sh -n $script_flags "$nomis_environment")
           desired_count=$(src/nomis/nomis_control.sh -c $script_flags "$nomis_environment")
@@ -142,7 +140,7 @@ jobs:
       - name: Set ASG Desired Count
         env:
           asg_name: "${{ needs.get_nomis_environment_status.outputs.asg_name }}"
-          dryrun: "${{ needs.setup.outputs.dryrun }}" 
+          dryrun: "${{ needs.setup.outputs.dryrun }}"
         run: |
           if [[ $dryrun == '0' ]]; then
             echo "aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name '$asg_name'" >&2
@@ -170,8 +168,8 @@ jobs:
 
       - name: Wait for healthy Weblogic Instance
         env:
-          dryrun: "${{ needs.setup.outputs.dryrun }}" 
-          script_flags: "${{ needs.setup.outputs.script_flags }}" 
+          dryrun: "${{ needs.setup.outputs.dryrun }}"
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
           nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
         run: |
           healthy_instance_count=0
@@ -214,7 +212,7 @@ jobs:
 
       - name: Disable Maintenance Mode
         env:
-          script_flags: "${{ needs.setup.outputs.script_flags }}" 
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
           nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
         run: |
           src/nomis/nomis_control.sh -0 $script_flags "$nomis_environment"
