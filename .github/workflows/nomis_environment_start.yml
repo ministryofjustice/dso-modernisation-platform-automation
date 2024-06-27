@@ -19,6 +19,8 @@ permissions:
   id-token: write
   contents: read
 
+run-name: "NOMIS ${{ inputs.nomis_environment }} Environment Start"
+
 jobs:
   setup:
     name: Setup
@@ -85,7 +87,7 @@ jobs:
         env:
           nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
         run: |
-          asg_name=$(src/nomis/get_nomis_environment.sh -t "$nomis_environment")
+          asg_name=$(src/nomis/get_nomis_environment.sh -n "$nomis_environment")
           desired_count=$(src/nomis/get_nomis_environment.sh -d "$nomis_environment")
           healthy_instance_count=$(src/nomis/get_nomis_environment.sh -h "$nomis_environment")
           maintenance_mode=$(src/nomis/get_nomis_environment.sh -m "$nomis_environment")
@@ -95,26 +97,26 @@ jobs:
           echo "healthy_instance_count=${healthy_instance_count}" >> $GITHUB_OUTPUT
           echo "maintenance_mode=${maintenance_mode}" >> $GITHUB_OUTPUT
 
-#  start_weblogic_instance:
-#    name: Start Weblogic Instance
-#    needs: get_nomis_environment_status
-#    runs-on: ubuntu-latest
-#    if: needs.get_nomis_environment_status.output.desired_count == '0'
-#    steps:
-#      - name: Configure AWS Credentials
-#        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
-#        with:
-#          role-to-assume: "${{ needs.setup.outputs.role_arn }}"
-#          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
-#          aws-region: eu-west-2
-#
-#      - name: Set ASG Desired Count
-#        env:
-#          asg_name: "${{ needs.get_nomis_environment_status.output.asg_name }}"
-#        run: |
-#          echo aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name" >&2
-#          # aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name"
-#
+  start_weblogic_instance:
+    name: Start Weblogic Instance
+    needs: get_nomis_environment_status
+    runs-on: ubuntu-latest
+    if: needs.get_nomis_environment_status.output.desired_count == '0'
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ needs.setup.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Set ASG Desired Count
+        env:
+          asg_name: "${{ needs.get_nomis_environment_status.output.asg_name }}"
+        run: |
+          echo aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name" >&2
+          # aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name"
+
 #  wait_for_healthy_instance:
 #    name: Wait for healthy Weblogic Instance
 #    needs: get_nomis_environment_status
