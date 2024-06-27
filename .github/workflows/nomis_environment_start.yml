@@ -67,7 +67,6 @@ jobs:
     outputs:
       asg_name: "${{ steps.active_asg_stats.outputs.asg_name }}"
       desired_count: "${{ steps.active_asg_stats.outputs.desired_count }}"
-      healthy_instance_count: "${{ steps.active_asg_stats.outputs.healthy_instance_count }}"
       maintenance_mode: "${{ steps.active_asg_stats.outputs.maintenance_mode }}"
     steps:
       - name: Configure AWS Credentials
@@ -89,12 +88,13 @@ jobs:
         run: |
           asg_name=$(src/nomis/get_nomis_environment.sh -n "$nomis_environment")
           desired_count=$(src/nomis/get_nomis_environment.sh -d "$nomis_environment")
-          healthy_instance_count=$(src/nomis/get_nomis_environment.sh -h "$nomis_environment")
           maintenance_mode=$(src/nomis/get_nomis_environment.sh -m "$nomis_environment")
-          echo "asg_name=${asg_name} desired_count=${desired_count} healthy_instance_count=${healthy_instance_count} maintenance_mode=${maintenance_mode}"
+          asg_name=t1-nomis-web-a
+          desired_count=0
+          maintenance_mode=disabled
+          echo "asg_name=${asg_name} desired_count=${desired_count} maintenance_mode=${maintenance_mode}"
           echo "asg_name=${asg_name}" >> $GITHUB_OUTPUT
           echo "desired_count=${desired_count}" >> $GITHUB_OUTPUT
-          echo "healthy_instance_count=${healthy_instance_count}" >> $GITHUB_OUTPUT
           echo "maintenance_mode=${maintenance_mode}" >> $GITHUB_OUTPUT
 
   start_weblogic_instance:
@@ -115,54 +115,64 @@ jobs:
           asg_name: "${{ needs.get_nomis_environment_status.outputs.asg_name }}"
         run: |
           echo aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name" >&2
-          # aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name"
+          aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name"
 
-#  wait_for_healthy_instance:
-#    name: Wait for healthy Weblogic Instance
-#    needs: get_nomis_environment_status
-#    runs-on: ubuntu-latest
-#    if: needs.get_nomis_environment_status.outputs.healthy_instance_count == '0'
-#    steps:
-#      - name: Configure AWS Credentials
-#        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
-#        with:
-#          role-to-assume: "${{ needs.setup.outputs.role_arn }}"
-#          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
-#          aws-region: eu-west-2
-#
-#      - name: Checkout Repository
-#        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
-#        with:
-#          ref: ${{ github.ref }}
-#
-#      - name: Wait for healthy Weblogic Instance
-#        run: |
-#          sleep 5
-#
-#  disable_maintenance_mode:
-#    name: Start Weblogic Instance
-#    needs: wait_for_healthy_instance
-#    runs-on: ubuntu-latest
-#    if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'enabled'
-#    steps:
-#      - name: Configure AWS Credentials
-#        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
-#        with:
-#          role-to-assume: "${{ needs.setup.outputs.role_arn }}"
-#          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
-#          aws-region: eu-west-2
-#
-#      - name: Checkout Repository
-#        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
-#        with:
-#          ref: ${{ github.ref }}
-#
-#      - name: Get Maintenance Mode Weblogic Status
-#        id: asg_current_asg_desired_count
-#        env:
-#          nomis_environment: "${{ steps.parseinput.outputs.nomis_environment }}"
-#        run: |
-#          nomis_environment="${{ steps.parseinput.outputs.nomis_environment }}"
-#          asg="${{ steps.nomis_environment.outputs.asg }}"
-#          echo "src/run_script_on_ec2.sh first ${asg} lb_maintenance_mode.sh '/home/oracle/admin/scripts/lb_maintenance_mode.sh check'"
-#          src/run_script_on_ec2.sh first ${asg} lb_maintenance_mode.sh "/home/oracle/admin/scripts/lb_maintenance_mode.sh check"
+  wait_for_healthy_instance:
+    name: Wait for healthy Weblogic Instance
+    needs: [setup, get_nomis_environment_status]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ needs.setup.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Wait for healthy Weblogic Instance
+        run: |
+          healthy_instance_count=0
+          n=2
+          for i in $(seq 1 $n); do
+            healthy_instance_count=$(src/nomis/get_nomis_environment.sh -h "$nomis_environment")
+            if (( healthy_instance_count > 0 )); then
+              echo "healthy_instance_count=${healthy_instance_count}"
+              echo "healthy_instance_count=${healthy_instance_count}" >> $GITHUB_OUTPUT
+              return 0
+            fi
+            echo "[$i/$n]: Waiting for healthy instance"
+            sleep 60
+          done
+          echo "Timed out waiting for healthy instance" >&2
+          exit 1
+
+  disable_maintenance_mode:
+    name: Start Weblogic Instance
+    needs: [setup, wait_for_healthy_instance]
+    runs-on: ubuntu-latest
+    if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'disabled'
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ needs.setup.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Get Maintenance Mode Weblogic Status
+        id: asg_current_asg_desired_count
+        env:
+          asg_name: "${{ needs.get_nomis_environment_status.outputs.asg_name }}"
+        run: |
+          echo "src/run_script_on_ec2.sh first ${asg_name} lb_maintenance_mode.sh '/home/oracle/admin/scripts/lb_maintenance_mode.sh check'"
+          src/run_script_on_ec2.sh first ${asg_name} lb_maintenance_mode.sh "/home/oracle/admin/scripts/lb_maintenance_mode.sh check"
