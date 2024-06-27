@@ -101,7 +101,7 @@ jobs:
     name: Start Weblogic Instance
     needs: [setup, get_nomis_environment_status]
     runs-on: ubuntu-latest
-    if: needs.get_nomis_environment_status.output.desired_count == '0'
+    if: needs.get_nomis_environment_status.outputs.desired_count == '0'
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
@@ -112,7 +112,7 @@ jobs:
 
       - name: Set ASG Desired Count
         env:
-          asg_name: "${{ needs.get_nomis_environment_status.output.asg_name }}"
+          asg_name: "${{ needs.get_nomis_environment_status.outputs.asg_name }}"
         run: |
           echo aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name" >&2
           # aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name"
@@ -121,7 +121,7 @@ jobs:
 #    name: Wait for healthy Weblogic Instance
 #    needs: get_nomis_environment_status
 #    runs-on: ubuntu-latest
-#    if: needs.get_nomis_environment_status.output.healthy_instance_count == '0'
+#    if: needs.get_nomis_environment_status.outputs.healthy_instance_count == '0'
 #    steps:
 #      - name: Configure AWS Credentials
 #        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
@@ -143,7 +143,7 @@ jobs:
 #    name: Start Weblogic Instance
 #    needs: wait_for_healthy_instance
 #    runs-on: ubuntu-latest
-#    if: needs.get_nomis_environment_status.output.maintenance_mode == 'enabled'
+#    if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'enabled'
 #    steps:
 #      - name: Configure AWS Credentials
 #        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
