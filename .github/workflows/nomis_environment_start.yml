@@ -145,7 +145,7 @@ jobs:
             if (( healthy_instance_count > 0 )); then
               echo "healthy_instance_count=${healthy_instance_count}"
               echo "healthy_instance_count=${healthy_instance_count}" >> $GITHUB_OUTPUT
-              return 0
+              exit 0
             fi
             echo "[$i/$n]: Waiting for healthy instance"
             sleep 60
