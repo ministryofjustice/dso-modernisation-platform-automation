@@ -49,10 +49,15 @@ jobs:
           echo "account_name=${account_name}" >> $GITHUB_OUTPUT
           echo "nomis_environment=${nomis_environment}" >> $GITHUB_OUTPUT
 
+      - name: Debug
+        run: |
+          echo "${{ env.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}"
+
       - name: Get AWS Account Details
         id: account
         run: |
           echo "account name: ${{ steps.parseinput.outputs.account_name }}"
+
           account_id="${{ fromJSON(env.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.parseinput.outputs.account_name] }}"
           role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
           echo "role arn:     ${role_arn}"
