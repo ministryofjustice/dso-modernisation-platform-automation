@@ -53,7 +53,7 @@ jobs:
         id: account
         run: |
           echo "account name: ${{ steps.parseinput.outputs.account_name }}"
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.parseinput.outputs.account_name] }}"
+          account_id="${{ fromJSON(env.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.parseinput.outputs.account_name] }}"
           role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
           echo "role arn:     ${role_arn}"
           echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
