@@ -83,7 +83,7 @@ jobs:
       - name: Get Active Weblogic ASG Stats
         id: active_asg_stats
         env:
-          nomis_environment="${{ needs.setup.outputs.nomis_environment }}"
+          nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
         run: |
           asg_name=$(src/nomis/get_nomis_environment.sh -t "$nomis_environment")
           desired_count=$(src/nomis/get_nomis_environment.sh -d "$nomis_environment")
@@ -110,7 +110,7 @@ jobs:
 #
 #      - name: Set ASG Desired Count
 #        env:
-#          asg_name="${{ needs.get_nomis_environment_status.output.asg_name }}"
+#          asg_name: "${{ needs.get_nomis_environment_status.output.asg_name }}"
 #        run: |
 #          echo aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name" >&2
 #          # aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name"
@@ -158,7 +158,7 @@ jobs:
 #      - name: Get Maintenance Mode Weblogic Status
 #        id: asg_current_asg_desired_count
 #        env:
-#          nomis_environment="${{ steps.parseinput.outputs.nomis_environment }}"
+#          nomis_environment: "${{ steps.parseinput.outputs.nomis_environment }}"
 #        run: |
 #          nomis_environment="${{ steps.parseinput.outputs.nomis_environment }}"
 #          asg="${{ steps.nomis_environment.outputs.asg }}"
