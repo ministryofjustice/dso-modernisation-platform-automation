@@ -8,8 +8,8 @@ usage() {
   echo "Usage $0: <opts> <nomis_environment>
 
 Where <opts>:
-  -0                     Enable maintenance mode
-  -1                     Disable maintenance mode
+  -0                     Disable maintenance mode
+  -1                     Enable maintenance mode
   -a                     Print account name
   -c                     Print active weblogic target group desired count
   -d                     Enable dryrun for maintenance mode commands
@@ -270,11 +270,11 @@ main() {
       case $opt in
           0)
               option_set=$((option_set + 1))
-              maintenance_mode_enable=1
+              maintenance_mode_disable=1
               ;;
           1)
               option_set=$((option_set + 1))
-              maintenance_mode_disable=1
+              maintenance_mode_enable=1
               ;;
           a)
               option_set=$((option_set + 1))

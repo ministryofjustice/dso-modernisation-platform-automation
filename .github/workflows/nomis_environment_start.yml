@@ -46,7 +46,7 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          account_name=$(src/nomis/get_nomis_environment.sh -a "$nomis_environment")
+          account_name=$(src/nomis/nomis_control.sh -a "$nomis_environment")
           echo "account_name=${account_name} nomis_environment=${nomis_environment}"
           echo "account_name=${account_name}" >> $GITHUB_OUTPUT
           echo "nomis_environment=${nomis_environment}" >> $GITHUB_OUTPUT
@@ -86,12 +86,12 @@ jobs:
         env:
           nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
         run: |
-          asg_name=$(src/nomis/get_nomis_environment.sh -n "$nomis_environment")
-          desired_count=$(src/nomis/get_nomis_environment.sh -d "$nomis_environment")
-          maintenance_mode=$(src/nomis/get_nomis_environment.sh -m "$nomis_environment")
+          asg_name=$(src/nomis/nomis_control.sh -n "$nomis_environment")
+          desired_count=$(src/nomis/nomis_control.sh -c "$nomis_environment")
+          maintenance_mode=$(src/nomis/nomis_control.sh -m "$nomis_environment")
           asg_name=t1-nomis-web-a
           desired_count=0
-          maintenance_mode=disabled
+          maintenance_mode=enabled
           echo "asg_name=${asg_name} desired_count=${desired_count} maintenance_mode=${maintenance_mode}"
           echo "asg_name=${asg_name}" >> $GITHUB_OUTPUT
           echo "desired_count=${desired_count}" >> $GITHUB_OUTPUT
@@ -135,11 +135,13 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Wait for healthy Weblogic Instance
+        env:
+          nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
         run: |
           healthy_instance_count=0
           n=2
           for i in $(seq 1 $n); do
-            healthy_instance_count=$(src/nomis/get_nomis_environment.sh -h "$nomis_environment")
+            healthy_instance_count=$(src/nomis/nomis_control.sh -h "$nomis_environment")
             if (( healthy_instance_count > 0 )); then
               echo "healthy_instance_count=${healthy_instance_count}"
               echo "healthy_instance_count=${healthy_instance_count}" >> $GITHUB_OUTPUT
@@ -152,10 +154,10 @@ jobs:
           exit 1
 
   disable_maintenance_mode:
-    name: Start Weblogic Instance
+    name: Disable Maintenance Mode
     needs: [setup, wait_for_healthy_instance]
     runs-on: ubuntu-latest
-    if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'disabled'
+    if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'enabled'
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
@@ -168,6 +170,12 @@ jobs:
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
         with:
           ref: ${{ github.ref }}
+
+      - name: Disable Maintenance Mode
+        env:
+          nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
+        run: |
+          src/nomis/nomis_control.sh -0 "$nomis_environment"
 
       - name: Get Maintenance Mode Weblogic Status
         id: asg_current_asg_desired_count
