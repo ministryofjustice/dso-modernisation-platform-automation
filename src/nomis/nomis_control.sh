@@ -79,7 +79,6 @@ get_lb_rule_json() {
   if ! url=$(get_url "$1"); then
     return 1
   fi
-  echo "Retrieving load balancer config using aws elbv2 commands" >&2
   lbarn=$(aws elbv2 describe-load-balancers | jq -r '.LoadBalancers[] | select(.LoadBalancerName=="'$LBNAME'").LoadBalancerArn')
   if [[ -z $lbarn ]]; then
     echo "Error retriving load balancer details for $LBNAME" >&2
