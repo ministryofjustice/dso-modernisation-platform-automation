@@ -1,5 +1,5 @@
 ---
-name: NOMIS Environment Start
+name: NOMIS Environment Stop
 
 on:
   workflow_dispatch:
@@ -35,7 +35,7 @@ permissions:
   id-token: write
   contents: read
 
-run-name: "NOMIS Environment Start (${{ inputs.nomis_environment }}${{ inputs.weblogic_deployment == 'auto' && '' || inputs.weblogic_deployment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+run-name: "NOMIS Environment Stop (${{ inputs.nomis_environment }}${{ inputs.weblogic_deployment == 'auto' && '' || inputs.weblogic_deployment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
 
 jobs:
   setup:
@@ -124,11 +124,36 @@ jobs:
           echo "desired_count=${desired_count}" >> $GITHUB_OUTPUT
           echo "maintenance_mode=${maintenance_mode}" >> $GITHUB_OUTPUT
 
-  start_weblogic_instance:
-    name: Start Weblogic Instance
+  enable_maintenance_mode:
+    name: Enable Maintenance Mode
     needs: [setup, get_nomis_environment_status]
     runs-on: ubuntu-latest
-    if: needs.get_nomis_environment_status.outputs.desired_count == '0'
+    if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'disabled'
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ needs.setup.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Enable Maintenance Mode
+        env:
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
+          nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
+        run: |
+          src/nomis/nomis_control.sh -1 $script_flags "$nomis_environment"
+
+  stop_weblogic_instance:
+    name: Stop Weblogic Instance
+    needs: [setup, get_nomis_environment_status, enable_maintenance_mode]
+    runs-on: ubuntu-latest
+    if: needs.get_nomis_environment_status.outputs.desired_count != '0'
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
@@ -143,77 +168,8 @@ jobs:
           dryrun: "${{ needs.setup.outputs.dryrun }}"
         run: |
           if [[ $dryrun == '0' ]]; then
-            echo "aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name '$asg_name'" >&2
-            aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name "$asg_name"
+            echo "aws autoscaling set-desired-capacity --desired-capacity 0 --auto-scaling-group-name '$asg_name'" >&2
+            aws autoscaling set-desired-capacity --desired-capacity 0 --auto-scaling-group-name "$asg_name"
           else
-            echo "Dry Run: aws autoscaling set-desired-capacity --desired-capacity 1 --auto-scaling-group-name '$asg_name'" >&2
+            echo "Dry Run: aws autoscaling set-desired-capacity --desired-capacity 0 --auto-scaling-group-name '$asg_name'" >&2
           fi
-
-  wait_for_healthy_instance:
-    name: Wait for healthy Weblogic Instance
-    needs: [setup, get_nomis_environment_status]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
-        with:
-          role-to-assume: "${{ needs.setup.outputs.role_arn }}"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
-          aws-region: eu-west-2
-
-      - name: Checkout Repository
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
-        with:
-          ref: ${{ github.ref }}
-
-      - name: Wait for healthy Weblogic Instance
-        env:
-          dryrun: "${{ needs.setup.outputs.dryrun }}"
-          script_flags: "${{ needs.setup.outputs.script_flags }}"
-          nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
-        run: |
-          healthy_instance_count=0
-          n=30
-          echo "Retrieving healthy instance count: src/nomis/nomis_control.sh -h $script_flags $nomis_environment"
-          for i in $(seq 1 $n); do
-            healthy_instance_count=$(src/nomis/nomis_control.sh -h $script_flags "$nomis_environment")
-            if (( healthy_instance_count > 0 )); then
-              echo "healthy_instance_count=${healthy_instance_count}"
-              echo "healthy_instance_count=${healthy_instance_count}" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-            if [[ $dryrun != '0' ]]; then
-              echo "healthy_instance_count=${healthy_instance_count}"
-              echo "healthy_instance_count=${healthy_instance_count}" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-            echo "[$i/$n]: Waiting for healthy instance"
-            sleep 60
-          done
-          echo "Timed out waiting for healthy instance" >&2
-          exit 1
-
-  disable_maintenance_mode:
-    name: Disable Maintenance Mode
-    needs: [setup, get_nomis_environment_status, wait_for_healthy_instance]
-    runs-on: ubuntu-latest
-    if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'enabled'
-    steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
-        with:
-          role-to-assume: "${{ needs.setup.outputs.role_arn }}"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
-          aws-region: eu-west-2
-
-      - name: Checkout Repository
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
-        with:
-          ref: ${{ github.ref }}
-
-      - name: Disable Maintenance Mode
-        env:
-          script_flags: "${{ needs.setup.outputs.script_flags }}"
-          nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
-        run: |
-          src/nomis/nomis_control.sh -0 $script_flags "$nomis_environment"
