@@ -128,10 +128,10 @@ jobs:
     name: Enable Maintenance Mode
     needs: [setup, get_nomis_environment_status]
     runs-on: ubuntu-latest
-    if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'disabled'
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'disabled'
         with:
           role-to-assume: "${{ needs.setup.outputs.role_arn }}"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
@@ -139,10 +139,12 @@ jobs:
 
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'disabled'
         with:
           ref: ${{ github.ref }}
 
       - name: Enable Maintenance Mode
+        if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'disabled'
         env:
           script_flags: "${{ needs.setup.outputs.script_flags }}"
           nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
