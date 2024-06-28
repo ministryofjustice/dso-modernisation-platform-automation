@@ -111,7 +111,7 @@ disable_maintenance_mode() {
   fi
   rulearn=$(jq -r '.RuleArn' <<< "$lbrulejson")
   priority=$(jq -r '.Priority' <<< "$lbrulejson")
-  num_priorities=$(wc -l <<< "$priority" | tr -d "[:space:]")
+  num_priorities=$(wc -l <<< "$priority" | tr -d " ")
   if [[ -z $priority || $num_priorities != "1" ]]; then
     echo "$lbrulejson" >&2
     echo "Error detecting weblogic lb rule priority" >&2
@@ -142,7 +142,7 @@ enable_maintenance_mode() {
   fi
   rulearn=$(jq -r '.RuleArn' <<< "$lbrulejson")
   priority=$(jq -r '.Priority' <<< "$lbrulejson")
-  num_priorities=$(wc -l <<< "$priority" | tr -d "[:space:]")
+  num_priorities=$(wc -l <<< "$priority" | tr -d " ")
   if [[ -z $priority || $num_priorities != "1" ]]; then
     echo "$lbrulejson" >&2
     echo "Error detecting weblogic lb rule priority" >&2
@@ -170,7 +170,7 @@ get_maintenance_mode() {
     return 1
   fi
   priority=$(jq -r '.Priority' <<< "$lbrulejson")
-  num_priorities=$(wc -l <<< "$priority" | tr -d "[:space:]")
+  num_priorities=$(wc -l <<< "$priority" | tr -d " ")
   if [[ -z $priority || $num_priorities != "1" ]]; then
     echo "$lbrulejson" >&2
     echo "Error detecting weblogic lb rule priority" >&2
@@ -191,7 +191,7 @@ get_target_group_arn() {
     return 1
   fi
   targetgrouparns=$(jq -r '.Actions[] | select(.Type == "forward").TargetGroupArn' <<< "$lbrulejson")
-  num_targetgrouparns=$(wc -l <<< "$targetgrouparns" | tr -d "[:space:]")
+  num_targetgrouparns=$(wc -l <<< "$targetgrouparns" | tr -d " ")
   if [[ -z $targetgrouparns || $num_targetgrouparns != "1" ]]; then
     echo "$lbrulejson" >&2
     echo "Error detecting weblogic target group arn" >&2
@@ -203,14 +203,18 @@ get_target_group_arn() {
 get_target_group_health() {
   local arn
   local json
+  local healthy_ec2s
 
   if ! arn=$(get_target_group_arn "$1"); then
     return 1
   fi
   json=$(aws elbv2 describe-target-health --target-group-arn "$arn")
   healthy_ec2s=$(jq -r '.TargetHealthDescriptions[] | select(.TargetHealth.State == "healthy").Target.Id' <<< "$json")
-  num_healthy_ec2s=$(wc -l <<< "$healthy_ec2s" | tr -d "[:space:]")
-  echo "$num_healthy_ec2s"
+  if [[ -z $healthy_ec2s ]]; then
+    echo 0
+  else
+    wc -l <<< "$healthy_ec2s" | tr -d " "
+  fi
 }
 
 get_target_group_name() {
