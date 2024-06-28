@@ -173,7 +173,7 @@ jobs:
           nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
         run: |
           healthy_instance_count=0
-          n=2
+          n=30
           for i in $(seq 1 $n); do
             healthy_instance_count=$(src/nomis/nomis_control.sh -h $script_flags "$nomis_environment")
             if (( healthy_instance_count > 0 )); then
