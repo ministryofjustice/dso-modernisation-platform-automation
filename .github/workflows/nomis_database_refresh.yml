@@ -85,6 +85,7 @@ jobs:
           echo "target_db_name=${target_db_name}" >> $GITHUB_OUTPUT
 
   refresh_db:
+    needs: parse_input
     uses: ./.github/workflows/database_refresh.yml
     with:
       source_oem_account_name: "hmpps-oem-production"
