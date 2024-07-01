@@ -36,7 +36,7 @@ on:
   # Each scheduled job requires a unique time
   schedule:
     - cron: '00 07 * * 0' # preprod-nomis-db-1-a PPCNOM
-    - cron: '35 09 * * 0' # preprod-nomis-db-2-a PPMIS
+    - cron: '15 09 * * 0' # preprod-nomis-db-2-a PPMIS
     - cron: '00 11 * * 0' # lsast-nomis-db-1-a LSCNOM
     - cron: '00 14 * * 0' # lsast-nomis-db-1-a LSMIS 
 
