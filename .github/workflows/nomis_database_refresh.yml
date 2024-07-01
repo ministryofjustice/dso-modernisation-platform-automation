@@ -36,7 +36,7 @@ on:
   # Each scheduled job requires a unique time
   schedule:
     - cron: '00 07 * * 0' # preprod-nomis-db-1-a PPCNOM
-    - cron: '45 09 * * 1' # preprod-nomis-db-2-a PPMIS
+    - cron: '00 10 * * 0' # preprod-nomis-db-2-a PPMIS
     - cron: '00 11 * * 0' # lsast-nomis-db-1-a LSCNOM
     - cron: '00 14 * * 0' # lsast-nomis-db-1-a LSMIS 
 
@@ -75,7 +75,7 @@ jobs:
               target_db_hostname="preprod-nomis-db-1-a"
               source_db_name="CNOMP"
               target_db_name="PPCNOM"
-            elif [[ "${cron_time}" == '45 09 * * 1' ]]; then
+            elif [[ "${cron_time}" == '00 10 * * 0' ]]; then
               target_db_hostname="preprod-nomis-db-2-a"
               source_db_name="MISP"
               target_db_name="PPMIS"
