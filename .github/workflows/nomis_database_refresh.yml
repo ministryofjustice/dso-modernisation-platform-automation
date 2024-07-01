@@ -11,20 +11,32 @@ on:
       source_db_name:
         description: 'Source database name'
         required: true
-        type: string
+        type: choice
+        options: 
+          - "CNOMP"
+          - "MISP"
       target_db_hostname:
         description: 'Target database hostname or ansible group'
         required: true
-        type: string
+        type: choice
+        options: 
+          - "preprod-nomis-db-1-a"
+          - "preprod-nomis-db-2-a"
+          - "lsast-nomis-db-1-a"
       target_db_name:
         description: 'Target database name'
         required: true
-        type: string
+        type: choice
+        options: 
+          - "PPCNOM"
+          - "PPMIS"
+          - "LSCNOM"
+          - "LSMIS"
 
   # Each scheduled job requires a unique time
   schedule:
     - cron: '00 07 * * 0' # preprod-nomis-db-1-a PPCNOM
-    - cron: '00 10 * * 0' # preprod-nomis-db-2-a PPMIS
+    - cron: '15 09 * * 1' # preprod-nomis-db-2-a PPMIS
     - cron: '00 11 * * 0' # lsast-nomis-db-1-a LSCNOM
     - cron: '00 14 * * 0' # lsast-nomis-db-1-a LSMIS 
 
@@ -85,6 +97,7 @@ jobs:
           echo "target_db_name=${target_db_name}" >> $GITHUB_OUTPUT
 
   refresh_db:
+    needs: parse_input
     uses: ./.github/workflows/database_refresh.yml
     with:
       source_oem_account_name: "hmpps-oem-production"
