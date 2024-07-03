@@ -30,6 +30,12 @@ on:
           - true
           - false
 
+  schedule:
+    - cron: "15 18 * * 1-5"  # T3 BST
+    - cron: "15 19 * * 1-5"  # T3 GMT
+    - cron: "10 18 * * 1-5"  # preprod BST
+    - cron: "10 19 * * 1-5"  # preprod GMT
+
 permissions:
   id-token: write
   contents: read
@@ -55,6 +61,8 @@ jobs:
       - name: Parse Workflow Inputs
         id: parseinput
         run: |
+          account_name=
+          nomis_environment=
           script_flags=
           dryrun=0
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
@@ -67,7 +75,32 @@ jobs:
               script_flags="$script_flags -${{ github.event.inputs.weblogic_deployment }}"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            nomis_environment="TODO"
+            script_flags="$script_flags -d"
+            dryrun=1
+            is_bst=1
+            if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
+              is_bst=0
+            fi
+            if [[ "${cron_time}" == '15 18 * * 1-5' ]]; then
+              if ((is_bst == 1)); then
+                nomis_environment=t3
+              fi
+            elif [[ "${cron_time}" == '15 19 * * 1-5' ]]; then
+              if ((is_bst == 0)); then
+                nomis_environment=t3
+              fi
+            elif [[ "${cron_time}" == '10 18 * * 1-5' ]]; then
+              if ((is_bst == 1)); then
+                nomis_environment=preprod
+              fi
+            elif [[ "${cron_time}" == '10 19 * * 1-5' ]]; then
+              if ((is_bst == 0)); then
+                nomis_environment=preprod
+              fi
+            else
+              echo "Unsupported schedule cron ${cron_time}"
+              exit 1
+            fi
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -91,6 +124,7 @@ jobs:
   get_nomis_environment_status:
     name: Get Nomis Environment Status
     needs: setup
+    if: needs.setup.outputs.account_name != ''
     runs-on: ubuntu-latest
     outputs:
       asg_name: "${{ steps.active_asg_stats.outputs.asg_name }}"
@@ -127,6 +161,7 @@ jobs:
     name: Enable Maintenance Mode
     needs: [setup, get_nomis_environment_status]
     runs-on: ubuntu-latest
+    if: needs.setup.outputs.account_name != ''
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
@@ -154,7 +189,7 @@ jobs:
     name: Stop Weblogic Instance
     needs: [setup, get_nomis_environment_status, enable_maintenance_mode]
     runs-on: ubuntu-latest
-    if: needs.get_nomis_environment_status.outputs.desired_count != '0'
+    if: needs.setup.outputs.account_name != '' && needs.get_nomis_environment_status.outputs.desired_count != '0'
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
