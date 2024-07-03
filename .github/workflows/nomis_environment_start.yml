@@ -7,14 +7,12 @@ on:
       nomis_environment:
         type: choice
         description: Which nomis environment to start
-        default: t1
         options:
           - t1
           - t2
           - t3
           - lsast
           - preprod
-          - ""
       weblogic_deployment:
         type: choice
         description: Which weblogic deployment to use
