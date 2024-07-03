@@ -127,6 +127,7 @@ jobs:
   get_nomis_environment_status:
     name: Get Nomis Environment Status
     needs: setup
+    if: needs.setup.outputs.account_name != ''
     runs-on: ubuntu-latest
     outputs:
       asg_name: "${{ steps.active_asg_stats.outputs.asg_name }}"
@@ -163,7 +164,7 @@ jobs:
     name: Start Weblogic Instance
     needs: [setup, get_nomis_environment_status]
     runs-on: ubuntu-latest
-    if: needs.get_nomis_environment_status.outputs.desired_count == '0'
+    if: needs.setup.outputs.account_name != '' && needs.get_nomis_environment_status.outputs.desired_count == '0'
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
@@ -187,6 +188,7 @@ jobs:
   wait_for_healthy_instance:
     name: Wait for healthy Weblogic Instance
     needs: [setup, get_nomis_environment_status]
+    if: needs.setup.outputs.account_name != ''
     runs-on: ubuntu-latest
     steps:
       - name: Configure AWS Credentials
@@ -232,7 +234,7 @@ jobs:
     name: Disable Maintenance Mode
     needs: [setup, get_nomis_environment_status, wait_for_healthy_instance]
     runs-on: ubuntu-latest
-    if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'enabled'
+    if: needs.setup.outputs.account_name != '' && needs.get_nomis_environment_status.outputs.maintenance_mode == 'enabled'
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
