@@ -65,16 +65,16 @@ jobs:
           nomis_environment=
           script_flags=
           dryrun=0
-          # if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-          #  nomis_environment="${{ github.event.inputs.nomis_environment }}"
-          #  if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
-          #    script_flags="$script_flags -d"
-          #    dryrun=1
-          #  fi
-          #  if [[ "${{ github.event.inputs.weblogic_deployment }}" != "auto" ]]; then
-          #    script_flags="$script_flags -${{ github.event.inputs.weblogic_deployment }}"
-          #  fi
-          # elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            nomis_environment="${{ github.event.inputs.nomis_environment }}"
+            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+              script_flags="$script_flags -d"
+              dryrun=1
+            fi
+            if [[ "${{ github.event.inputs.weblogic_deployment }}" != "auto" ]]; then
+              script_flags="$script_flags -${{ github.event.inputs.weblogic_deployment }}"
+            fi
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             script_flags="$script_flags -d"
             dryrun=1
             is_bst=1
@@ -98,13 +98,13 @@ jobs:
                 nomis_environment=preprod
               fi
             else
-              echo "Unsupported schedule cron ${cron_time} ${is_bst}"
-              # exit 1
+              echo "Unsupported schedule cron ${cron_time}"
+              exit 1
             fi
-          # else
-          #   echo "Unsupported event ${GITHUB_EVENT_NAME}"
-          #   exit 1
-          # fi
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
           if [[ -n $nomis_environment ]]; then
             account_name=$(src/nomis/nomis_control.sh -z "$nomis_environment")
           fi
