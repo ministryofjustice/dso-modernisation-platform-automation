@@ -14,6 +14,7 @@ on:
           - t3
           - lsast
           - preprod
+          - ""
       weblogic_deployment:
         type: choice
         description: Which weblogic deployment to use
@@ -29,6 +30,12 @@ on:
         options:
           - true
           - false
+
+  schedule:
+    - cron: "45 5 * * 1-5"  # T3 BST
+    - cron: "45 6 * * 1-5"  # T3 GMT
+    - cron: "50 5 * * 1-5"  # preprod BST
+    - cron: "50 6 * * 1-5"  # preprod GMT
 
 permissions:
   id-token: write
@@ -55,6 +62,8 @@ jobs:
       - name: Parse Workflow Inputs
         id: parseinput
         run: |
+          account_name=
+          nomis_environment=
           script_flags=
           dryrun=0
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
@@ -67,12 +76,37 @@ jobs:
               script_flags="$script_flags -${{ github.event.inputs.weblogic_deployment }}"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            nomis_environment="TODO"
+            is_bst=1
+            if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
+              is_bst=0
+            fi
+            if [[ "${cron_time}" == '45 5 * * 1-5' ]]; then
+              if ((is_bst == 1)); then
+                nomis_environment=t3
+              fi
+            elif [[ "${cron_time}" == '45 6 * * 1-5' ]]; then
+              if ((is_bst == 0)); then
+                nomis_environment=t3
+              fi
+            elif [[ "${cron_time}" == '50 5 * * 1-5' ]]; then
+              if ((is_bst == 1)); then
+                nomis_environment=preprod
+              fi
+            elif [[ "${cron_time}" == '50 6 * * 1-5' ]]; then
+              if ((is_bst == 0)); then
+                nomis_environment=preprod
+              fi
+            else
+              echo "Unsupported schedule cron ${cron_time}"
+              exit 1
+            fi
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          account_name=$(src/nomis/nomis_control.sh -z "$nomis_environment")
+          if [[ -n $nomis_environment ]]; then
+            account_name=$(src/nomis/nomis_control.sh -z "$nomis_environment")
+          fi
           echo "account_name=${account_name} nomis_environment=${nomis_environment} script_flags=${script_flags} dryrun=${dryrun}"
           echo "account_name=${account_name}" >> $GITHUB_OUTPUT
           echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
@@ -81,6 +115,7 @@ jobs:
 
       - name: Get AWS Account Details
         id: account
+        if: steps.parseinput.outputs.account_name != ''
         run: |
           echo "account name: ${{ steps.parseinput.outputs.account_name }}"
           account_id="${{ fromJSON(vars.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.parseinput.outputs.account_name] }}"
