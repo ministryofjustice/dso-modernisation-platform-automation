@@ -75,6 +75,7 @@ jobs:
               script_flags="$script_flags -${{ github.event.inputs.weblogic_deployment }}"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            cron_time="${{ github.event.schedule }}"
             script_flags="$script_flags -d"
             dryrun=1
             is_bst=1
