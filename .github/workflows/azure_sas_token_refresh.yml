@@ -101,6 +101,7 @@ jobs:
 
       - name: Azure Subscription Check
         run: |
+          az --version
           az account list
 
       - name: Checkout Repository

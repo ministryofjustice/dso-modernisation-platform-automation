@@ -99,8 +99,10 @@ get_azure_sas_tokens() {
   sas_resource_types=$(jq -r ".storage_accounts[0].sas_resource_types" <<< "$account_json")
   sas_services=$(jq -r ".storage_accounts[0].sas_services" <<< "$account_json")
   generate_sas_args="--permissions $sas_permissions --resource-types $sas_resource_types --services $sas_services --https-only"
-  echo "az storage account generate-sas --subscription '$azure_subscription_id' --account-name '$storage_account_name' --expiry '$expiry' $generate_sas_args" >&2
-  az storage account generate-sas --only-show-errors --subscription "$azure_subscription_id" --account-name "$storage_account_name" --expiry "$expiry" -o tsv $generate_sas_args
+  echo "az account set --subscription '$azure_subscription_id'" >&2
+  az account set --subscription "$azure_subscription_id"
+  echo "az storage account generate-sas --account-name '$storage_account_name' --expiry '$expiry' $generate_sas_args" >&2
+  az storage account generate-sas --account-name "$storage_account_name" --expiry "$expiry" -o tsv $generate_sas_args
 }
 
 refresh_azure_sas_tokens() {
