@@ -43,7 +43,6 @@ jobs:
         id: strategy
         run: |
           echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
-          echo '${{ env.AZURE_SAS_TOKEN_REFRESH }}'
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             matrix=$(src/azure_sas_token_refresh.sh -c '${{ env.AZURE_SAS_TOKEN_REFRESH }}' -a "${{ github.event.inputs.applications }}" -e "${{ github.event.inputs.environments }}" gha)
           else
@@ -109,5 +108,5 @@ jobs:
         run: |
           application=$(echo "${{ matrix.account_name }}" | rev | cut -d- -f2- | rev)
           environment=$(echo "${{ matrix.account_name }}" | rev | cut -d- -f1 | rev)
-          echo src/azure_sas_token_refresh.sh -c \"${{ env.AZURE_SAS_TOKEN_REFRESH }}\" -a \"$application\" -e \"$environment\" ${{ needs.strategy.outputs.azure_sas_token_refresh_sh_args }} refresh
-          src/azure_sas_token_refresh.sh -c "${{ env.AZURE_SAS_TOKEN_REFRESH }}" -a "$application" -e "$environment" ${{ needs.strategy.outputs.azure_sas_token_refresh_sh_args }} refresh
+          echo src/azure_sas_token_refresh.sh -c 'xxxx' -a \"$application\" -e \"$environment\" ${{ needs.strategy.outputs.azure_sas_token_refresh_sh_args }} refresh
+          src/azure_sas_token_refresh.sh -c '${{ env.AZURE_SAS_TOKEN_REFRESH }}' -a "$application" -e "$environment" ${{ needs.strategy.outputs.azure_sas_token_refresh_sh_args }} refresh
