@@ -1,0 +1,112 @@
+---
+name: Azure SAS Token refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      applications:
+        description: 'e.g. nomis or leave blank for all'
+        type: string
+      environments:
+        description: 'e.g. development or leave blank for all'
+        type: string
+      dryrun:
+        type: choice
+        description: Dryrun mode
+        default: false
+        options:
+          - true
+          - false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_CREDENTIALS: ${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}  # Azure credentials are managed in GitHub Secrets via dso-infra-azure-ad
+  AZURE_SAS_TOKEN_REFRESH: ${{ vars.AZURE_SAS_TOKEN_REFRESH }}
+
+jobs:
+  strategy:
+    name: strategy
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+      azure_sas_token_refresh_sh_args: "${{ steps.options.outputs.azure_sas_token_refresh_sh_args }}"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: strategy
+        id: strategy
+        run: |
+          echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+          echo "{$matrix}"
+
+      - name: options
+        id: options
+        run: |
+          echo "Setting options event=${GITHUB_EVENT_NAME}"
+          azure_sas_token_refresh_sh_args=""
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+              azure_sas_token_refresh_sh_args="-d"
+            fi
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo "azure_sas_token_refresh_sh_args=${azure_sas_token_refresh_sh_args}"
+          echo "azure_sas_token_refresh_sh_args=${azure_sas_token_refresh_sh_args}" >> $GITHUB_OUTPUT
+
+  azure_sas_token_refresh:
+    name: Azure SAS Token refresh
+    runs-on: ubuntu-latest
+    needs: strategy
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.strategy.outputs.matrix) }}
+    steps:
+      - name: Get Account Details
+        id: account
+        run: |
+          echo "account name: ${{ matrix.account_name }}"
+          account_id="${{ fromJSON(vars.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ env.AZURE_CREDENTIALS }}
+
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Refresh Token
+        run: |
+          application=$(echo "${{ matrix.account_name }}" | rev | cut -d- -f2- | rev)
+          environment=$(echo "${{ matrix.account_name }}" | rev | cut -d- -f1 | rev)
+          echo src/azure_sas_token_refresh.sh -c \"${{ env.AZURE_SAS_TOKEN_REFRESH }}\" -a \"$application\" -e \"$environment\" ${{ needs.strategy.outputs.azure_sas_token_refresh_sh_args }}
+          #src/azure_sas_token_refresh.sh -c "${{ env.AZURE_SAS_TOKEN_REFRESH }}" -a "$application" -e "$environment" ${{ needs.strategy.outputs.azure_sas_token_refresh_sh_args }}
