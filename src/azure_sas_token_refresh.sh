@@ -61,10 +61,12 @@ get_azure_sas_tokens() {
   local account
   local account_json
   local azure_subscription_id
+  local config_json
   local expiry
   local generate_sas_args
-  local config_json
-  local sas_json
+  local sas_permissions
+  local sas_resource_types
+  local sas_services
   local storage_account_name
   local num_storage_accounts
 
@@ -93,7 +95,10 @@ get_azure_sas_tokens() {
   fi
   azure_subscription_id=$(jq -r ".storage_accounts[0].azure_subscription_id" <<< "$account_json")
   storage_account_name=$(jq -r ".storage_accounts[0].storage_account_name" <<< "$account_json")
-  generate_sas_args=$(jq -r ".storage_accounts[0].generate_sas_args" <<< "$account_json")
+  sas_permissions=$(jq -r ".storage_accounts[0].sas_permissions" <<< "$account_json")
+  sas_resource_types=$(jq -r ".storage_accounts[0].sas_resource_types" <<< "$account_json")
+  sas_services=$(jq -r ".storage_accounts[0].sas_services" <<< "$account_json")
+  generate_sas_args="--permissions $sas_permissions --resource-types $sas_resource_types --services $sas_services --https-only"
   echo "az storage account generate-sas --subscription '$azure_subscription_id' --account-name '$storage_account_name' --expiry '$expiry' $generate_sas_args" >&2
   az storage account generate-sas --only-show-errors --subscription "$azure_subscription_id" --account-name "$storage_account_name" --expiry "$expiry" -o tsv $generate_sas_args
 }
