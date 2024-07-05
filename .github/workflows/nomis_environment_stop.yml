@@ -76,8 +76,6 @@ jobs:
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             cron_time="${{ github.event.schedule }}"
-            script_flags="$script_flags -d"
-            dryrun=1
             is_bst=1
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
@@ -106,7 +104,9 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          account_name=$(src/nomis/nomis_control.sh -z "$nomis_environment")
+          if [[ -n $nomis_environment ]]; then
+            account_name=$(src/nomis/nomis_control.sh -z "$nomis_environment")
+          fi
           echo "account_name=${account_name} nomis_environment=${nomis_environment} script_flags=${script_flags} dryrun=${dryrun}"
           echo "account_name=${account_name}" >> $GITHUB_OUTPUT
           echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
@@ -115,6 +115,7 @@ jobs:
 
       - name: Get AWS Account Details
         id: account
+        if: steps.parseinput.outputs.account_name != ''
         run: |
           echo "account name: ${{ steps.parseinput.outputs.account_name }}"
           account_id="${{ fromJSON(vars.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.parseinput.outputs.account_name] }}"
