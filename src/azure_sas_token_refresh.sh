@@ -15,6 +15,24 @@ Where <opts>:
   -e <environment>       Specify which AWS environment, e.g. development
   -c <config>            JSON containing Azure Account Ids and Storage Account Names
 "
+  echo 'Example <config>:
+{
+  "account_config": [
+    {
+      "aws_account_name": "nomis-data-hub-production",
+      "storage_accounts": [
+        {
+          "azure_subscription_id": "foo",
+          "storage_account_name": "bar",
+          "sas_permissions": "acrluw",
+          "sas_resource_types": "oc",
+          "sas_services": "b"
+        }
+      ]
+    }
+  ]
+}
+'
 }
 
 get_accounts() {
