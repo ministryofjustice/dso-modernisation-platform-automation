@@ -17,6 +17,8 @@ on:
         options:
           - true
           - false
+  schedule:
+    - cron: "15 6 * * 1-5"
 
 permissions:
   id-token: write
@@ -44,7 +46,9 @@ jobs:
         run: |
           echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+            matrix=$(src/azure_sas_token_refresh.sh -c '${{ env.AZURE_SAS_TOKEN_REFRESH }}' -a "${{ github.event.inputs.applications }}" -e "${{ github.event.inputs.environments }}" gha)
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            matrix=$(src/azure_sas_token_refresh.sh -c '${{ env.AZURE_SAS_TOKEN_REFRESH }}' gha)
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -63,7 +67,7 @@ jobs:
             if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
               azure_sas_token_refresh_sh_args="-d"
             fi
-          else
+          elif [[ "${GITHUB_EVENT_NAME}" != "schedule" ]]; then
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
@@ -99,6 +103,11 @@ jobs:
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
 
+      - name: Azure Subscription Check
+        run: |
+          az --version
+          az account list
+
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
         with:
@@ -108,5 +117,5 @@ jobs:
         run: |
           application=$(echo "${{ matrix.account_name }}" | rev | cut -d- -f2- | rev)
           environment=$(echo "${{ matrix.account_name }}" | rev | cut -d- -f1 | rev)
-          echo src/azure_sas_token_refresh.sh -c \"${{ env.AZURE_SAS_TOKEN_REFRESH }}\" -a \"$application\" -e \"$environment\" ${{ needs.strategy.outputs.azure_sas_token_refresh_sh_args }}
-          #src/azure_sas_token_refresh.sh -c "${{ env.AZURE_SAS_TOKEN_REFRESH }}" -a "$application" -e "$environment" ${{ needs.strategy.outputs.azure_sas_token_refresh_sh_args }}
+          echo src/azure_sas_token_refresh.sh -c 'xxxx' -a \"$application\" -e \"$environment\" ${{ needs.strategy.outputs.azure_sas_token_refresh_sh_args }} refresh
+          src/azure_sas_token_refresh.sh -c '${{ env.AZURE_SAS_TOKEN_REFRESH }}' -a "$application" -e "$environment" ${{ needs.strategy.outputs.azure_sas_token_refresh_sh_args }} refresh
