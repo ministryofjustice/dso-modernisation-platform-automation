@@ -118,10 +118,9 @@ disable_maintenance_mode() {
   fi
   if ((priority > MAINTENANCE_PRIORITY)); then
     newpriority=$((priority - 1000))
-    echo aws elbv2 set-rule-priorities --rule-priorities "RuleArn=$rulearn,Priority=$newpriority" >&2
     if (( DRYRUN == 0 )); then
       echo "aws elbv2 set-rule-priorities --rule-priorities 'RuleArn=$rulearn,Priority=$newpriority'" >&2
-      echo aws elbv2 set-rule-priorities --rule-priorities "RuleArn=$rulearn,Priority=$newpriority"
+      aws elbv2 set-rule-priorities --rule-priorities "RuleArn=$rulearn,Priority=$newpriority"
     else
       echo "Dry Run: aws elbv2 set-rule-priorities --rule-priorities 'RuleArn=$rulearn,Priority=$newpriority'" >&2
     fi
