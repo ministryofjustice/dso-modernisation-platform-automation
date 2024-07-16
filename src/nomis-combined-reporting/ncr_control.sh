@@ -1,62 +1,151 @@
 #!/bin/bash
-LBNAME="private-lb"
-MAINTENANCE_PRIORITY=999
-PORT=443
-DRYRUN=0
-DEPLOYMENT=enduser
+AWS_ACCOUNT_NAME=
+CMS_NAMES=
+PROCESSING_NAMES=
+TOMCAT_NAMES=
+EC2_RUN_SCRIPT=$(dirname "$0")/../run_script_on_ec2.sh
+
+set -eo pipefail
 
 usage() {
-  echo "Usage $0: <opts> <nomis_combined_reporting_environment>
+  echo "Usage $0: <opts> <nomis_combined_reporting_environemnt>
 
 Where <opts>:
   -0                     Stop BIP
   -1                     Start BIP
+  -d                     Run in dryrun mode
+  -z                     Print account name
+
+Examples:
+To stop t1:  $0 -0 t1
+To start t1: $0 -1 t1
 "
 }
 
-get_instance_names() {
-  local nomis_combined_reporting_environment
-  local cms_names
-  local processing_names
-  local tomcat_names
-
+set_environment_vars() {
   nomis_combined_reporting_environment=$1
   if [[ $nomis_combined_reporting_environment == "dev" ]]; then
-    account_name="nomis-combined-reporting-development"
+    AWS_ACCOUNT_NAME="nomis-combined-reporting-development"
   elif [[ $nomis_combined_reporting_environment == "t1" ]]; then
-    account_name="nomis-combined-reporting-test"
+    AWS_ACCOUNT_NAME="nomis-combined-reporting-test"
   elif [[ $nomis_combined_reporting_environment == "lsast" ]]; then
-    account_name="nomis-combined-reporting-preproduction"
+    AWS_ACCOUNT_NAME="nomis-combined-reporting-preproduction"
   elif [[ $nomis_combined_reporting_environment == "preprod" ]]; then
-    account_name="nomis-combined-reporting-preproduction"
-    cms_names=("pp-ncr-cms-a.nomis-combined-reporting.hmpps-preproduction.modernisation-platform.service.justice.gov.uk", "pp-ncr-cms-b.nomis-combined-reporting.hmpps-preproduction.modernisation-platform.service.justice.gov.uk")
-    processing_names=("pp-ncr-processing-a.nomis-combined-reporting.hmpps-preproduction.modernisation-platform.service.justice.gov.uk")
-    tomcat_names=("pp-ncr-web-admin-a.nomis-combined-reporting.hmpps-preproduction.modernisation-platform.service.justice.gov.uk", "pp-ncr-web-a.nomis-combined-reporting.hmpps-preproduction.modernisation-platform.service.justice.gov.uk", "pp-ncr-web-b.nomis-combined-reporting.hmpps-preproduction.modernisation-platform.service.justice.gov.uk")
+    AWS_ACCOUNT_NAME="nomis-combined-reporting-preproduction"
+    CMS_NAMES="pp-ncr-cms-a pp-ncr-cms-b"
+    PROCESSING_NAMES="pp-ncr-processing-a"
+    TOMCAT_NAMES="pp-ncr-web-admin-a pp-ncr-web-a pp-ncr-web-b"
   elif [[ $nomis_combined_reporting_environment == "prod" ]]; then
-    account_name="nomis-combined-reporting-production"
-    cms_names=("pd-ncr-cms-a.nomis-combined-reporting.hmpps-preproduction.modernisation-platform.service.justice.gov.uk", "pd-ncr-cms-b.nomis-combined-reporting.hmpps-preproduction.modernisation-platform.service.justice.gov.uk")
+    AWS_ACCOUNT_NAME="nomis-combined-reporting-production"
   else
-    echo "Unsupported nomis_combined_reporting_environment $nomis_combined_reporting_environment" >&2
+    echo "Unsupported AWS_ACCOUNT_NAME $AWS_ACCOUNT_NAME" >&2
     return 1
   fi
-  echo "$account_name"
-  echo "$cms_names"
-  echo "$processing_names"
-  echo "$tomcat_names"
 }
 
 start_ncr() {
-  # Get environment
-  # Get instance name for cms machines, processing nodes and tomcat servers
-  # run start server bash script on cms machines a then b
-  # run start server bash script on processing nodes
-  # run start server bash script on tomcat web servers
+  local ec2name
+  local stdout
+  local stderr
+
+  stderr=$(mktemp)
+  for ec2name in $CMS_NAMES; do
+    # run start server bash script on cms machines a then b
+     echo "$ec2name: start"
+     if ! stdout=$($EC2_RUN_SCRIPT first "$ec2name" "StartNCR" 'echo this is running hostname command remotely && hostname' 2>$stderr); then
+       cat $stderr >&2
+       echo "ERROR: $ec2name: $stdout"
+       rm -f $stderr
+       exit 1
+     fi
+     echo "$ec2name: $stdout"
+  done
+  for ec2name in $PROCESSING_NAMES; do
+    # run start server bash script on processing nodes
+    echo "$ec2name: start"
+  done
+  for ec2name in $TOMCAT_NAMES; do
+    # run start server bash script on tomcat web servers
+    echo "$ec2name: start"
+  done
+  rm -f $stderr
 }
 
 stop_ncr() {
-  # Get environment
-  # Get instance name for cms machines, processing nodes and tomcat servers
-  # run stop server bash script on tomcat web servers
-  # run stop server bash script on processing nodes
-  # run stop server bash script on cms machines b then a
+  local ec2name
+
+  for ec2name in $TOMCAT_NAMES; do
+    # run stop server bash script on tomcat web servers
+    echo "$ec2name: stop"
+  done
+  for ec2name in $PROCESSING_NAMES; do
+    # run stop server bash script on processing nodes
+    echo "$ec2name: stop"
+  done
+  for ec2name in $CMS_NAMES; do
+    # run stop server bash script on cms machines b then a
+    echo "$ec2name: stop"
+  done
 }
+
+main() {
+  account_name=0
+  start=0
+  stop=0
+  option_set=0
+  while getopts "01dz" opt; do
+      case $opt in
+          0)
+              stop=1
+              option_set=$((option_set+1))
+              ;;
+          1)
+              start=1
+              option_set=$((option_set+1))
+              ;;
+          d)
+              DRYRUN=1
+              ;;
+          z)
+              account_name=1
+              option_set=$((option_set+1))
+              ;;
+          :)
+              echo "Error: option ${OPTARG} requires an argument" >&2
+              exit 1
+              ;;
+          ?)
+              echo "Invalid option: ${OPTARG}" >&2
+              echo >&2
+              usage >&2
+              exit 1
+              ;;
+      esac
+  done
+
+  shift $((OPTIND-1))
+
+  if [[ -z $1 || -n $2 || $option_set != 1 ]]; then
+    usage >&2
+    exit 1
+  fi
+  if ! set_environment_vars "$1"; then
+    exit 1
+  fi
+  if [[ ! -x $EC2_RUN_SCRIPT ]]; then
+    echo "Could not find $EC2_RUN_SCRIPT" >&2
+    exit 1
+  fi
+  if ((account_name == 1)); then
+    echo $AWS_ACCOUNT_NAME
+  elif ((start == 1)); then
+    start_ncr
+  elif ((stop == 1)); then
+    stop_ncr
+  else
+    usage >&2
+    exit 1
+  fi
+}
+
+main "$@"
