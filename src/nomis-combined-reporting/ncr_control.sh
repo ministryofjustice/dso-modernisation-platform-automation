@@ -52,7 +52,7 @@ start_ncr() {
   for ec2name in $CMS_NAMES; do
     # run start server bash script on cms machines a then b
      echo "$ec2name: start"
-     if ! stdout=$($EC2_RUN_SCRIPT first "$ec2name" "StartNCR" 'echo this is running hostname command remotely && hostname' 2>$stderr); then
+     if ! stdout=$($EC2_RUN_SCRIPT first "$ec2name" "StartNCR" 'sudo su bobj && . ~/.bash_profile && /u01/app/bobj/BIP4/sap_bobj/ccm.sh -start all' 2>$stderr); then
        cat $stderr >&2
        echo "ERROR: $ec2name: $stdout"
        rm -f $stderr
@@ -63,10 +63,24 @@ start_ncr() {
   for ec2name in $PROCESSING_NAMES; do
     # run start server bash script on processing nodes
     echo "$ec2name: start"
+    if ! stdout=$($EC2_RUN_SCRIPT first "$ec2name" "StartNCR" 'sudo su bobj && . ~/.bash_profile && /u01/app/bobj/BIP4/sap_bobj/ccm.sh -start all' 2>$stderr); then
+       cat $stderr >&2
+       echo "ERROR: $ec2name: $stdout"
+       rm -f $stderr
+       exit 1
+     fi
+     echo "$ec2name: $stdout"
   done
   for ec2name in $TOMCAT_NAMES; do
     # run start server bash script on tomcat web servers
     echo "$ec2name: start"
+    if ! stdout=$($EC2_RUN_SCRIPT first "$ec2name" "StartNCR" 'sudo su bobj && . ~/.bash_profile && /u01/app/bobj/BIP4/sap_bobj/ccm.sh -start all' 2>$stderr); then
+       cat $stderr >&2
+       echo "ERROR: $ec2name: $stdout"
+       rm -f $stderr
+       exit 1
+     fi
+     echo "$ec2name: $stdout"
   done
   rm -f $stderr
 }
@@ -77,14 +91,35 @@ stop_ncr() {
   for ec2name in $TOMCAT_NAMES; do
     # run stop server bash script on tomcat web servers
     echo "$ec2name: stop"
+    if ! stdout=$($EC2_RUN_SCRIPT first "$ec2name" "StartNCR" 'sudo su bobj && . ~/.bash_profile && /u01/app/bobj/BIP4/sap_bobj/ccm.sh -stop all' 2>$stderr); then
+       cat $stderr >&2
+       echo "ERROR: $ec2name: $stdout"
+       rm -f $stderr
+       exit 1
+     fi
+     echo "$ec2name: $stdout"
   done
   for ec2name in $PROCESSING_NAMES; do
     # run stop server bash script on processing nodes
     echo "$ec2name: stop"
+    if ! stdout=$($EC2_RUN_SCRIPT first "$ec2name" "StartNCR" 'sudo su bobj && . ~/.bash_profile && /u01/app/bobj/BIP4/sap_bobj/ccm.sh -stop all' 2>$stderr); then
+       cat $stderr >&2
+       echo "ERROR: $ec2name: $stdout"
+       rm -f $stderr
+       exit 1
+     fi
+     echo "$ec2name: $stdout"
   done
   for ec2name in $CMS_NAMES; do
     # run stop server bash script on cms machines b then a
     echo "$ec2name: stop"
+    if ! stdout=$($EC2_RUN_SCRIPT first "$ec2name" "StartNCR" 'sudo su bobj && . ~/.bash_profile && /u01/app/bobj/BIP4/sap_bobj/ccm.sh -stop all' 2>$stderr); then
+       cat $stderr >&2
+       echo "ERROR: $ec2name: $stdout"
+       rm -f $stderr
+       exit 1
+     fi
+     echo "$ec2name: $stdout"
   done
 }
 
