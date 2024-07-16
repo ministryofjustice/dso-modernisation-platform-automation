@@ -71,13 +71,13 @@ main() {
     exit 1
   fi
   command_json=$(run_command_on_instance "$instance_ids" "$comment" "$script")
-  echo "$command_json"
+  echo "$command_json" >&2
   command_id=$(jq -r ".Command.CommandId" <<< "$command_json")
 
   exitcode=0
   for instance_id in $instance_ids; do
     result_json=$(wait_for_command "$instance_id" "$command_id")
-    echo "$result_json"
+    echo "$result_json" >&2
     result_status=$(jq -r ".Status" <<< "$result_json")
 
     echo "Results for instance_id=$instance_id" >&2
