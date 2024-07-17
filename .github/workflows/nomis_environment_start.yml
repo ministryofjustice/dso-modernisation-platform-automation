@@ -60,8 +60,8 @@ jobs:
           get_strategy_matrix() {
             echo '{"include":['
             (
-              for account in $@; do
-                echo '{"account_name": "'$account'"},'
+              for nomis_environment in $@; do
+                echo '{"nomis_environment": "'$nomis_environment'"},'
               done
             ) | sed '$s/,$//'
             echo ']}'
@@ -90,7 +90,7 @@ jobs:
               fi
             elif [[ "${cron_time}" == '45 6 * * 1-5' ]]; then
               if ((is_bst == 0)); then
-                nomis_environment="t3 preprod"
+                nomis_environments="t3 preprod"
               fi
             else
               echo "Unsupported schedule cron ${cron_time}"
@@ -99,9 +99,6 @@ jobs:
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
-          fi
-          if [[ -n $nomis_environment ]]; then
-            account_name=$(src/nomis/nomis_control.sh -z "$nomis_environment")
           fi
           echo "nomis_environments=${nomis_environments} script_flags=${script_flags} dryrun=${dryrun}"
           echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
@@ -116,22 +113,26 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.strategy.outputs.matrix) }}
     steps:
-      - name: Get Account Details
+      - name: Get Account Name
         env:
           nomis_environment: "${{ matrix.nomis_environment }}"
-        id: account
+        id: account_name
         run: |
           account_name=$(src/nomis/nomis_control.sh -z "$nomis_environment")
-          echo "account name: $account_name"
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.matrix.account_name] }}"
-          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
-          echo "role arn:     ${role_arn}"
-          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
- 
+          echo "account_name=${account_name}"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+
+      - name: Get Account Id
+        id: account_id
+        run: |
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.account_name.outputs.account_name] }}"
+          echo "account_id=${account_id}"
+          echo "account_id=${account_id}" >> $GITHUB_OUTPUT
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
         with:
-          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
 
@@ -197,7 +198,7 @@ jobs:
       - name: Disable Maintenance Mode
         env:
           script_flags: "${{ needs.setup.outputs.script_flags }}"
-          nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
+          nomis_environment: "${{ matrixnomis_environment }}"
         if: steps.active_asg_stats.maintenance_mode == 'enabled'
         run: |
           src/nomis/nomis_control.sh -0 $script_flags "$nomis_environment"
