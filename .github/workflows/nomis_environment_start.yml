@@ -113,6 +113,11 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
       - name: Get Account Name
         env:
           nomis_environment: "${{ matrix.nomis_environment }}"
@@ -135,11 +140,6 @@ jobs:
           role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
-
-      - name: Checkout Repository
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
-        with:
-          ref: ${{ github.ref }}
 
       - name: Get Active Weblogic ASG Stats
         id: active_asg_stats
