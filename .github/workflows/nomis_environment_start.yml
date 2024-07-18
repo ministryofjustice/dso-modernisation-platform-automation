@@ -16,7 +16,7 @@ on:
           - preprod
       weblogic_deployment:
         type: choice
-        description: Which weblogic deployment to use
+        description: Which weblogic deployment to use (leave as auto unless testing)
         default: auto
         options:
           - auto
@@ -24,15 +24,15 @@ on:
           - b
       dryrun:
         type: choice
-        description: Dryrun mode
+        description: Dryrun mode (leave as false unless testing)
         default: false
         options:
           - true
           - false
 
-  schedule:
-    - cron: "45 5 * * 1-5"  # BST
-    - cron: "45 6 * * 1-5"  # GMT
+  schedule
+    - cron: "30 5 * * 1-5"  # BST
+    - cron: "30 6 * * 1-5"  # GMT
 
 permissions:
   id-token: write
@@ -138,7 +138,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
         with:
           role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.nomis_environment }}-1"
           aws-region: eu-west-2
 
       - name: Get Active Weblogic ASG Stats
@@ -175,7 +175,7 @@ jobs:
           nomis_environment: "${{ matrix.nomis_environment }}"
         run: |
           healthy_instance_count=0
-          n=30
+          n=45
           echo "Retrieving healthy instance count: src/nomis/nomis_control.sh -h $script_flags $nomis_environment"
           for i in $(seq 1 $n); do
             healthy_instance_count=$(src/nomis/nomis_control.sh -h $script_flags "$nomis_environment")
@@ -199,6 +199,6 @@ jobs:
         env:
           script_flags: "${{ needs.setup.outputs.script_flags }}"
           nomis_environment: "${{ matrix.nomis_environment }}"
-        if: steps.active_asg_stats.maintenance_mode == 'enabled'
+        if: steps.active_asg_stats.outputs.maintenance_mode == 'enabled'
         run: |
           src/nomis/nomis_control.sh -0 $script_flags "$nomis_environment"
