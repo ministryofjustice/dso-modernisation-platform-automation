@@ -1,0 +1,165 @@
+---
+name: NDH Offloc CDE Copy
+
+on:
+  workflow_dispatch:
+    inputs:
+      ndh_environment:
+        type: choice
+        description: Which ndh environment to copy from
+        default: pd
+        options:
+          - t1
+          - t2
+          - pp
+          - pd
+          - dr
+      script_flags:
+        type: string
+        description: "Flags to pass to ndh-cdecopy script: a=Azure p=pins m=Mercury s=s3"
+        default: "-apms"
+      dryrun:
+        type: choice
+        description: Dryrun mode (leave as false unless testing)
+        default: false
+        options:
+          - true
+          - false
+
+  schedule:
+    - cron: "20 23 * * *"  # BST
+    - cron: "20 00 * * *"  # GMT
+
+permissions:
+  id-token: write
+  contents: read
+
+run-name: "NDH Offloc CDE Copy (${{ inputs.ndh_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+      dryrun: "${{ steps.parseinput.outputs.dryrun }}"
+      matrix: "${{ steps.parseinput.outputs.matrix }}"
+      script_flags: "${{ steps.parseinput.outputs.script_flags }}"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Parse Workflow Inputs
+        id: parseinput
+        run: |
+          get_strategy_matrix() {
+            echo '{"include":['
+            (
+              for ndh_environment in $@; do
+                echo '{"ndh_environment": "'$ndh_environment'"},'
+              done
+            ) | sed '$s/,$//'
+            echo ']}'
+          }
+          ndh_environments=
+          script_flags=
+          dryrun=0
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            ndh_environments="${{ github.event.inputs.ndh_environment }}"
+            script_flags="${{ github.event.inputs.script_flags }}"
+            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+              script_flags="$script_flags -d"
+              dryrun=1
+            fi
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            cron_time="${{ github.event.schedule }}"
+            is_bst=1
+            if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
+              is_bst=0
+            fi
+            if [[ "${cron_time}" == '20 23 * * *' ]]; then
+              if ((is_bst == 1)); then
+                ndh_environments="t1 t2 pp pd dr"
+              fi
+            elif [[ "${cron_time}" == '20 00 * * *' ]]; then
+              if ((is_bst == 0)); then
+                ndh_environments="t1 t2 pp pd dr"
+              fi
+            else
+              echo "Unsupported schedule cron ${cron_time}"
+              exit 1
+            fi
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo "ndh_environments=${ndh_environments} script_flags=${script_flags} dryrun=${dryrun}"
+          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
+          echo "matrix=$(get_strategy_matrix $ndh_environments | jq -c)" >> $GITHUB_OUTPUT
+          echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT
+
+  cdecopy:
+    name: CDE Copy
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Get Account Name
+        env:
+          ndh_environment: "${{ matrix.ndh_environment }}"
+        id: account_name
+        run: |
+          account_name=
+          ec2_name_app=
+          if [[ $ndh_environment == "t1" ]]; else
+            account_name="nomis-data-hub-test"
+            ec2_name_app="t1-ndh-app-a"
+          elif [[ $ndh_environment == "t2" ]]; else
+            account_name="nomis-data-hub-test"
+            ec2_name_app="t2-ndh-app-a"
+          elif [[ $ndh_environment == "pp" ]]; then
+            account_name="nomis-data-hub-preproduction"
+            ec2_name_app="pp-ndh-app-a"
+          elif [[ $ndh_environment == "pd" || $ndh_environment == "dr" ]]; then
+            account_name="nomis-data-hub-production"
+            ec2_name_app="pd-ndh-app-a"
+          elif [[ $ndh_environment == "pd" || $ndh_environment == "dr" ]]; then
+            account_name="nomis-data-hub-production"
+            ec2_name_app="dr-ndh-app-b"
+          else
+            echo "Unsupported NDH environment: $ndh_environment"
+            exit 1
+          fi
+          echo "account_name=${account_name} ec2_name_app=${ec2_name_app}"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+          echo "ec2_name_app=${ec2_name_app}" >> $GITHUB_OUTPUT
+
+      - name: Get Account Id
+        id: account_id
+        run: |
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.account_name.outputs.account_name] }}"
+          echo "account_id=${account_id}"
+          echo "account_id=${account_id}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ndh_environment }}-1"
+          aws-region: eu-west-2
+
+      - name: Run cdecopy.sh on ndh-app EC2
+        env:
+          ec2_name_app: "${{ steps.account_name.outputs.ec2_name_app }}"
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
+        run: |
+          echo "src/run_script_on_ec2.sh first '$ec2_name_app' 'cdecopy' 'sudo su tibco -c /usr/local/bin/cdecopy.sh $script_flags'"
+          src/run_script_on_ec2.sh first "$ec2_name_app" "cdecopy" "sudo su tibco -c '/usr/local/bin/cdecopy.sh $script_flags'"
