@@ -1,13 +1,18 @@
 #!/bin/bash
 set -eo pipefail
 
+TIMEOUT_SECS="${TIMEOUT_SECS:-300}"
+CHECK_INTERVAL_SECS="${CHECK_INTERVAL_SECS:-10}"
+
 usage() {
     echo "Usage: $0 first|all <tag:Name> <comment> <script>"
     echo
     echo "Finds EC2s matching tag:Name and runs the given script using SSM"
     echo "  first: run on first EC2 only."
     echo "  all:   run on all matching EC2s"
-    echo "Returns exitcode of 1 if script fails to run, 2 if instance not found"G
+    echo "Returns exitcode of 1 if script fails to run, 2 if instance not found"
+    echo
+    echo "Example Usage: TIMEOUT_SECS=3600 $0 first 'pd-ndh-app-a' 'cdecopy' 'sudo su tibco -c cdecopy.sh'"
 }
 
 get_instance_ids() {
@@ -35,15 +40,15 @@ wait_for_command() {
   local i
   local n
 
-  n=12
+  n=$((1+TIMEOUT_SECS/CHECK_INTERVAL_SECS))
   for i in $(seq 1 $n); do
+    sleep $CHECK_INTERVAL_SECS
     echo "[$i/$n] aws ssm get-command-invocation --instance-id '$1' --command-id '$2'" >&2
     result_json=$(aws ssm get-command-invocation --instance-id "$1" --command-id "$2")
     result_status=$(jq -r ".Status" <<< "$result_json")
     if [[ $result_status == "Success" || $result_status == "Failed" || $result_status == "Terminated" ]]; then
       break
     fi
-    sleep 5
   done
   echo "$result_json"
 }
