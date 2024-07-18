@@ -106,7 +106,7 @@ jobs:
           echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT
 
   start:
-    name: Start Nomis Environment
+    name: Start
     needs: setup
     runs-on: ubuntu-latest
     strategy:
