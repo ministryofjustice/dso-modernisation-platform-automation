@@ -6,7 +6,7 @@ on:
     inputs:
       nomis_environment:
         type: choice
-        description: Which nomis environment to start
+        description: Which nomis environment to stop
         default: t1
         options:
           - t1
@@ -16,7 +16,7 @@ on:
           - preprod
       weblogic_deployment:
         type: choice
-        description: Which weblogic deployment to use
+        description: Which weblogic deployment to use (leave as auto unless testing)
         default: auto
         options:
           - auto
@@ -24,17 +24,15 @@ on:
           - b
       dryrun:
         type: choice
-        description: Dryrun mode
+        description: Dryrun mode (leave as false unless testing)
         default: false
         options:
           - true
           - false
 
   schedule:
-    - cron: "15 18 * * 1-5"  # T3 BST
-    - cron: "15 19 * * 1-5"  # T3 GMT
-    - cron: "10 18 * * 1-5"  # preprod BST
-    - cron: "10 19 * * 1-5"  # preprod GMT
+    - cron: "05 18 * * 1-5"  # T3 BST
+    - cron: "05 19 * * 1-5"  # T3 GMT
 
 permissions:
   id-token: write
@@ -42,31 +40,37 @@ permissions:
 
 run-name: "NOMIS Environment Stop (${{ inputs.nomis_environment }}${{ inputs.weblogic_deployment == 'auto' && '' || inputs.weblogic_deployment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
 
+
 jobs:
   setup:
     name: Setup
     runs-on: ubuntu-latest
     outputs:
-      account_name: "${{ steps.parseinput.outputs.account_name }}"
       dryrun: "${{ steps.parseinput.outputs.dryrun }}"
-      nomis_environment: "${{ steps.parseinput.outputs.nomis_environment }}"
-      role_arn: "${{ steps.account.outputs.role_arn }}"
+      matrix: "${{ steps.parseinput.outputs.matrix }}"
       script_flags: "${{ steps.parseinput.outputs.script_flags }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
         with:
           ref: ${{ github.ref }}
-
       - name: Parse Workflow Inputs
         id: parseinput
         run: |
-          account_name=
-          nomis_environment=
+          get_strategy_matrix() {
+            echo '{"include":['
+            (
+              for nomis_environment in $@; do
+                echo '{"nomis_environment": "'$nomis_environment'"},'
+              done
+            ) | sed '$s/,$//'
+            echo ']}'
+          }
+          nomis_environments=
           script_flags=
           dryrun=0
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            nomis_environment="${{ github.event.inputs.nomis_environment }}"
+            nomis_environments="${{ github.event.inputs.nomis_environment }}"
             if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
               script_flags="$script_flags -d"
               dryrun=1
@@ -80,21 +84,13 @@ jobs:
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
             fi
-            if [[ "${cron_time}" == '15 18 * * 1-5' ]]; then
+            if [[ "${cron_time}" == '05 18 * * 1-5' ]]; then
               if ((is_bst == 1)); then
-                nomis_environment=t3
+                nomis_environments="t1 t2 t3 lsast preprod"
               fi
-            elif [[ "${cron_time}" == '15 19 * * 1-5' ]]; then
+            elif [[ "${cron_time}" == '05 19 * * 1-5' ]]; then
               if ((is_bst == 0)); then
-                nomis_environment=t3
-              fi
-            elif [[ "${cron_time}" == '10 18 * * 1-5' ]]; then
-              if ((is_bst == 1)); then
-                nomis_environment=preprod
-              fi
-            elif [[ "${cron_time}" == '10 19 * * 1-5' ]]; then
-              if ((is_bst == 0)); then
-                nomis_environment=preprod
+                nomis_environments="t1 t2 t3 lsast preprod"
               fi
             else
               echo "Unsupported schedule cron ${cron_time}"
@@ -104,51 +100,51 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          if [[ -n $nomis_environment ]]; then
-            account_name=$(src/nomis/nomis_control.sh -z "$nomis_environment")
-          fi
-          echo "account_name=${account_name} nomis_environment=${nomis_environment} script_flags=${script_flags} dryrun=${dryrun}"
-          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+          echo "nomis_environments=${nomis_environments} script_flags=${script_flags} dryrun=${dryrun}"
           echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
-          echo "nomis_environment=${nomis_environment}" >> $GITHUB_OUTPUT
+          echo "matrix=$(get_strategy_matrix $nomis_environments | jq -c)" >> $GITHUB_OUTPUT
           echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT
 
-      - name: Get AWS Account Details
-        id: account
-        if: steps.parseinput.outputs.account_name != ''
-        run: |
-          echo "account name: ${{ steps.parseinput.outputs.account_name }}"
-          account_id="${{ fromJSON(vars.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.parseinput.outputs.account_name] }}"
-          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
-          echo "role arn:     ${role_arn}"
-          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
-
-  get_nomis_environment_status:
-    name: Get Nomis Environment Status
+  stop:
+    name: Stop Nomis Environment
     needs: setup
-    if: needs.setup.outputs.account_name != ''
     runs-on: ubuntu-latest
-    outputs:
-      asg_name: "${{ steps.active_asg_stats.outputs.asg_name }}"
-      desired_count: "${{ steps.active_asg_stats.outputs.desired_count }}"
-      maintenance_mode: "${{ steps.active_asg_stats.outputs.maintenance_mode }}"
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
-        with:
-          role-to-assume: "${{ needs.setup.outputs.role_arn }}"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
-          aws-region: eu-west-2
-
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
         with:
           ref: ${{ github.ref }}
 
+      - name: Get Account Name
+        env:
+          nomis_environment: "${{ matrix.nomis_environment }}"
+        id: account_name
+        run: |
+          account_name=$(src/nomis/nomis_control.sh -z "$nomis_environment")
+          echo "account_name=${account_name}"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+
+      - name: Get Account Id
+        id: account_id
+        run: |
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.account_name.outputs.account_name] }}"
+          echo "account_id=${account_id}"
+          echo "account_id=${account_id}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.nomis_environment }}-1"
+          aws-region: eu-west-2
+
       - name: Get Active Weblogic ASG Stats
         id: active_asg_stats
         env:
-          nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
+          nomis_environment: "${{ matrix.nomis_environment }}"
           script_flags: "${{ needs.setup.outputs.script_flags }}"
         run: |
           asg_name=$(src/nomis/nomis_control.sh -n $script_flags "$nomis_environment")
@@ -159,51 +155,19 @@ jobs:
           echo "desired_count=${desired_count}" >> $GITHUB_OUTPUT
           echo "maintenance_mode=${maintenance_mode}" >> $GITHUB_OUTPUT
 
-  enable_maintenance_mode:
-    name: Enable Maintenance Mode
-    needs: [setup, get_nomis_environment_status]
-    runs-on: ubuntu-latest
-    if: needs.setup.outputs.account_name != ''
-    steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
-        if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'disabled'
-        with:
-          role-to-assume: "${{ needs.setup.outputs.role_arn }}"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
-          aws-region: eu-west-2
-
-      - name: Checkout Repository
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
-        if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'disabled'
-        with:
-          ref: ${{ github.ref }}
-
       - name: Enable Maintenance Mode
-        if: needs.get_nomis_environment_status.outputs.maintenance_mode == 'disabled'
+        if: steps.active_asg_stats.outputs.maintenance_mode == 'disabled'
         env:
           script_flags: "${{ needs.setup.outputs.script_flags }}"
-          nomis_environment: "${{ needs.setup.outputs.nomis_environment }}"
+          nomis_environment: "${{ matrix.nomis_environment }}"
         run: |
           src/nomis/nomis_control.sh -1 $script_flags "$nomis_environment"
 
-  stop_weblogic_instance:
-    name: Stop Weblogic Instance
-    needs: [setup, get_nomis_environment_status, enable_maintenance_mode]
-    runs-on: ubuntu-latest
-    if: needs.setup.outputs.account_name != '' && needs.get_nomis_environment_status.outputs.desired_count != '0'
-    steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
-        with:
-          role-to-assume: "${{ needs.setup.outputs.role_arn }}"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
-          aws-region: eu-west-2
-
       - name: Set ASG Desired Count
         env:
-          asg_name: "${{ needs.get_nomis_environment_status.outputs.asg_name }}"
+          asg_name: "${{ steps.active_asg_stats.outputs.asg_name }}"
           dryrun: "${{ needs.setup.outputs.dryrun }}"
+        if: steps.active_asg_stats.outputs.desired_count != '0'
         run: |
           if [[ $dryrun == '0' ]]; then
             echo "aws autoscaling set-desired-capacity --desired-capacity 0 --auto-scaling-group-name '$asg_name'" >&2
