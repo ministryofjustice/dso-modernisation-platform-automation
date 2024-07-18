@@ -30,7 +30,7 @@ on:
           - true
           - false
 
-  schedule
+  schedule:
     - cron: "30 5 * * 1-5"  # BST
     - cron: "30 6 * * 1-5"  # GMT
 
