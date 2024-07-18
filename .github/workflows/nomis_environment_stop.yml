@@ -6,7 +6,7 @@ on:
     inputs:
       nomis_environment:
         type: choice
-        description: Which nomis environment to start
+        description: Which nomis environment to stop
         default: t1
         options:
           - t1
