@@ -162,5 +162,6 @@ jobs:
           ec2_name_app: "${{ steps.account_name.outputs.ec2_name_app }}"
           script_flags: "${{ needs.setup.outputs.script_flags }}"
         run: |
+          export TIMEOUT_SECS=3600
           echo "src/run_script_on_ec2.sh first '$ec2_name_app' 'cdecopy' 'sudo su tibco -c /usr/local/bin/cdecopy.sh $script_flags'"
           src/run_script_on_ec2.sh first "$ec2_name_app" "cdecopy" "sudo su tibco -c '/usr/local/bin/cdecopy.sh $script_flags'"
