@@ -84,11 +84,11 @@ jobs:
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
             fi
-            if [[ "${cron_time}" == '45 5 * * 1-5' ]]; then
+            if [[ "${cron_time}" == '30 5 * * 1-5' ]]; then
               if ((is_bst == 1)); then
                 nomis_environments="t3 preprod"
               fi
-            elif [[ "${cron_time}" == '45 6 * * 1-5' ]]; then
+            elif [[ "${cron_time}" == '30 6 * * 1-5' ]]; then
               if ((is_bst == 0)); then
                 nomis_environments="t3 preprod"
               fi
@@ -175,7 +175,7 @@ jobs:
           nomis_environment: "${{ matrix.nomis_environment }}"
         run: |
           healthy_instance_count=0
-          n=45
+          n=55
           echo "Retrieving healthy instance count: src/nomis/nomis_control.sh -h $script_flags $nomis_environment"
           for i in $(seq 1 $n); do
             healthy_instance_count=$(src/nomis/nomis_control.sh -h $script_flags "$nomis_environment")
