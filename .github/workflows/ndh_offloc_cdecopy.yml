@@ -120,19 +120,19 @@ jobs:
         run: |
           account_name=
           ec2_name_app=
-          if [[ $ndh_environment == "t1" ]]; else
+          if [[ $ndh_environment == "t1" ]]; then
             account_name="nomis-data-hub-test"
             ec2_name_app="t1-ndh-app-a"
-          elif [[ $ndh_environment == "t2" ]]; else
+          elif [[ $ndh_environment == "t2" ]]; then
             account_name="nomis-data-hub-test"
             ec2_name_app="t2-ndh-app-a"
           elif [[ $ndh_environment == "pp" ]]; then
             account_name="nomis-data-hub-preproduction"
             ec2_name_app="pp-ndh-app-a"
-          elif [[ $ndh_environment == "pd" || $ndh_environment == "dr" ]]; then
+          elif [[ $ndh_environment == "pd" ]]; then
             account_name="nomis-data-hub-production"
             ec2_name_app="pd-ndh-app-a"
-          elif [[ $ndh_environment == "pd" || $ndh_environment == "dr" ]]; then
+          elif [[ $ndh_environment == "dr" ]]; then
             account_name="nomis-data-hub-production"
             ec2_name_app="dr-ndh-app-b"
           else
