@@ -75,7 +75,7 @@ jobs:
           echo "azure_sas_token_refresh_sh_args=${azure_sas_token_refresh_sh_args}" >> $GITHUB_OUTPUT
 
   azure_sas_token_refresh:
-    name: Azure SAS Token refresh
+    name: refresh
     runs-on: ubuntu-latest
     needs: strategy
     strategy:
