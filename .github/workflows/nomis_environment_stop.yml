@@ -31,8 +31,9 @@ on:
           - false
 
   schedule:
-    - cron: "05 18 * * 1-5"  # T3 BST
-    - cron: "05 19 * * 1-5"  # T3 GMT
+    # runs at 19:05 local time. 2 entries to deal with BST/GMT
+    - cron: "05 18 * * 1-5"
+    - cron: "05 19 * * 1-5"
 
 permissions:
   id-token: write
