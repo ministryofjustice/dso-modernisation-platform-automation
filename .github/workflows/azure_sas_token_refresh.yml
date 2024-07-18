@@ -5,14 +5,14 @@ on:
   workflow_dispatch:
     inputs:
       applications:
-        description: 'e.g. nomis or leave blank for all'
+        description: 'Application, e.g. nomis-data-hub or leave blank for all apps configured in AZURE_SAS_TOKEN_REFRESH var'
         type: string
       environments:
-        description: 'e.g. development or leave blank for all'
+        description: 'Environment, e.g. development or leave blank for all'
         type: string
       dryrun:
         type: choice
-        description: Dryrun mode
+        description: Dryrun mode (leave as false unless testing)
         default: false
         options:
           - true
@@ -82,19 +82,17 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.strategy.outputs.matrix) }}
     steps:
-      - name: Get Account Details
-        id: account
+      - name: Get Account Id
+        id: account_id
         run: |
-          echo "account name: ${{ matrix.account_name }}"
-          account_id="${{ fromJSON(vars.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
-          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
-          echo "role arn:     ${role_arn}"
-          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          echo "account_id=${account_id}"
+          echo "account_id=${account_id}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
         with:
-          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
 
