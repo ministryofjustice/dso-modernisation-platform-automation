@@ -1,6 +1,9 @@
 #!/bin/bash
 set -eo pipefail
 
+SHOW_COMMAND_JSON="${SHOW_COMMAND_JSON:-0}"
+SHOW_RESULT_JSON="${SHOW_RESULT_JSON:-0}"
+SHOW_STDERR_ON_SUCCESS="${SHOW_STDERR_ON_SUCCESS:0}"
 TIMEOUT_SECS="${TIMEOUT_SECS:-300}"
 CHECK_INTERVAL_SECS="${CHECK_INTERVAL_SECS:-10}"
 
@@ -76,21 +79,28 @@ main() {
     exit 1
   fi
   command_json=$(run_command_on_instance "$instance_ids" "$comment" "$script")
-  echo "$command_json" >&2
+  if ((SHOW_COMMAND_JSON != 0)); then
+    echo "$command_json" >&2
+  fi
   command_id=$(jq -r ".Command.CommandId" <<< "$command_json")
 
   exitcode=0
   for instance_id in $instance_ids; do
     result_json=$(wait_for_command "$instance_id" "$command_id")
-    echo "$result_json" >&2
+    if ((SHOW_RESULT_JSON != 0)); then
+      echo "$result_json" | grep -v StandardErrorContent | grep -v StandardOutputContent >&2
+    fi
     result_status=$(jq -r ".Status" <<< "$result_json")
 
     echo "Results for instance_id=$instance_id" >&2
     if [[ $result_status == "Success" ]]; then
+      if ((SHOW_STDERR_ON_SUCCESS != 0)); then
+        jq -r ".StandardErrorContent" <<< "$result_json" >&2
+      fi
       jq -r ".StandardOutputContent" <<< "$result_json"
     elif [[ $result_status == "Failed" ]]; then
-      jq -r ".StandardOutputContent" <<< "$result_json"
       jq -r ".StandardErrorContent" <<< "$result_json" >&2
+      jq -r ".StandardOutputContent" <<< "$result_json"
       exitcode=1
     else
       echo "Command failed to execute, or timed out waiting for response >&2"
