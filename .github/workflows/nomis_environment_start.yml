@@ -31,9 +31,11 @@ on:
           - false
 
   schedule:
-    # runs at 06:30 local time. 2 entries to deal with BST/GMT
+    # runs at 06:30 and 09:30 local time. 2 entries to deal with BST/GMT
     - cron: "30 5 * * 1-5"
     - cron: "30 6 * * 1-5"
+    - cron: "30 8 * * 1-5"
+    - cron: "30 9 * * 1-5"
 
 permissions:
   id-token: write
@@ -86,11 +88,11 @@ jobs:
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
             fi
-            if [[ "${cron_time}" == '30 5 * * 1-5' ]]; then
+            if [[ "${cron_time}" == '30 5 * * 1-5' || "${cron_time}" == '30 8 * * 1-5' ]]; then
               if ((is_bst == 1)); then
                 nomis_environments="t3 preprod"
               fi
-            elif [[ "${cron_time}" == '30 6 * * 1-5' ]]; then
+            elif [[ "${cron_time}" == '30 6 * * 1-5' || "${cron_time}" == '30 9 * * 1-5' ]]; then
               if ((is_bst == 0)); then
                 nomis_environments="t3 preprod"
               fi
