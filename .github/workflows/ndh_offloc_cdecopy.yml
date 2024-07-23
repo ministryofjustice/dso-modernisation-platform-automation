@@ -16,7 +16,7 @@ on:
           - dr
       script_flags:
         type: string
-        description: "Flags to pass to ndh-cdecopy script: a=Azure m=mercury s=s3"
+        description: "Flags to pass to ndh-cdecopy script: a=Azure m=Mercury s=s3"
         default: "-ams"
       dryrun:
         type: choice
