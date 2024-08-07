@@ -91,7 +91,7 @@ jobs:
           ansible-playbook site.yml -e role=oracle-db-refresh --tags get_latest_backup_control_file --limit ${{ inputs.source_oem_hostname }} --extra-vars "SOURCE_DB=${{ inputs.source_db_name }}"
         working-directory: configuration-management/ansible
       - name: Upload control file
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a # v4.3.6
         with:
           name: control_file
           path: "${{ inputs.source_db_name }}_control.txt"
