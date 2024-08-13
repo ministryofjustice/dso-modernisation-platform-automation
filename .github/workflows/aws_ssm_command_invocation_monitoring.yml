@@ -26,7 +26,7 @@ jobs:
       - name: Get SSM Command Invocation Failures
         id: get_ssm_command_invocation_failures
         run: |
-          DATE=$(date -v-1d '+%Y-%m-%dT%TZ')
+          DATE=$(date -d '1 day ago' '+%Y-%m-%dT%TZ')
           FAILED_COMMAND_INVOCATIONS=$(aws ssm list-command-invocations --filters 'key=Status,value=Failed' 'key=InvokedAfter,value='$DATE | jq -r '.CommandInvocations | length')
           if [ $FAILED_COMMAND_INVOCATIONS -gt 0 ]; then
             echo "${{ matrix.account }} has $FAILED_COMMAND_INVOCATIONS failed SSM command invocations"
