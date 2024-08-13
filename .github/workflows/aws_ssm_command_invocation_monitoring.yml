@@ -29,9 +29,10 @@ jobs:
           DATE=$(date -d '1 day ago' '+%Y-%m-%dT%TZ')
           FAILED_COMMAND_INVOCATIONS=$(aws ssm list-command-invocations --filters 'key=Status,value=Failed' 'key=InvokedAfter,value='$DATE | jq -r '.CommandInvocations | length')
           if [ $FAILED_COMMAND_INVOCATIONS -gt 0 ]; then
-            echo "${{ matrix.account }} has $FAILED_COMMAND_INVOCATIONS failed SSM command invocations"
+            echo "${{ matrix.account }} has $FAILED_COMMAND_INVOCATIONS failed SSM command invocations in the last 24 hours"
             echo "FAILED_COMMAND_INVOCATIONS=$FAILED_COMMAND_INVOCATIONS" >> $GITHUB_OUTPUT
           else
+            echo "${{ matrix.account }} has no failed SSM command invocations in the last 24 hours"
             echo "FAILED_COMMAND_INVOCATIONS=0" >> $GITHUB_OUTPUT
           fi
       - name: Set Metric Timestamp
