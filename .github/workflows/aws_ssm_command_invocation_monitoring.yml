@@ -1,0 +1,53 @@
+name: AWS SSM Command Invocation Monitoring
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  get_ssm_command_invocation_failures:
+    strategy:
+      matrix:
+        account:
+          - 'nomis-test'
+          - 'oasys-test'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account] }}:role/modernisation-platform-oidc-cicd"
+          aws-region: eu-west-2
+      - name: Get SSM Command Invocation Failures
+        id: get_ssm_command_invocation_failures
+        run: |
+          DATE=$(date -v-1d '+%Y-%m-%dT%TZ')
+          FAILED_COMMAND_INVOCATIONS=$(aws ssm list-command-invocations --filters 'key=Status,value=Failed' 'key=InvokedAfter,value='$DATE | jq -r '.CommandInvocations | length')
+          if [ $FAILED_COMMAND_INVOCATIONS -gt 0 ]; then
+            echo "${{ matrix.account }} has $FAILED_COMMAND_INVOCATIONS failed SSM command invocations"
+            echo "FAILED_COMMAND_INVOCATIONS=$FAILED_COMMAND_INVOCATIONS" >> $GITHUB_OUTPUT
+          else
+            echo "FAILED_COMMAND_INVOCATIONS=0" >> $GITHUB_OUTPUT
+          fi
+      - name: Set Metric Timestamp
+        id: set_metric_timestamp
+        run: echo "TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+      - name: Setup AWS Credentials - Metric Write
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['hmpps-oem-test'] }}:role/modernisation-platform-oidc-cicd"
+          aws-region: eu-west-2
+      - name: Update CloudMetric with Failed SSM Command Invocations - Per Account
+        run: |
+          aws cloudwatch put-metric-data \
+            --metric-name FailedSSMCommandInvocations \
+            --namespace CustomMetrics \
+            --value ${{ steps.get_ssm_command_invocation_failures.outputs.FAILED_COMMAND_INVOCATIONS }} \
+            --dimensions Account=${{ matrix.account }} \
+            --timestamp ${{ steps.set_metric_timestamp.outputs.TIMESTAMP }} \
+            --region eu-west-2
