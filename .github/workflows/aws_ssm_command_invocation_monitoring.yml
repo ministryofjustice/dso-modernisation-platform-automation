@@ -10,14 +10,15 @@ on:
       - '*'
 
 jobs:
-  get_ssm_command_invocation_failures:
+  SSMCommandInvocationMonitoring:
     strategy:
       matrix:
         account: ['nomis', 'oasys']
         environment: ['test', 'development']
     runs-on: ubuntu-latest
     env:
-      aws_account: "${{matrix.account}}-${{matrix.environment}}"
+      aws_account: "${{ matrix.account }}-${{ matrix.environment }}"
+      aws_monitoring_account: "hmpps-oem-${{ matrix.environment }}"
     steps:
       - name: Setup AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
@@ -29,6 +30,10 @@ jobs:
         run: |
           DATE=$(date -d '1 day ago' '+%Y-%m-%dT%TZ')
           FAILED_COMMAND_INVOCATIONS=$(aws ssm list-command-invocations --filters 'key=Status,value=Failed' 'key=InvokedAfter,value='$DATE | jq -r '.CommandInvocations | length')
+          if [ $? -ne 0 ]; then
+            echo "Failed to get SSM command invocations"
+            exit 1
+          fi
           if [ $FAILED_COMMAND_INVOCATIONS -gt 0 ]; then
             echo "${{ env.aws_account }} has $FAILED_COMMAND_INVOCATIONS failed SSM command invocations in the last 24 hours"
             echo "FAILED_COMMAND_INVOCATIONS=$FAILED_COMMAND_INVOCATIONS" >> $GITHUB_OUTPUT
@@ -42,7 +47,7 @@ jobs:
       - name: Setup AWS Credentials - Metric Write
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['hmpps-oem-test'] }}:role/modernisation-platform-oidc-cicd"
+          role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.aws_monitoring_account] }}:role/modernisation-platform-oidc-cicd"
           aws-region: eu-west-2
       - name: Update CloudMetric with Failed SSM Command Invocations - Per Account
         run: |
