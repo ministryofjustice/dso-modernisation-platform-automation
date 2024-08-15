@@ -5,6 +5,8 @@ permissions:
   contents: read
 
 on:
+  schedule:
+    - cron: '0 0/15 * * *'  # Run every 15 minutes
   push:
     branches:
       - '*'
@@ -14,26 +16,36 @@ jobs:
     strategy:
       matrix:
         account: ['nomis', 'oasys']
-        environment: ['test', 'development']
+        environment: ['test', 'development']  # Different environments per account
     runs-on: ubuntu-latest
     env:
+      # Construct environment-specific AWS account identifiers
       aws_account: "${{ matrix.account }}-${{ matrix.environment }}"
       aws_monitoring_account: "hmpps-oem-${{ matrix.environment }}"
     steps:
-      - name: Setup AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+      - name: Setup AWS Credentials for Command Invocation Monitoring
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
         with:
+          # Role to assume for accessing the AWS account
           role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.aws_account] }}:role/modernisation-platform-oidc-cicd"
-          aws-region: eu-west-2
+          aws-region: eu-west-2  # AWS region to operate in
+
       - name: Get SSM Command Invocation Failures
         id: get_ssm_command_invocation_failures
         run: |
+          # Get the date 24 hours ago in ISO 8601 format
           DATE=$(date -d '1 day ago' '+%Y-%m-%dT%TZ')
+
+          # List failed SSM command invocations after the given date
           FAILED_COMMAND_INVOCATIONS=$(aws ssm list-command-invocations --filters 'key=Status,value=Failed' 'key=InvokedAfter,value='$DATE | jq -r '.CommandInvocations | length')
+
+          # Check if the command failed
           if [ $? -ne 0 ]; then
             echo "Failed to get SSM command invocations"
             exit 1
           fi
+
+          # Output the number of failed invocations
           if [ $FAILED_COMMAND_INVOCATIONS -gt 0 ]; then
             echo "${{ env.aws_account }} has $FAILED_COMMAND_INVOCATIONS failed SSM command invocations in the last 24 hours"
             echo "FAILED_COMMAND_INVOCATIONS=$FAILED_COMMAND_INVOCATIONS" >> $GITHUB_OUTPUT
@@ -41,16 +53,23 @@ jobs:
             echo "${{ env.aws_account }} has no failed SSM command invocations in the last 24 hours"
             echo "FAILED_COMMAND_INVOCATIONS=0" >> $GITHUB_OUTPUT
           fi
+
       - name: Set Metric Timestamp
         id: set_metric_timestamp
-        run: echo "TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
-      - name: Setup AWS Credentials - Metric Write
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        run: |
+          # Record the current timestamp in ISO 8601 format
+          echo "TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+      - name: Setup AWS Credentials for Metric Write - Per Environment
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
         with:
+          # Role to assume for writing metrics to the monitoring account
           role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.aws_monitoring_account] }}:role/modernisation-platform-oidc-cicd"
           aws-region: eu-west-2
-      - name: Update CloudMetric with Failed SSM Command Invocations - Per Account
+
+      - name: Update CloudWatch Metric with Failed SSM Command Invocations
         run: |
+          # Publish a custom metric for failed SSM command invocations to CloudWatch
           aws cloudwatch put-metric-data \
             --metric-name FailedSSMCommandInvocations \
             --namespace CustomMetrics \
