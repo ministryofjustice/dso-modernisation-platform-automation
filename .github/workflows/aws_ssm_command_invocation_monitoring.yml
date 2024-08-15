@@ -16,11 +16,13 @@ jobs:
         account: ['nomis', 'oasys']
         environment: ['test', 'development']
     runs-on: ubuntu-latest
+    env:
+      aws_account: "${{matrix.account}}-${{matrix.environment}}"
     steps:
       - name: Setup AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account-matrix.environment] }}:role/modernisation-platform-oidc-cicd"
+          role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.aws_account] }}:role/modernisation-platform-oidc-cicd"
           aws-region: eu-west-2
       - name: Get SSM Command Invocation Failures
         id: get_ssm_command_invocation_failures
@@ -28,10 +30,10 @@ jobs:
           DATE=$(date -d '1 day ago' '+%Y-%m-%dT%TZ')
           FAILED_COMMAND_INVOCATIONS=$(aws ssm list-command-invocations --filters 'key=Status,value=Failed' 'key=InvokedAfter,value='$DATE | jq -r '.CommandInvocations | length')
           if [ $FAILED_COMMAND_INVOCATIONS -gt 0 ]; then
-            echo "${{ matrix.account }}-${{ matrix.environment}} has $FAILED_COMMAND_INVOCATIONS failed SSM command invocations in the last 24 hours"
+            echo "${{ env.aws_account }} has $FAILED_COMMAND_INVOCATIONS failed SSM command invocations in the last 24 hours"
             echo "FAILED_COMMAND_INVOCATIONS=$FAILED_COMMAND_INVOCATIONS" >> $GITHUB_OUTPUT
           else
-            echo "${{ matrix.account }}-${{ matrix.environment}} has no failed SSM command invocations in the last 24 hours"
+            echo "${{ env.aws_account }} has no failed SSM command invocations in the last 24 hours"
             echo "FAILED_COMMAND_INVOCATIONS=0" >> $GITHUB_OUTPUT
           fi
       - name: Set Metric Timestamp
@@ -48,6 +50,6 @@ jobs:
             --metric-name FailedSSMCommandInvocations \
             --namespace CustomMetrics \
             --value ${{ steps.get_ssm_command_invocation_failures.outputs.FAILED_COMMAND_INVOCATIONS }} \
-            --dimensions Account=${{ matrix.account }}-${{ matrix.environment }} \
+            --dimensions Account=${{ env.aws_account }} \
             --timestamp ${{ steps.set_metric_timestamp.outputs.TIMESTAMP }} \
             --region eu-west-2
