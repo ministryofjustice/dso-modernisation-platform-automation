@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         account: ['nomis', 'oasys', 'hmpps-domain-services', 'corporate-staff-rostering', 'nomis-combined-reporting', 'nomis-data-hub', 'oasys-national-reporting', 'planetfm']
-        environment: ['test', 'development']  # Different environments per account
+        environment: ['test', 'development', 'production', 'preproduction']  # Different environments per account
     runs-on: ubuntu-latest
     env:
       # Construct environment-specific AWS account identifiers
