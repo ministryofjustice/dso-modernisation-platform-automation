@@ -15,7 +15,7 @@ jobs:
   SSMCommandInvocationMonitoring:
     strategy:
       matrix:
-        account: ['nomis', 'oasys', 'hmpps-domain-services', 'corporate-staff-rostering', 'nomis-combined-reporting', 'nomis-data-hub', 'oasys-national-reporting', 'planetfm']
+        account: ['nomis', 'oasys', 'hmpps-domain-services', 'corporate-staff-rostering', 'nomis-combined-reporting', 'nomis-data-hub', 'oasys-national-reporting', 'planetfm', 'hmpps-oem']
         environment: ['test', 'development', 'production', 'preproduction']  # Different environments per account
     runs-on: ubuntu-latest
     env:
