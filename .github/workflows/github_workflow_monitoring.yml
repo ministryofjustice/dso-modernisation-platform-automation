@@ -9,7 +9,7 @@ on:
     - cron: '*/5 * * * *' # every 5 minutes
 
 jobs:
-  get_workflow_runs:
+  GetFailedWorkflowRunsAndUpdateCloudMetric:
     name: Get Failed Workflow Runs and Update CloudMetric
     strategy:
       matrix:
@@ -24,13 +24,25 @@ jobs:
         with:
           role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['hmpps-oem-test'] }}:role/modernisation-platform-oidc-cicd"
           aws-region: eu-west-2
+
       - name: Get Workflow Runs
         id: get_failed_workflow_runs
         run: |
+          # Get the date 24 hours ago in ISO 8601 format
           DATE=$(date -d '1 day ago' '+%Y-%m-%dT%H:%M:%SZ')
+
+          # List failed workflow runs after the given date
           WORKFLOW_RUNS=$(curl -s -H "Authorization: Bearer ${{ secrets.DSO_GITHUB_PAT }}" \
             'https://api.github.com/repos/ministryofjustice/${{ matrix.repository }}/actions/runs?event=schedule&created=>='"$DATE")
           FAILED_WORKFLOW_RUN_COUNT=$(echo $WORKFLOW_RUNS | jq '[.workflow_runs[] | select(.conclusion == "failure") | .id] | length')
+
+          # Check if the command failed
+          if [ $? -ne 0 ]; then
+            echo "Failed to get workflow runs"
+            exit 1
+          fi
+
+          # Output the number of failed workflow runs
           if [ $FAILED_WORKFLOW_RUN_COUNT -gt 0 ]; then
             echo "${{ matrix.repository }} has ${FAILED_WORKFLOW_RUNS} failed workflow runs"
             echo "FAILED_WORKFLOW_RUNS=1" >> $GITHUB_OUTPUT
@@ -38,9 +50,11 @@ jobs:
           else
             echo "FAILED_WORKFLOW_RUNS=0" >> $GITHUB_OUTPUT
           fi
+
       - name: Set Metric Timestamp
         id: set_metric_timestamp
         run: echo "TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
       - name: Update CloudMetric with Failed Workflow Runs - Per Repository
         run: |
           aws cloudwatch put-metric-data \
@@ -50,6 +64,7 @@ jobs:
             --dimensions Repository=${{ matrix.repository }} \
             --timestamp ${{ steps.set_metric_timestamp.outputs.TIMESTAMP }} \
             --region eu-west-2
+
       - name: Update CloudMetric with Failed Workflow Runs - Total
         run: |
           aws cloudwatch put-metric-data \
