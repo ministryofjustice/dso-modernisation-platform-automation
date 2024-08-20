@@ -7,9 +7,6 @@ permissions:
 on:
   schedule:
     - cron: '0 0/15 * * *'  # Run every 15 minutes
-  push:
-    branches:
-      - '*'
 
 jobs:
   SSMCommandInvocationMonitoring:
