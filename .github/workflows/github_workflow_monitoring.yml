@@ -17,6 +17,7 @@ jobs:
           - 'dso-infra-azure-ad'
           - 'dso-certificates'
           - 'dso-infra-azure-fixngo'
+          - 'dso-modernisation-platform-automation'
     runs-on: ubuntu-latest
     steps:
       - name: Setup AWS Credemtials
