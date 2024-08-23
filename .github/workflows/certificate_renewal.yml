@@ -227,8 +227,7 @@ jobs:
         shell: pwsh
         run: |
           if (-not (Get-InstalledModule | Where-Object Name -Eq Posh-ACME)) {
-            Write-Output "Installing NuGet and Posh-ACME"
-            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+            Write-Output "Installing Posh-ACME"
             Install-Module -Name Posh-ACME -Force
           }
           Set-PAServer "${{ needs.strategy.outputs.le_server }}"
