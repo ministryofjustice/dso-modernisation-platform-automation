@@ -53,17 +53,17 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo '' > expiry.csv
+          echo '' > expiry.txt
+          echo "${matrix}"
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
           echo "${matrix}" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
-          echo "{$matrix}"
 
       - name: Upload Expiry Artifact
         uses: actions/upload-artifact@v4
         with:
           name: "expiry"
-          path: expiry.csv
+          path: expiry.txt
           overwrite: true
 
   check-expiry:
@@ -124,17 +124,62 @@ jobs:
       - name: Update Expiry Artifact if Missing Cert
         if: ${{ steps.expiry.outputs.expiry_days == '' }}
         run: |
-          echo "${{ matrix.ec2_hostname }}" >> expiry.csv
+          echo "${{ matrix.ec2_hostname }}" >> expiry.txt
 
       - name: Update Expiry Artifact if Cert Expiring Soon
         if: ${{ steps.expiry.outputs.expiry_days != '' && steps.expiry.outputs.expiry_days < 30 }}
         run: |
-          echo "${{ matrix.ec2_hostname }}" >> expiry.csv
+          echo "${{ matrix.ec2_hostname }}" >> expiry.txt
 
       - name: Upload Expiry Artifact
         if: ${{ steps.expiry.outputs.expiry_days == '' || steps.expiry.outputs.expiry_days < 30 }}
         uses: actions/upload-artifact@v4
         with:
           name: "expiry"
-          path: expiry.csv
+          path: expiry.txt
           overwrite: true
+
+  renew-strategy:
+    name: Renew Strategy
+    needs: check-expiry
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+    steps:
+      - name: Download Expiry Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: "expiry"
+
+      - name: Strategy
+        id: strategy
+        run: |
+          get_matrix() {
+            echo '{"include":['
+            (
+              for ec2 in $@; do
+                echo '{"ec2_hostname": "'"$ec2"'"},'
+              done
+            ) | sed '$s/,$//'
+            echo ']}'
+          }
+          echo "Setting strategy matrix for certificate renewal"
+          matrix=$(get_matrix $(cat expiry.txt))
+          echo "${matrix}"
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+  renew-cert:
+    name: Renew Cert
+    needs: renew-strategy
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.renew-strategy.outputs.matrix) }}
+      max-parallel: 1
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
