@@ -8,7 +8,7 @@ TIMEOUT_SECS="${TIMEOUT_SECS:-300}"
 CHECK_INTERVAL_SECS="${CHECK_INTERVAL_SECS:-10}"
 
 usage() {
-    echo "Usage: $0 first|all <tag:Name> <comment> <script>"
+    echo "Usage: $0 first|all <tag:Name> <comment> <script|filename>"
     echo
     echo "Finds EC2s matching tag:Name and runs the given script using SSM"
     echo "  first: run on first EC2 only."
@@ -18,23 +18,42 @@ usage() {
     echo "Example Usage: TIMEOUT_SECS=3600 $0 first 'pd-ndh-app-a' 'cdecopy' 'sudo su tibco -c cdecopy.sh'"
 }
 
-get_instance_ids() {
-  local instance_json
-  instance_json=$(aws ec2 describe-instances --no-cli-pager --filters "Name=tag:Name,Values=$1" "Name=instance-state-name,Values=running" || true)
-  jq -r ".Reservations[].Instances[].InstanceId" <<< "$instance_json"
+get_command_json() {
+  local script_lines
+  local script_line
+  local i
+  local n
+
+  IFS=$'\n'
+  if [[ -f "$1" ]]; then
+    script_lines=($(cat "$1"))
+  else
+    script_lines=($(echo "$1"))
+  fi
+  unset IFS
+  echo '{"commands":['
+  n=${#script_lines[@]}
+  for ((i=0; i<n-1; i++)); do
+    script_line=$(jq -MR <<< "${script_lines[$i]}")
+    echo "${script_line},"
+  done
+  jq -MR <<< "${script_lines[$i]}"
+  echo ']}'
 }
 
 run_command_on_instance() {
+  local command_json
+  command_json=$(get_command_json "$3")
   echo "aws ssm send-command \
     --instance-ids '$1' \
-    --document-name 'AWS-RunShellScript' \
+    --document-name '$4' \
     --comment '$2' \
-    --parameters '{\"commands\":[\"$3\"]}'" >&2
+    --parameters '$command_json'" >&2
   aws ssm send-command \
     --instance-ids $1 \
-    --document-name "AWS-RunShellScript" \
+    --document-name "$4" \
     --comment "$2" \
-    --parameters "{\"commands\":[\"$3\"]}"
+    --parameters "$command_json"
 }
 
 wait_for_command() {
@@ -45,7 +64,7 @@ wait_for_command() {
 
   n=$((1+TIMEOUT_SECS/CHECK_INTERVAL_SECS))
   for i in $(seq 1 $n); do
-    sleep $CHECK_INTERVAL_SECS
+    sleep "$CHECK_INTERVAL_SECS"
     echo "[$i/$n] aws ssm get-command-invocation --instance-id '$1' --command-id '$2'" >&2
     result_json=$(aws ssm get-command-invocation --instance-id "$1" --command-id "$2")
     result_status=$(jq -r ".Status" <<< "$result_json")
@@ -66,7 +85,14 @@ main() {
     exit 1
   fi
 
-  instance_ids=$(get_instance_ids "$name")
+  instance_json=$(aws ec2 describe-instances --no-cli-pager --filters "Name=tag:Name,Values=$name" "Name=instance-state-name,Values=running" || true)
+  instance_ids=$(jq -r ".Reservations[].Instances[].InstanceId" <<< "$instance_json")
+  platforms=$(jq -r ".Reservations[].Instances[].Platform" <<< "$instance_json" | sort -u)
+  if [[ $platforms == "windows" ]]; then
+    document_name=AWS-RunPowerShellScript
+  else
+    document_name="AWS-RunShellScript"
+  fi
   if [[ -z $instance_ids ]]; then
     echo "No running instance with tag:Name=$name" >&2
     exit 2
@@ -78,7 +104,7 @@ main() {
     usage >&2
     exit 1
   fi
-  command_json=$(run_command_on_instance "$instance_ids" "$comment" "$script")
+  command_json=$(run_command_on_instance "$instance_ids" "$comment" "$script" "$document_name")
   if ((SHOW_COMMAND_JSON != 0)); then
     echo "$command_json" >&2
   fi
@@ -108,7 +134,7 @@ main() {
       exitcode=1
     fi
   done
-  return $exitcode
+  return "$exitcode"
 }
 
 main "$@"
