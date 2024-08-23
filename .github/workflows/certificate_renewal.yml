@@ -96,5 +96,13 @@ jobs:
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ec2_hostname }}-1"
           aws-region: eu-west-2
+
+      - name: Get IIS Web Certificate Expiry Days
+        id: expiry
+        run: |
+          ec2_hostname="${{ matrix.ec2_hostname }}"
+          expiry_days=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/GetWebCertExpiryDays.ps1"
+          echo "expiry_days: $expiry_days"
+          echo "expiry_days=${expiry_days}" >> $GITHUB_OUTPUT
