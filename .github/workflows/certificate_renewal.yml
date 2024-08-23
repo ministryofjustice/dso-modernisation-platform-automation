@@ -8,6 +8,10 @@ on:
         description: 'e.g. pd-cafm-w-37-a'
         type: string
         default: ''
+      le_server:
+        description: 'e.g. LE_STAGE or LE_PROD'
+        type: string
+        default: 'LE_PROD'
   schedule:
     # separate crons to ensure certs aren't all updated on same day
     - cron: "30 06 * * 2"
@@ -24,6 +28,7 @@ jobs:
     name: Strategy
     runs-on: ubuntu-latest
     outputs:
+      le_server: "${{ steps.strategy.outputs.le_server }}"
       matrix: "${{ steps.strategy.outputs.matrix }}"
     steps:
       - name: Checkout Repository
@@ -37,8 +42,10 @@ jobs:
           echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             matrix=$(src/certificates/get_strategy_matrix.sh ec2_hostname "${{ github.event.inputs.ec2_hostname }}")
+            le_server=${{ github.event.inputs.le_server }}
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             cron_time="${{ github.event.schedule }}"
+            le_server="LE_PROD"
             if [[ "${cron_time}" == '30 06 * * 2' ]]; then
               matrix=$(src/certificates/get_strategy_matrix.sh schedule 0)
             elif [[ "${cron_time}" == '30 06 * * 3' ]]; then
@@ -54,7 +61,9 @@ jobs:
             exit 1
           fi
           echo '' > expiry.txt
+          echo "le_server: ${le_server}"
           echo "${matrix}"
+          echo "le_server=${le_server}" >> $GITHUB_OUTPUT
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
           echo "${matrix}" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
@@ -172,7 +181,9 @@ jobs:
 
   renew-cert:
     name: Renew Cert
-    needs: renew-strategy
+    needs:
+      - strategy
+      - renew-strategy
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -183,3 +194,47 @@ jobs:
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
         with:
           ref: ${{ github.ref }}
+
+      - name: Get Config
+        id: config
+        run: |
+          ec2_hostname="${{ matrix.ec2_hostname }}"
+          echo "ec2_hostname: $ec2_hostname"
+          account_name=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").account_name' src/certificates/certs.json)
+          domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
+          echo "account_name: $account_name"
+          echo "domain_names: $domain_names"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+          echo "domain_names=${domain_names}" >> $GITHUB_OUTPUT
+
+      - name: Get Account Id
+        id: account
+        run: |
+          echo "account name: ${{ steps.config.outputs.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.config.outputs.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ec2_hostname }}-1"
+          aws-region: eu-west-2
+
+      - name: Create LetsEncrypt Cert
+        shell: pwsh
+        run: |
+          Set-PAServer "${{ needs.strategy.outputs.le_server }}"
+          $Password = $(-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 16 | % {[char]$_}))
+          $PasswordSecureString = ConvertTo-SecureString $Password -AsPlainText -Force
+          $LetsEncryptCert = New-PACertificate $Config.DomainNames -DnsPlugin Route53 -PluginArgs @{R53UseIAMRole=$true} -Contact $Config.Email -AcceptTOS -PfxPass $Password -Force -Verbose
+          $ChainFile = $LetsEncryptCert.ChainFile
+          $PfxFile = $LetsEncryptCert.PfxFile
+          echo "chain_file=$ChainFile"
+          echo "pfx_file=$PfxFile"
+          echo "password_secure_string=$PasswordSecureString"
+          echo "chain_file=$ChainFile" >> $env:GITHUB_OUTPUT 
+          echo "pfx_file=$PfxFile" >> $env:GITHUB_OUTPUT 
+          echo "password_secure_string=$PasswordSecureString" >> $env:GITHUB_OUTPUT 
