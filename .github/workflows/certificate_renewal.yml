@@ -103,6 +103,6 @@ jobs:
         id: expiry
         run: |
           ec2_hostname="${{ matrix.ec2_hostname }}"
-          expiry_days=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/GetWebCertExpiryDays.ps1"
+          expiry_days=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/GetWebCertExpiryDays.ps1")
           echo "expiry_days: $expiry_days"
           echo "expiry_days=${expiry_days}" >> $GITHUB_OUTPUT
