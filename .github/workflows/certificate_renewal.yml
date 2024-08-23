@@ -53,10 +53,18 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
+          echo '' > expiry.csv
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
           echo "${matrix}" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
           echo "{$matrix}"
+
+      - name: Upload Expiry Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "expiry"
+          path: expiry.csv
+          overwrite: true
 
   check-expiry:
     name: Check Expiry
@@ -65,6 +73,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.strategy.outputs.matrix) }}
+      max-parallel: 1
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
@@ -99,6 +108,11 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ec2_hostname }}-1"
           aws-region: eu-west-2
 
+      - name: Download Expiry Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: "expiry"
+
       - name: Get IIS Web Certificate Expiry Days
         id: expiry
         run: |
@@ -106,3 +120,21 @@ jobs:
           expiry_days=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/GetWebCertExpiryDays.ps1")
           echo "expiry_days: $expiry_days"
           echo "expiry_days=${expiry_days}" >> $GITHUB_OUTPUT
+
+      - name: Update Expiry Artifact if Missing Cert
+        if: ${{ steps.expiry.outputs.expiry_days == '' }}
+        run: |
+          echo "${{ matrix.ec2_hostname }}" >> expiry.csv
+
+      - name: Update Expiry Artifact if Cert Expiring Soon
+        if: ${{ steps.expiry.outputs.expiry_days != '' && steps.expiry.outputs.expiry_days < 30 }}
+        run: |
+          echo "${{ matrix.ec2_hostname }}" >> expiry.csv
+
+      - name: Upload Expiry Artifact
+        if: ${{ steps.expiry.outputs.expiry_days == '' || steps.expiry.outputs.expiry_days < 30 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: "expiry"
+          path: expiry.csv
+          overwrite: true
