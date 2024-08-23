@@ -243,11 +243,10 @@ jobs:
           $Password = $(-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 16 | % {[char]$_}))
           $PasswordSecureString = ConvertTo-SecureString $Password -AsPlainText -Force
           $LetsEncryptCert = New-PACertificate ($DomainNames.Split(' ')) -DnsPlugin Route53 -PluginArgs @{R53UseIAMRole=$true} -Contact $Config.Email -AcceptTOS -PfxPass $Password -Force -Verbose
-          $ChainFile = $LetsEncryptCert.ChainFile
-          $PfxFile = $LetsEncryptCert.PfxFile
+          $ChainFile = [Convert]::ToBase64String([IO.File]::ReadAllBytes($LetsEncryptCert.ChainFile))
+          $PfxFile = [Convert]::ToBase64String([IO.File]::ReadAllBytes($LetsEncryptCert.PfxFile))
           echo "chain_file=$ChainFile"
           echo "pfx_file=$PfxFile"
-          echo "password_secure_string=$PasswordSecureString"
           echo "chain_file=$ChainFile" >> $env:GITHUB_OUTPUT 
           echo "pfx_file=$PfxFile" >> $env:GITHUB_OUTPUT 
-          echo "password_secure_string=$PasswordSecureString" >> $env:GITHUB_OUTPUT 
+          echo "password=$Password" >> $env:GITHUB_OUTPUT 
