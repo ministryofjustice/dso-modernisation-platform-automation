@@ -226,6 +226,11 @@ jobs:
       - name: Create LetsEncrypt Cert
         shell: pwsh
         run: |
+          if (-not (Get-InstalledModule | Where-Object Name -Eq Posh-ACME)) {
+            Write-Output "Installing NuGet and Posh-ACME"
+            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+            Install-Module -Name Posh-ACME -Force
+          }
           Set-PAServer "${{ needs.strategy.outputs.le_server }}"
           $Password = $(-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 16 | % {[char]$_}))
           $PasswordSecureString = ConvertTo-SecureString $Password -AsPlainText -Force
