@@ -8,6 +8,10 @@ on:
         description: 'e.g. pd-cafm-w-37-a'
         type: string
         default: ''
+      renew_expiry_days:
+        description: 'number of days before expiry to renew'
+        type: number
+        default: 28
       le_server:
         description: 'e.g. LE_STAGE or LE_PROD'
         type: string
@@ -30,6 +34,7 @@ jobs:
     outputs:
       le_server: "${{ steps.strategy.outputs.le_server }}"
       matrix: "${{ steps.strategy.outputs.matrix }}"
+      renew_expiry_days: "${{ steps.strategy.outputs.renew_expiry_days }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
@@ -43,9 +48,11 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             matrix=$(src/certificates/get_strategy_matrix.sh ec2_hostname "${{ github.event.inputs.ec2_hostname }}")
             le_server=${{ github.event.inputs.le_server }}
+            renew_expiry_days=${{ github.event.inputs.renew_expiry_days }}
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             cron_time="${{ github.event.schedule }}"
             le_server="LE_PROD"
+            renew_expiry_days=28
             if [[ "${cron_time}" == '30 06 * * 2' ]]; then
               matrix=$(src/certificates/get_strategy_matrix.sh schedule 0)
             elif [[ "${cron_time}" == '30 06 * * 3' ]]; then
@@ -62,6 +69,7 @@ jobs:
           fi
           echo '' > expiry.txt
           echo "le_server: ${le_server}"
+          echo "renew_expiry_days: ${renew_expiry_days}"
           echo "${matrix}"
           echo "le_server=${le_server}" >> $GITHUB_OUTPUT
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
@@ -136,12 +144,12 @@ jobs:
           echo "${{ matrix.ec2_hostname }}" >> expiry.txt
 
       - name: Update Expiry Artifact if Cert Expiring Soon
-        if: ${{ steps.expiry.outputs.expiry_days != '' && steps.expiry.outputs.expiry_days < 30 }}
+        if: ${{ steps.expiry.outputs.expiry_days != '' && steps.expiry.outputs.expiry_days < needs.strategy.outputs.renew_expiry_days }}
         run: |
           echo "${{ matrix.ec2_hostname }}" >> expiry.txt
 
       - name: Upload Expiry Artifact
-        if: ${{ steps.expiry.outputs.expiry_days == '' || steps.expiry.outputs.expiry_days < 30 }}
+        if: ${{ steps.expiry.outputs.expiry_days == '' || steps.expiry.outputs.expiry_days < needs.strategy.outputs.renew_expiry_days }}
         uses: actions/upload-artifact@v4
         with:
           name: "expiry"
@@ -226,14 +234,17 @@ jobs:
       - name: Create LetsEncrypt Cert
         shell: pwsh
         run: |
+          $PAServer = "${{ needs.strategy.outputs.le_server }}"
+          $DomainNames = "${{ steps.config.outputs.domain_names }}"
+          Write-Output "Create Cert $PAServer $DomainNames"
           if (-not (Get-InstalledModule | Where-Object Name -Eq Posh-ACME)) {
             Write-Output "Installing Posh-ACME"
             Install-Module -Name Posh-ACME -Force
           }
-          Set-PAServer "${{ needs.strategy.outputs.le_server }}"
+          Set-PAServer $PAServer
           $Password = $(-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 16 | % {[char]$_}))
           $PasswordSecureString = ConvertTo-SecureString $Password -AsPlainText -Force
-          $LetsEncryptCert = New-PACertificate $Config.DomainNames -DnsPlugin Route53 -PluginArgs @{R53UseIAMRole=$true} -Contact $Config.Email -AcceptTOS -PfxPass $Password -Force -Verbose
+          $LetsEncryptCert = New-PACertificate ($DomainNames.Split(' ')) -DnsPlugin Route53 -PluginArgs @{R53UseIAMRole=$true} -Contact $Config.Email -AcceptTOS -PfxPass $Password -Force -Verbose
           $ChainFile = $LetsEncryptCert.ChainFile
           $PfxFile = $LetsEncryptCert.PfxFile
           echo "chain_file=$ChainFile"
