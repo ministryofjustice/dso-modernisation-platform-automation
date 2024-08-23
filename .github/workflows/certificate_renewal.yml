@@ -4,22 +4,92 @@ name: Certificate Renewal
 on:
   workflow_dispatch:
     inputs:
-      server:
+      ec2_hostname:
         description: 'e.g. pd-cafm-w-37-a'
         type: string
+        default: ''
+  schedule:
+    # separate crons to ensure certs aren't all updated on same day
+    - cron: "30 06 * * 2"
+    - cron: "30 06 * * 3"
+    - cron: "30 06 * * 4"
 
 permissions:
   id-token: write
   contents: read
 
 # WORK IN PROGRESS
-
 jobs:
   strategy:
-    name: strategy
+    name: Strategy
     runs-on: ubuntu-latest
+    outputs:
+      matrix: "${{ steps.strategy.outputs.matrix }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
         with:
           ref: ${{ github.ref }}
+
+      - name: Strategy
+        id: strategy
+        run: |
+          echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            matrix=$(src/certificates/get_strategy_matrix.sh ec2_hostname "${{ github.event.inputs.ec2_hostname }}")
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            cron_time="${{ github.event.schedule }}"
+            if [[ "${cron_time}" == '30 06 * * 2' ]]; then
+              matrix=$(src/certificates/get_strategy_matrix.sh schedule 0)
+            elif [[ "${cron_time}" == '30 06 * * 3' ]]; then
+              matrix=$(src/certificates/get_strategy_matrix.sh schedule 1)
+            elif [[ "${cron_time}" == '30 06 * * 4' ]]; then
+              matrix=$(src/certificates/get_strategy_matrix.sh schedule 2)
+            else
+              echo "Unsupported schedule cron ${cron_time}"
+              exit 1
+            fi
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+          echo "{$matrix}"
+
+  check-expiry:
+    name: Check Expiry
+    needs: strategy
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.strategy.outputs.matrix) }}
+    steps:
+      - name: Get Config
+        id: config
+        run: |
+          ec2_hostname="${{ matrix.ec2_hostname }}"
+          echo "ec2_hostname: $ec2_hostname"
+          account_name=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").account_name' src/certificates/certs.json)
+          domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
+          echo "account_name: $account_name"
+          echo "domain_names: $domain_names"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+          echo "domain_names=${domain_names}" >> $GITHUB_OUTPUT
+
+      - name: Get Account Id
+        id: account
+        run: |
+          echo "account name: ${{ steps.config.outputs.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.config.outputs.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
