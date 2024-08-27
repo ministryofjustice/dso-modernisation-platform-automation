@@ -48,7 +48,7 @@ run_command_on_instance() {
     --instance-ids '$1' \
     --document-name '$4' \
     --comment '$2' \
-    --parameters '$command_json'" >&2
+    --parameters '$3'" >&2
   aws ssm send-command \
     --instance-ids $1 \
     --document-name "$4" \
