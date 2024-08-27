@@ -163,6 +163,7 @@ jobs:
     needs: check-cert
     runs-on: ubuntu-latest
     outputs:
+      do_update: "${{ steps.strategy.outputs.do_update }}"
       matrix: "${{ steps.strategy.outputs.matrix }}"
     steps:
       - name: Download Expiry Artifact
@@ -183,6 +184,11 @@ jobs:
             echo ']}'
           }
           echo "Setting strategy matrix for certificate renewal"
+          do_update=1
+          expiry=$(cat expiry.txt)
+          [[ -z $expiry ]] && do_update=0
+          echo "do_update=${do_update}"
+          echo "do_update=${do_update}" >> $GITHUB_OUTPUT
           matrix=$(get_matrix $(cat expiry.txt))
           echo "${matrix}"
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
@@ -195,6 +201,7 @@ jobs:
       - check-strategy
       - update-strategy
     runs-on: ubuntu-latest
+    if: ${{ needs.update-strategy.outputs.do_update == 1) }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.update-strategy.outputs.matrix) }}
