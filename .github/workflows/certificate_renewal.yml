@@ -269,6 +269,7 @@ jobs:
           Install-Module -Name AWSPowerShell.NetCore -Force
           Set-PAServer $PAServer
           $Password = $(-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 16 | % {[char]$_}))
+          Write-Output "::add-mask::$Password"
           $PasswordSecureString = ConvertTo-SecureString $Password -AsPlainText -Force
           $LetsEncryptCert = New-PACertificate ($DomainNames.Split(' ')) -DnsPlugin Route53 -PluginArgs @{R53UseIAMRole=$true} -Contact $Config.Email -AcceptTOS -PfxPass $Password -Force -Verbose
           $ChainBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($LetsEncryptCert.ChainFile))
@@ -282,9 +283,9 @@ jobs:
         run: |
           ec2_hostname="${{ matrix.ec2_hostname }}"
           $cert=$(aws secretsmanager get-secret-value --secret-id '/ec2/${{ matrix.ec2_hostname }}/web-cert' --query SecretString --output text)
-          $chainBase64=$(jq -r .ChainBase64 <<< "$cert")
-          $pfxBase64=$(jq -r .PfxBase64 <<< "$cert")
-          $password=$(jq -r .Password <<< "$cert")
+          chainBase64=$(jq -r .ChainBase64 <<< "$cert")
+          pfxBase64=$(jq -r .PfxBase64 <<< "$cert")
+          password=$(jq -r .Password <<< "$cert")
           sed -i "s|sed-chain-base64|$chainBase64|g" src/certificates/ImportLetsEncryptCert.ps1
           sed -i "s|sed-pfx-base64|$pfxBase64|g" src/certificates/ImportLetsEncryptCert.ps1
           sed -i "s|sed-password|$password|g" src/certificates/ImportLetsEncryptCert.ps1
