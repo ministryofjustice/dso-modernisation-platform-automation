@@ -83,8 +83,8 @@ jobs:
           path: expiry.txt
           overwrite: true
 
-  check-expiry:
-    name: Check Expiry
+  check-cert:
+    name: Check Cert
     needs: check-strategy
     runs-on: ubuntu-latest
     strategy:
@@ -134,9 +134,11 @@ jobs:
         id: certexpiry
         run: |
           ec2_hostname="${{ matrix.ec2_hostname }}"
+          renew_expiry_days="${{ needs.check-strategy.outputs.renew_expiry_days }}"
           domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
+          echo "EC2=$ec2_hostname RenewExpiryDays=$renew_expiry_days DomainNames=$domain_names"
           sed -i "s|sed-domain-names|$domain_names|g" src/certificates/CheckCertRenewal.ps1
-          sed -i "s|sed-renew-expiry-days|${{ needs.check-strategy.outputs.renew_expiry_days }}|g" src/certificates/CheckCertRenewal.ps1
+          sed -i "s|sed-renew-expiry-days|$renew_expiry_days|g" src/certificates/CheckCertRenewal.ps1
           cert=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/CheckCertRenewal.ps1")
           echo "$cert"
           requires_update=$(echo "$cert" | grep "^requires_update=" | cut -d= -f2)
@@ -157,7 +159,7 @@ jobs:
 
   update-strategy:
     name: Update Strategy
-    needs: check-expiry
+    needs: check-cert
     runs-on: ubuntu-latest
     outputs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
@@ -234,9 +236,11 @@ jobs:
         id: certexpiry
         run: |
           ec2_hostname="${{ matrix.ec2_hostname }}"
+          renew_expiry_days="${{ needs.check-strategy.outputs.renew_expiry_days }}"
           domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
+          echo "EC2=$ec2_hostname RenewExpiryDays=$renew_expiry_days DomainNames=$domain_names"
           sed -i "s|sed-domain-names|$domain_names|g" src/certificates/CheckCertRenewal.ps1
-          sed -i "s|sed-renew-expiry-days|${{ needs.check-strategy.outputs.renew_expiry_days }}|g" src/certificates/CheckCertRenewal.ps1
+          sed -i "s|sed-renew-expiry-days|$renew_expiry_days|g" src/certificates/CheckCertRenewal.ps1
           cert=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/CheckCertRenewal.ps1")
           echo "$cert"
           renew_cert=$(echo "$cert" | grep "^renew_cert=" | cut -d= -f2)
@@ -279,4 +283,7 @@ jobs:
         if: ${{ steps.certexpiry.outputs.update_web == 1 }}
         run: |
           ec2_hostname="${{ matrix.ec2_hostname }}"
+          domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
+          echo "EC2=$ec2_hostname DomainNames=$domain_names"
+          sed -i "s|sed-domain-names|$domain_names|g" src/certificates/UpdateWebBinding.ps1
           src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-web-binding" "src/certificates/UpdateWebBinding.ps1"
