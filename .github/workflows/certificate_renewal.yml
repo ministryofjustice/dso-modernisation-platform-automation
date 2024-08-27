@@ -201,7 +201,7 @@ jobs:
       - check-strategy
       - update-strategy
     runs-on: ubuntu-latest
-    if: ${{ needs.update-strategy.outputs.do_update == 1) }}
+    if: ${{ needs.update-strategy.outputs.do_update == 1 }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.update-strategy.outputs.matrix) }}
