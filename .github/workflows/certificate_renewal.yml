@@ -28,8 +28,8 @@ permissions:
 
 # WORK IN PROGRESS
 jobs:
-  strategy:
-    name: Strategy
+  check-strategy:
+    name: Check Strategy
     runs-on: ubuntu-latest
     outputs:
       le_server: "${{ steps.strategy.outputs.le_server }}"
@@ -85,11 +85,11 @@ jobs:
 
   check-expiry:
     name: Check Expiry
-    needs: strategy
+    needs: check-strategy
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.strategy.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
       max-parallel: 1
     steps:
       - name: Checkout Repository
@@ -130,34 +130,33 @@ jobs:
         with:
           name: "expiry"
 
-      - name: Get IIS Web Certificate Expiry Days
-        id: expiry
+      - name: Check Cert Expiry
+        id: certexpiry
         run: |
           ec2_hostname="${{ matrix.ec2_hostname }}"
-          expiry_days=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/GetWebCertExpiryDays.ps1")
-          echo "expiry_days: $expiry_days"
-          echo "expiry_days=${expiry_days}" >> $GITHUB_OUTPUT
+          domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
+          sed -i "s|sed-domain-names|$domain_names|g" src/certificates/CheckCertRenewal.ps1
+          sed -i "s|sed-renew-expiry-days|${{ needs.check-strategy.outputs.renew_expiry_days }}|g" src/certificates/CheckCertRenewal.ps1
+          cert=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/CheckCertRenewal.ps1")
+          echo "$cert"
+          requires_update=$(echo "$cert" | grep "^requires_update=" | cut -d= -f2)
+          echo "requires_update=${requires_update}" >> $GITHUB_OUTPUT
 
-      - name: Update Expiry Artifact if Missing Cert
-        if: ${{ steps.expiry.outputs.expiry_days == '' }}
-        run: |
-          echo "${{ matrix.ec2_hostname }}" >> expiry.txt
-
-      - name: Update Expiry Artifact if Cert Expiring Soon
-        if: ${{ steps.expiry.outputs.expiry_days != '' && steps.expiry.outputs.expiry_days < needs.strategy.outputs.renew_expiry_days }}
+      - name: Update Expiry Artifact if Requires Update
+        if: ${{ steps.certexpiry.outputs.requires_update == 1 }}
         run: |
           echo "${{ matrix.ec2_hostname }}" >> expiry.txt
 
       - name: Upload Expiry Artifact
-        if: ${{ steps.expiry.outputs.expiry_days == '' || steps.expiry.outputs.expiry_days < needs.strategy.outputs.renew_expiry_days }}
+        if: ${{ steps.certexpiry.outputs.requires_update == 1 }}
         uses: actions/upload-artifact@v4
         with:
           name: "expiry"
           path: expiry.txt
           overwrite: true
 
-  renew-strategy:
-    name: Renew Strategy
+  update-strategy:
+    name: Update Strategy
     needs: check-expiry
     runs-on: ubuntu-latest
     outputs:
@@ -187,15 +186,15 @@ jobs:
           echo "${matrix}" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
-  renew-cert:
-    name: Renew Cert
+  update-cert:
+    name: Update Cert
     needs:
-      - strategy
-      - renew-strategy
+      - check-strategy
+      - update-strategy
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.renew-strategy.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.update-strategy.outputs.matrix) }}
       max-parallel: 1
     steps:
       - name: Checkout Repository
@@ -231,11 +230,26 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ec2_hostname }}-1"
           aws-region: eu-west-2
 
+      - name: Check Cert Expiry
+        id: certexpiry
+        run: |
+          ec2_hostname="${{ matrix.ec2_hostname }}"
+          domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
+          sed -i "s|sed-domain-names|$domain_names|g" src/certificates/CheckCertRenewal.ps1
+          sed -i "s|sed-renew-expiry-days|${{ needs.check-strategy.outputs.renew_expiry_days }}|g" src/certificates/CheckCertRenewal.ps1
+          cert=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/CheckCertRenewal.ps1")
+          echo "$cert"
+          renew_cert=$(echo "$cert" | grep "^renew_cert=" | cut -d= -f2)
+          update_web=$(echo "$cert" | grep "^update_web=" | cut -d= -f2)
+          echo "renew_cert=${renew_cert}" >> $GITHUB_OUTPUT
+          echo "update_web=${update_web}" >> $GITHUB_OUTPUT
+
       - name: Create LetsEncrypt Cert
         id: cert
+        if: ${{ steps.certexpiry.outputs.renew_cert == 1 }}
         shell: pwsh
         run: |
-          $PAServer = "${{ needs.strategy.outputs.le_server }}"
+          $PAServer = "${{ needs.check-strategy.outputs.le_server }}"
           $DomainNames = "${{ steps.config.outputs.domain_names }}"
           Write-Output "Create Cert $PAServer $DomainNames"
           Install-Module -Name Posh-ACME -Force
@@ -252,10 +266,17 @@ jobs:
           echo "pfx_file=$PfxFile" >> $env:GITHUB_OUTPUT 
           echo "password=$Password" >> $env:GITHUB_OUTPUT 
 
-      - name: Update LetsEncrypt Cert
+      - name: Import LetsEncrypt Cert into WebStore
+        if: ${{ steps.certexpiry.outputs.renew_cert == 1 }}
         run: |
           ec2_hostname="${{ matrix.ec2_hostname }}"
-          sed -i 's|sed-chain-file|${{ steps.cert.outputs.chain_file }}|g' src/certificates/UpdateWebCert.ps1
-          sed -i 's|sed-pfx-file|${{ steps.cert.outputs.pfx_file }}|g' src/certificates/UpdateWebCert.ps1
-          sed -i 's|sed-password|${{ steps.cert.outputs.password }}|g' src/certificates/UpdateWebCert.ps1
-          src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-update" "src/certificates/UpdateWebCert.ps1"
+          sed -i 's|sed-chain-file|${{ steps.cert.outputs.chain_file }}|g' src/certificates/ImportLetsEncryptCert.ps1
+          sed -i 's|sed-pfx-file|${{ steps.cert.outputs.pfx_file }}|g' src/certificates/ImportLetsEncryptCert.ps1
+          sed -i 's|sed-password|${{ steps.cert.outputs.password }}|g' src/certificates/ImportLetsEncryptCert.ps1
+          src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-import-cert" "src/certificates/ImportLetsEncryptCert.ps1"
+
+      - name: Update IIS WebBinding
+        if: ${{ steps.certexpiry.outputs.update_cert == 1 }}
+        run: |
+          ec2_hostname="${{ matrix.ec2_hostname }}"
+          src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-web-binding" "src/certificates/UpdateWebBinding.ps1"
