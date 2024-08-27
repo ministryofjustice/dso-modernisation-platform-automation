@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
-$ChainFileBase64 = "sed-chain-file"
-$PfxFileBase64 = "sed-pfx-file"
+$ChainFileBase64 = "sed-chain-base64"
+$PfxFileBase64 = "sed-pfx-base64"
 $Password = "sed-password"
 $PasswordSecureString = ConvertTo-SecureString $Password -AsPlainText -Force
 
