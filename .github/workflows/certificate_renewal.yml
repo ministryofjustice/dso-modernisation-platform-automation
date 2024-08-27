@@ -125,11 +125,6 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ec2_hostname }}-1"
           aws-region: eu-west-2
 
-      - name: Download Expiry Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: "expiry"
-
       - name: Check Cert Expiry
         id: certexpiry
         run: |
@@ -144,12 +139,18 @@ jobs:
           requires_update=$(echo "$cert" | grep "^requires_update=" | cut -d= -f2)
           echo "requires_update=${requires_update}" >> $GITHUB_OUTPUT
 
-      - name: Update Expiry Artifact if Requires Update
+      - name: Download Expiry Artifact if Update Required
+        if: ${{ steps.certexpiry.outputs.requires_update == 1 }}
+        uses: actions/download-artifact@v4
+        with:
+          name: "expiry"
+
+      - name: Update Expiry Artifact if Update Required
         if: ${{ steps.certexpiry.outputs.requires_update == 1 }}
         run: |
           echo "${{ matrix.ec2_hostname }}" >> expiry.txt
 
-      - name: Upload Expiry Artifact
+      - name: Upload Expiry Artifact if Update Required
         if: ${{ steps.certexpiry.outputs.requires_update == 1 }}
         uses: actions/upload-artifact@v4
         with:
