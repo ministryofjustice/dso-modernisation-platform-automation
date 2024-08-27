@@ -72,6 +72,7 @@ jobs:
           echo "renew_expiry_days: ${renew_expiry_days}"
           echo "${matrix}"
           echo "le_server=${le_server}" >> $GITHUB_OUTPUT
+          echo "renew_expiry_days=${renew_expiry_days} >> $GITHUB_OUTPUT
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
           echo "${matrix}" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
