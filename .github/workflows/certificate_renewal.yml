@@ -276,7 +276,7 @@ jobs:
           src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-import-cert" "src/certificates/ImportLetsEncryptCert.ps1"
 
       - name: Update IIS WebBinding
-        if: ${{ steps.certexpiry.outputs.update_cert == 1 }}
+        if: ${{ steps.certexpiry.outputs.update_web == 1 }}
         run: |
           ec2_hostname="${{ matrix.ec2_hostname }}"
           src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-web-binding" "src/certificates/UpdateWebBinding.ps1"
