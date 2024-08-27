@@ -13,4 +13,4 @@ if (-not $Cert) {
   Exit 1
 }
 
-$WebBinding.AddSslCertificate($Cert.Thumbprint, 'Cert:\LocalMachine\My')
+$WebBinding.AddSslCertificate($Cert.Thumbprint, 'My')
