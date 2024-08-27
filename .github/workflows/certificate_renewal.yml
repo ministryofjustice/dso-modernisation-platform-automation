@@ -282,7 +282,7 @@ jobs:
         if: ${{ steps.certexpiry.outputs.renew_cert == 1 }}
         run: |
           ec2_hostname="${{ matrix.ec2_hostname }}"
-          $cert=$(aws secretsmanager get-secret-value --secret-id '/ec2/${{ matrix.ec2_hostname }}/web-cert' --query SecretString --output text)
+          cert=$(aws secretsmanager get-secret-value --secret-id '/ec2/${{ matrix.ec2_hostname }}/web-cert' --query SecretString --output text)
           chainBase64=$(jq -r .ChainBase64 <<< "$cert")
           pfxBase64=$(jq -r .PfxBase64 <<< "$cert")
           password=$(jq -r .Password <<< "$cert")
