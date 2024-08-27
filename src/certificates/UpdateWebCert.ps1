@@ -5,9 +5,10 @@ $Password = "sed-password"
 
 $WebBinding = Get-WebBinding -Name 'Default Web Site' | Where-Object -Property protocol -eq 'https'
 if (-not $WebBinding) {
-  Write-Ouput "Creating https WebBinding"
+  Write-Output "Creating https WebBinding"
   $WebBinding = New-WebBinding -Name $Config.WebSiteName -IPAddress "*" -Port 443 -Protocol "https"
 }
+$WebBinding
 
 $ChainFileName = [System.IO.Path]::GetTempFileName().Replace(".tmp",".pem")
 [IO.File]::WriteAllBytes($ChainFileName, [Convert]::FromBase64String($ChainFileBase64))
@@ -21,10 +22,4 @@ $PfxCert = Import-PfxCertificate -FilePath $PfxFileName -CertStoreLocation 'Cert
 $PfxCert
 Remove-Item -Path $PfxFileName -Force
 
-$WebBinding = Get-WebBinding -Name 'Default Web Site' | Where-Object -Property protocol -eq 'https'
-if (-not $WebBinding) {
-  Write-Ouput "Creating https WebBinding"
-  $WebBinding = New-WebBinding -Name $Config.WebSiteName -IPAddress "*" -Port 443 -Protocol "https"
-}
-$WebBinding
 $WebBinding.AddSslCertificate($PfxCert.Thumbprint, 'Cert:\LocalMachine\My')
