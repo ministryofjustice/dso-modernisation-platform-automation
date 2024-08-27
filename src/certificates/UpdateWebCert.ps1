@@ -2,6 +2,7 @@ $ErrorActionPreference = "Stop"
 $ChainFileBase64 = "sed-chain-file"
 $PfxFileBase64 = "sed-pfx-file"
 $Password = "sed-password"
+$PasswordSecureString = ConvertTo-SecureString $Password -AsPlainText -Force
 
 $WebBinding = Get-WebBinding -Name 'Default Web Site' | Where-Object -Property protocol -eq 'https'
 if (-not $WebBinding) {
@@ -18,7 +19,7 @@ Remove-Item -Path $ChainFileName -Force
 
 $PfxFileName = [System.IO.Path]::GetTempFileName().Replace(".tmp",".pfx")
 [IO.File]::WriteAllBytes($PfxFileName, [Convert]::FromBase64String($PfxFileBase64))
-$PfxCert = Import-PfxCertificate -FilePath $PfxFileName -CertStoreLocation 'Cert:\LocalMachine\My' -Password $Password
+$PfxCert = Import-PfxCertificate -FilePath $PfxFileName -CertStoreLocation 'Cert:\LocalMachine\My' -Password $PasswordSecureString
 $PfxCert
 Remove-Item -Path $PfxFileName -Force
 
