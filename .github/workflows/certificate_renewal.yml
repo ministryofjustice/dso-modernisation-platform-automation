@@ -232,6 +232,7 @@ jobs:
           aws-region: eu-west-2
 
       - name: Create LetsEncrypt Cert
+        id: cert
         shell: pwsh
         run: |
           $PAServer = "${{ needs.strategy.outputs.le_server }}"
@@ -250,3 +251,11 @@ jobs:
           echo "chain_file=$ChainFile" >> $env:GITHUB_OUTPUT 
           echo "pfx_file=$PfxFile" >> $env:GITHUB_OUTPUT 
           echo "password=$Password" >> $env:GITHUB_OUTPUT 
+
+      - name: Update LetsEncrypt Cert
+        run: |
+          ec2_hostname="${{ matrix.ec2_hostname }}"
+          sed -i 's/sed-chain-file/${{ steps.cert.outputs.chain_file }}/g' src/certificates/UpdateWebCert.ps1
+          sed -i 's/sed-pfx-file/${{ steps.cert.outputs.pfx_file }}/g' src/certificates/UpdateWebCert.ps1
+          sed -i 's/sed-password/${{ steps.cert.outputs.password }}/g' src/certificates/UpdateWebCert.ps1
+          src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-update" "src/certificates/UpdateWebCert.ps1")
