@@ -17,5 +17,5 @@ $PfxCert = Import-PfxCertificate -Exportable -FilePath $PfxFileName -CertStoreLo
 $PfxCert
 Remove-Item -Path $PfxFileName -Force
 
-Thumbprint=$PfxCert.Thumbprint
+$Thumbprint=$PfxCert.Thumbprint
 Write-Output "cert_thumbprint=$Thumbprint"
