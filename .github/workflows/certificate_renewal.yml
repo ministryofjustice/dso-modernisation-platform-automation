@@ -258,4 +258,4 @@ jobs:
           sed -i 's|sed-chain-file|${{ steps.cert.outputs.chain_file }}|g' src/certificates/UpdateWebCert.ps1
           sed -i 's|sed-pfx-file|${{ steps.cert.outputs.pfx_file }}|g' src/certificates/UpdateWebCert.ps1
           sed -i 's|sed-password|${{ steps.cert.outputs.password }}|g' src/certificates/UpdateWebCert.ps1
-          src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-update" "src/certificates/UpdateWebCert.ps1")
+          src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-update" "src/certificates/UpdateWebCert.ps1"
