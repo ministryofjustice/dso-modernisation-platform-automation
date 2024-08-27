@@ -5,8 +5,8 @@ $Password = "sed-password"
 
 $WebBinding = Get-WebBinding -Name 'Default Web Site' | Where-Object -Property protocol -eq 'https'
 if (-not $WebBinding) {
-  Write-Output "Creating https WebBinding"
-  $WebBinding = New-WebBinding -Name $Config.WebSiteName -IPAddress "*" -Port 443 -Protocol "https"
+  Write-Output "Creating Default Web Site https WebBinding"
+  $WebBinding = New-WebBinding -Name 'Default Web Site' -IPAddress "*" -Port 443 -Protocol "https"
 }
 $WebBinding
 
