@@ -14,5 +14,5 @@ if (-not $Cert) {
   Exit 1
 }
 $Cert
-Write-Output "Updaing Default Web Site https WebBinding"
+Write-Output "Updating Default Web Site https WebBinding"
 $WebBinding.AddSslCertificate($Cert.Thumbprint, 'My')
