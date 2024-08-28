@@ -1,0 +1,44 @@
+{
+  "certs": [
+    {
+      "account_name": "planetfm-preproduction",
+      "domain_names": [
+        "cafmwebx.pp.planetfm.service.justice.gov.uk"
+      ],
+      "ec2_hostname": "pp-cafm-w-4-b",
+      "schedule": 0
+    },
+    {
+      "account_name": "planetfm-preproduction",
+      "domain_names": [
+        "cafmwebx.pp.planetfm.service.justice.gov.uk"
+      ],
+      "ec2_hostname": "pp-cafm-w-5-a",
+      "schedule": 0
+    },
+    {
+      "account_name": "planetfm-production",
+      "domain_names": [
+        "cafmwebx2.planetfm.service.justice.gov.uk"
+      ],
+      "ec2_hostname": "pd-cafm-w-36-b",
+      "schedule": 1
+    },
+    {
+      "account_name": "planetfm-production",
+      "domain_names": [
+        "cafmwebx2.planetfm.service.justice.gov.uk"
+      ],
+      "ec2_hostname": "pd-cafm-w-37-a",
+      "schedule": 2
+    },
+    {
+      "account_name": "planetfm-production",
+      "domain_names": [
+        "cafmtrainweb.planetfm.service.justice.gov.uk"
+      ],
+      "ec2_hostname": "pd-cafm-w-38-b",
+      "schedule": 0
+    }
+  ]
+}

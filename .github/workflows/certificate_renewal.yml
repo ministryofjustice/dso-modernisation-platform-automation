@@ -4,22 +4,298 @@ name: Certificate Renewal
 on:
   workflow_dispatch:
     inputs:
-      server:
+      ec2_hostname:
         description: 'e.g. pd-cafm-w-37-a'
         type: string
+        default: ''
+      renew_expiry_days:
+        description: 'number of days before expiry to renew'
+        type: number
+        default: 28
+      le_server:
+        description: 'e.g. LE_STAGE or LE_PROD'
+        type: string
+        default: 'LE_PROD'
+  schedule:
+    # separate crons to ensure certs aren't all updated on same day
+    - cron: "30 06 * * 2"
+    - cron: "30 06 * * 3"
+    - cron: "30 06 * * 4"
 
 permissions:
   id-token: write
   contents: read
 
 # WORK IN PROGRESS
-
 jobs:
-  strategy:
-    name: strategy
+  check-strategy:
+    name: Check Strategy
     runs-on: ubuntu-latest
+    outputs:
+      le_server: "${{ steps.strategy.outputs.le_server }}"
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+      renew_expiry_days: "${{ steps.strategy.outputs.renew_expiry_days }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
         with:
           ref: ${{ github.ref }}
+
+      - name: Strategy
+        id: strategy
+        run: |
+          echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            matrix=$(src/certificates/get_strategy_matrix.sh ec2_hostname "${{ github.event.inputs.ec2_hostname }}")
+            le_server=${{ github.event.inputs.le_server }}
+            renew_expiry_days=${{ github.event.inputs.renew_expiry_days }}
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            cron_time="${{ github.event.schedule }}"
+            le_server="LE_PROD"
+            renew_expiry_days=28
+            if [[ "${cron_time}" == '30 06 * * 2' ]]; then
+              matrix=$(src/certificates/get_strategy_matrix.sh schedule 0)
+            elif [[ "${cron_time}" == '30 06 * * 3' ]]; then
+              matrix=$(src/certificates/get_strategy_matrix.sh schedule 1)
+            elif [[ "${cron_time}" == '30 06 * * 4' ]]; then
+              matrix=$(src/certificates/get_strategy_matrix.sh schedule 2)
+            else
+              echo "Unsupported schedule cron ${cron_time}"
+              exit 1
+            fi
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo '' > expiry.txt
+          echo "le_server: ${le_server}"
+          echo "renew_expiry_days: ${renew_expiry_days}"
+          echo "${matrix}"
+          echo "le_server=${le_server}" >> $GITHUB_OUTPUT
+          echo "renew_expiry_days=${renew_expiry_days}" >> $GITHUB_OUTPUT
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: Upload Expiry Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "expiry"
+          path: expiry.txt
+          overwrite: true
+
+  check-cert:
+    name: Check Cert
+    needs: check-strategy
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
+      max-parallel: 1
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Get Config
+        id: config
+        run: |
+          ec2_hostname="${{ matrix.ec2_hostname }}"
+          echo "ec2_hostname: $ec2_hostname"
+          account_name=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").account_name' src/certificates/certs.json)
+          domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
+          echo "account_name: $account_name"
+          echo "domain_names: $domain_names"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+          echo "domain_names=${domain_names}" >> $GITHUB_OUTPUT
+
+      - name: Get Account Id
+        id: account
+        run: |
+          echo "account name: ${{ steps.config.outputs.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.config.outputs.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ec2_hostname }}-1"
+          aws-region: eu-west-2
+
+      - name: Check Cert Expiry
+        id: certexpiry
+        run: |
+          ec2_hostname="${{ matrix.ec2_hostname }}"
+          renew_expiry_days="${{ needs.check-strategy.outputs.renew_expiry_days }}"
+          domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
+          echo "EC2=$ec2_hostname RenewExpiryDays=$renew_expiry_days DomainNames=$domain_names"
+          sed -i "s|sed-domain-names|$domain_names|g" src/certificates/CheckCertRenewal.ps1
+          sed -i "s|sed-renew-expiry-days|$renew_expiry_days|g" src/certificates/CheckCertRenewal.ps1
+          cert=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/CheckCertRenewal.ps1")
+          echo "$cert"
+          requires_update=$(echo "$cert" | grep "^requires_update=" | cut -d= -f2)
+          echo "requires_update=${requires_update}" >> $GITHUB_OUTPUT
+
+      - name: Download Expiry Artifact if Update Required
+        if: ${{ steps.certexpiry.outputs.requires_update == 1 }}
+        uses: actions/download-artifact@v4
+        with:
+          name: "expiry"
+
+      - name: Update Expiry Artifact if Update Required
+        if: ${{ steps.certexpiry.outputs.requires_update == 1 }}
+        run: |
+          echo "${{ matrix.ec2_hostname }}" >> expiry.txt
+
+      - name: Upload Expiry Artifact if Update Required
+        if: ${{ steps.certexpiry.outputs.requires_update == 1 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: "expiry"
+          path: expiry.txt
+          overwrite: true
+
+  update-strategy:
+    name: Update Strategy
+    needs: check-cert
+    runs-on: ubuntu-latest
+    outputs:
+      do_update: "${{ steps.strategy.outputs.do_update }}"
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+    steps:
+      - name: Download Expiry Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: "expiry"
+
+      - name: Strategy
+        id: strategy
+        run: |
+          get_matrix() {
+            echo '{"include":['
+            (
+              for ec2 in $@; do
+                echo '{"ec2_hostname": "'"$ec2"'"},'
+              done
+            ) | sed '$s/,$//'
+            echo ']}'
+          }
+          echo "Setting strategy matrix for certificate renewal"
+          do_update=1
+          expiry=$(cat expiry.txt)
+          [[ -z $expiry ]] && do_update=0
+          echo "do_update=${do_update}"
+          echo "do_update=${do_update}" >> $GITHUB_OUTPUT
+          matrix=$(get_matrix $(cat expiry.txt))
+          echo "${matrix}"
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+  update-cert:
+    name: Update Cert
+    needs:
+      - check-strategy
+      - update-strategy
+    runs-on: ubuntu-latest
+    if: ${{ needs.update-strategy.outputs.do_update == 1 }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.update-strategy.outputs.matrix) }}
+      max-parallel: 1
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Get Config
+        id: config
+        run: |
+          ec2_hostname="${{ matrix.ec2_hostname }}"
+          echo "ec2_hostname: $ec2_hostname"
+          account_name=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").account_name' src/certificates/certs.json)
+          domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
+          echo "account_name: $account_name"
+          echo "domain_names: $domain_names"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+          echo "domain_names=${domain_names}" >> $GITHUB_OUTPUT
+
+      - name: Get Account Id
+        id: account
+        run: |
+          echo "account name: ${{ steps.config.outputs.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.config.outputs.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ec2_hostname }}-1"
+          aws-region: eu-west-2
+
+      - name: Check Cert Expiry
+        id: certexpiry
+        run: |
+          ec2_hostname="${{ matrix.ec2_hostname }}"
+          renew_expiry_days="${{ needs.check-strategy.outputs.renew_expiry_days }}"
+          domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
+          echo "EC2=$ec2_hostname RenewExpiryDays=$renew_expiry_days DomainNames=$domain_names"
+          sed -i "s|sed-domain-names|$domain_names|g" src/certificates/CheckCertRenewal.ps1
+          sed -i "s|sed-renew-expiry-days|$renew_expiry_days|g" src/certificates/CheckCertRenewal.ps1
+          cert=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/CheckCertRenewal.ps1")
+          echo "$cert"
+          renew_cert=$(echo "$cert" | grep "^renew_cert=" | cut -d= -f2)
+          update_web=$(echo "$cert" | grep "^update_web=" | cut -d= -f2)
+          echo "renew_cert=${renew_cert}" >> $GITHUB_OUTPUT
+          echo "update_web=${update_web}" >> $GITHUB_OUTPUT
+
+      - name: Create LetsEncrypt Cert
+        id: cert
+        if: ${{ steps.certexpiry.outputs.renew_cert == 1 }}
+        shell: pwsh
+        run: |
+          $PAServer = "${{ needs.check-strategy.outputs.le_server }}"
+          $DomainNames = "${{ steps.config.outputs.domain_names }}"
+          Write-Output "Create Cert $PAServer $DomainNames"
+          Install-Module -Name Posh-ACME -Force
+          Install-Module -Name AWSPowerShell.NetCore -Force
+          Set-PAServer $PAServer
+          $Password = $(-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 16 | % {[char]$_}))
+          Write-Output "::add-mask::$Password"
+          $PasswordSecureString = ConvertTo-SecureString $Password -AsPlainText -Force
+          $LetsEncryptCert = New-PACertificate ($DomainNames.Split(' ')) -DnsPlugin Route53 -PluginArgs @{R53UseIAMRole=$true} -Contact $Config.Email -AcceptTOS -PfxPass $Password -Force -Verbose
+          $ChainBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($LetsEncryptCert.ChainFile))
+          $PfxBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($LetsEncryptCert.PfxFile))
+          $WebCertSecret = @{ChainBase64=$ChainBase64;PfxBase64=$PfxBase64;Password=$Password} | ConvertTo-Json -Compress
+          Write-Output "aws secretsmanager put-secret-value --secret-id /ec2/${{ matrix.ec2_hostname }}/web-cert --secret-string xxx"
+          aws secretsmanager put-secret-value --secret-id '/ec2/${{ matrix.ec2_hostname }}/web-cert' --secret-string "$WebCertSecret"
+
+      - name: Import LetsEncrypt Cert into WebStore
+        if: ${{ steps.certexpiry.outputs.renew_cert == 1 }}
+        run: |
+          ec2_hostname="${{ matrix.ec2_hostname }}"
+          cert=$(aws secretsmanager get-secret-value --secret-id '/ec2/${{ matrix.ec2_hostname }}/web-cert' --query SecretString --output text)
+          chainBase64=$(jq -r .ChainBase64 <<< "$cert")
+          pfxBase64=$(jq -r .PfxBase64 <<< "$cert")
+          password=$(jq -r .Password <<< "$cert")
+          sed -i "s|sed-chain-base64|$chainBase64|g" src/certificates/ImportLetsEncryptCert.ps1
+          sed -i "s|sed-pfx-base64|$pfxBase64|g" src/certificates/ImportLetsEncryptCert.ps1
+          sed -i "s|sed-password|$password|g" src/certificates/ImportLetsEncryptCert.ps1
+          src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-import-cert" "src/certificates/ImportLetsEncryptCert.ps1"
+
+      - name: Update IIS WebBinding
+        if: ${{ steps.certexpiry.outputs.update_web == 1 }}
+        run: |
+          ec2_hostname="${{ matrix.ec2_hostname }}"
+          domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
+          echo "EC2=$ec2_hostname DomainNames=$domain_names"
+          sed -i "s|sed-domain-names|$domain_names|g" src/certificates/UpdateWebBinding.ps1
+          src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-web-binding" "src/certificates/UpdateWebBinding.ps1"
