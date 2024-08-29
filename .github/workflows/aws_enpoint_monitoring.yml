@@ -9,6 +9,9 @@ on:
   #  - cron: '0 0/5 * * *'  # Run every 5 minutes
   push:
 
+env:
+    AWS_REGION: eu-west-2
+
 jobs:
     monitor-endpoints:
         # strategy:
@@ -46,12 +49,15 @@ jobs:
                 import boto3
                 from datetime import datetime
 
+                # Get the AWS region from environment variable
+                aws_region = os.environ.get('AWS_REGION', 'eu-west-2')
+
                 endpoints = {
                     'http://r1.csr.service.justice.gov.uk:7770/isps/index.html?2057': 200,
                     'https://onr.oasys.az.justice.gov.uk/InfoViewApp': 302
                 }
 
-                cloudwatch = boto3.client('cloudwatch')
+                cloudwatch = boto3.client('cloudwatch', region_name=aws_region)
 
                 for endpoint, expected_code in endpoints.items():
                     try:
