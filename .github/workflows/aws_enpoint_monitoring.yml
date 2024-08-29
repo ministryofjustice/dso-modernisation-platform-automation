@@ -7,7 +7,7 @@ permissions:
 on:
   # schedule:
   #  - cron: '0 0/5 * * *'  # Run every 5 minutes
-  workflow_dispatch:
+  push:
 
 jobs:
     monitor-endpoints:
