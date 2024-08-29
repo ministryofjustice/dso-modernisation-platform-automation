@@ -40,83 +40,84 @@ jobs:
                 pip install requests boto3                
 
             - name: Run endpoint checks
+              env: 
+                PYTHON_SCRIPT: |
+                    import requests
+                    import boto3
+                    from datetime import datetime
+
+                    endpoints = {
+                        'http://r1.csr.service.justice.gov.uk:7770/isps/index.html?2057': 200,
+                        'https://onr.oasys.az.justice.gov.uk/InfoViewApp': 302
+                    }
+
+                    cloudwatch = boto3.client('cloudwatch')
+
+                    for endpoint, expected_code in endpoints.items():
+                        try:
+                            start_time = datetime.now()
+                            response = requests.get(endpoint, timeout=5) # possible allow_redirects=False
+                            end_time = datetime.now()
+                            duration = (end_time - start_time).total_seconds() * 1000 # milliseconds
+
+                            success = response.status_code == expected_code
+                            metric_value = 0 if success else 1
+
+                            print(f"Endpoint: {endpoint}")
+                            print(f"Epected status code: {expected_code}")
+                            print(f"Actual status code: {response.status_code}")
+                            print(f"Success: {'Yes' if success else 'No'}")
+                            print(f"Duration: {duration} ms")
+
+                            cloudwatch.put_metric_data(
+                                Namespace='GitHubActionsEndpointMonitoring',
+                                MetricData=[
+                                    {
+                                        'MetricName': 'EndpointSuccess',
+                                        'Dimensions': [
+                                            {
+                                                'Name': 'Endpoint',
+                                                'Value': endpoint
+                                            }
+                                        ],
+                                        'Value': metric_value,
+                                        'Unit': 'Count'
+                                    },
+                                    {
+                                        'MetricName': 'ResponseTime',
+                                        'Dimensions': [
+                                            {
+                                                'Name': 'Endpoint',
+                                                'Value': endpoint
+                                            }
+                                        ],
+                                        'Value': duration,
+                                        'Unit': 'Milliseconds'
+                                    }
+                                ]
+                            )
+
+                            if not success:
+                                print(f"Endpoint {endpoint} failed with status code {response.status_code}")
+
+                        except Exception as e:
+                            print(f"Error monitoring {endpoint}: {str(e)}")
+                            cloudwatch.put_metric_data(
+                                Namespace='GitHubActionsEndpointMonitoring',
+                                MetricData=[
+                                    {
+                                        'MetricName': 'EndpointStatus',
+                                        'Dimensions': [
+                                            {
+                                                'Name': 'Endpoint',
+                                                'Value': endpoint
+                                            },
+                                        ],
+                                        'Value': 1,  # Failure
+                                        'Unit': 'Count'
+                                    }
+                                ]
+                            )
               run: |
-                python - <<EOF
-                import requests
-                import boto3
-                from datetime import datetime
-
-                endpoints = {
-                    'http://r1.csr.service.justice.gov.uk:7770/isps/index.html?2057': 200,
-                    'https://onr.oasys.az.justice.gov.uk/InfoViewApp': 302
-                }
-
-                cloudwatch = boto3.client('cloudwatch')
-
-                for endpoint, expected_code in endpoints.items():
-                    try:
-                        start_time = datetime.now()
-                        response = requests.get(endpoint, timeout=5) # possible allow_redirects=False
-                        end_time = datetime.now()
-                        duration = (end_time - start_time).total_seconds() * 1000 # milliseconds
-
-                        success = response.status_code == expected_code
-                        metric_value = 0 if success else 1
-
-                        print(f"Endpoint: {endpoint}")
-                        print(f"Epected status code: {expected_code}")
-                        print(f"Actual status code: {response.status_code}")
-                        print(f"Success: {'Yes' if success else 'No'}")
-                        print(f"Duration: {duration} ms")
-
-                        cloudwatch.put_metric_data(
-                            Namespace='GitHubActionsEndpointMonitoring',
-                            MetricData=[
-                                {
-                                    'MetricName': 'EndpointSuccess',
-                                    'Dimensions': [
-                                        {
-                                            'Name': 'Endpoint',
-                                            'Value': endpoint
-                                        }
-                                    ],
-                                    'Value': metric_value,
-                                    'Unit': 'Count'
-                                },
-                                {
-                                    'MetricName': 'ResponseTime',
-                                    'Dimensions': [
-                                        {
-                                            'Name': 'Endpoint',
-                                            'Value': endpoint
-                                        }
-                                    ],
-                                    'Value': duration,
-                                    'Unit': 'Milliseconds'
-                                }
-                            ]
-                        )
-
-                        if not success:
-                            print(f"Endpoint {endpoint} failed with status code {response.status_code}")
-
-                    except Exception as e:
-                        print(f"Error monitoring {endpoint}: {str(e)}")
-                        cloudwatch.put_metric_data(
-                            Namespace='GitHubActionsEndpointMonitoring',
-                            MetricData=[
-                                {
-                                    'MetricName': 'EndpointStatus',
-                                    'Dimensions': [
-                                        {
-                                            'Name': 'Endpoint',
-                                            'Value': endpoint
-                                        },
-                                    ],
-                                    'Value': 1,  # Failure
-                                    'Unit': 'Count'
-                                }
-                            ]
-                        )
-        
-                EOF        
+                python -c "$PYTHON_SCRIPT"
+  
