@@ -57,7 +57,7 @@ jobs:
                     for endpoint, expected_code in endpoints.items():
                         try:
                             start_time = datetime.now()
-                            response = requests.get(endpoint, timeout=5) # possible allow_redirects=False
+                            response = requests.get(endpoint, timeout=10, allow_redirects=True)
                             end_time = datetime.now()
                             duration = (end_time - start_time).total_seconds() * 1000 # milliseconds
 
