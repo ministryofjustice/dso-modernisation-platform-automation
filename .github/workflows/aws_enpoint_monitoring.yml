@@ -9,27 +9,24 @@ on:
   #  - cron: '0 0/5 * * *'  # Run every 5 minutes
   push:
 
-env:
-    AWS_REGION: eu-west-2
-
 jobs:
     monitor-endpoints:
-        # strategy:
-        #     matrix:
-        #       account: ['nomis', 'oasys', 'hmpps-domain-services', 'corporate-staff-rostering', 'nomis-combined-reporting', 'nomis-data-hub', 'oasys-national-reporting', 'planetfm', 'hmpps-oem']
-        #       environment: ['test', 'development', 'production', 'preproduction']  # Different environments per account
+        strategy:
+            matrix:
+               account: ['nomis', 'oasys', 'hmpps-domain-services', 'corporate-staff-rostering', 'nomis-combined-reporting', 'nomis-data-hub', 'oasys-national-reporting', 'planetfm', 'hmpps-oem']
+               environment: ['test', 'development', 'production', 'preproduction']  # Different environments per account
         runs-on: ubuntu-latest
-        # env:
-        #     # Construct environment-specific AWS account identifiers
-        #     aws_account: "${{ matrix.account }}-${{ matrix.environment }}"
-        #     aws_monitoring_account: "hmpps-oem-${{ matrix.environment }}"
+        env:
+            # Construct environment-specific AWS account identifiers
+            aws_account: "${{ matrix.account }}-${{ matrix.environment }}"
+            aws_monitoring_account: "hmpps-oem-${{ matrix.environment }}"
         steps:
-            # - name: Setup credentials for monitoring
-            #   uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
-            #   with:
-            #   # Role to assume for accessing the AWS account
-            #     role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.aws_account] }}:role/modernisation-platform-oidc-cicd"
-            #     aws-region: eu-west-2  # AWS region to operate in
+            - name: Setup credentials for monitoring
+              uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+              with:
+                # Role to assume for accessing the AWS account
+                role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.aws_account] }}:role/modernisation-platform-oidc-cicd"
+                aws-region: eu-west-2  # AWS region to operate in
        
 
             - name: Setup Python
@@ -48,9 +45,6 @@ jobs:
                 import requests
                 import boto3
                 from datetime import datetime
-
-                # Get the AWS region from environment variable
-                aws_region = os.environ.get('AWS_REGION', 'eu-west-2')
 
                 endpoints = {
                     'http://r1.csr.service.justice.gov.uk:7770/isps/index.html?2057': 200,
