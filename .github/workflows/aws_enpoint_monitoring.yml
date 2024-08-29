@@ -13,8 +13,8 @@ jobs:
     monitor-endpoints:
         strategy:
             matrix:
-               account: ['nomis', 'oasys', 'hmpps-domain-services', 'corporate-staff-rostering', 'nomis-combined-reporting', 'nomis-data-hub', 'oasys-national-reporting', 'planetfm', 'hmpps-oem']
-               environment: ['test', 'development', 'production', 'preproduction']  # Different environments per account
+               account: ['hmpps-oem'] # just run in the one account
+               environment: ['development']  # Different environments per account
         runs-on: ubuntu-latest
         env:
             # Construct environment-specific AWS account identifiers
@@ -51,7 +51,7 @@ jobs:
                     'https://onr.oasys.az.justice.gov.uk/InfoViewApp': 302
                 }
 
-                cloudwatch = boto3.client('cloudwatch', region_name=aws_region)
+                cloudwatch = boto3.client('cloudwatch')
 
                 for endpoint, expected_code in endpoints.items():
                     try:
