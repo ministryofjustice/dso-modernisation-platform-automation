@@ -1,0 +1,122 @@
+name: AWS Endpoint Monitoring
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  schedule:
+    - cron: '0 0/5 * * *'  # Run every 15 minutes
+  workflow_dispatch:
+
+jobs:
+    monitor-endpoints:
+        strategy:
+            matrix:
+              account: ['nomis', 'oasys', 'hmpps-domain-services', 'corporate-staff-rostering', 'nomis-combined-reporting', 'nomis-data-hub', 'oasys-national-reporting', 'planetfm', 'hmpps-oem']
+              environment: ['test', 'development', 'production', 'preproduction']  # Different environments per account
+        runs-on: ubuntu-latest
+        env:
+            # Construct environment-specific AWS account identifiers
+            aws_account: "${{ matrix.account }}-${{ matrix.environment }}"
+            aws_monitoring_account: "hmpps-oem-${{ matrix.environment }}"
+        steps:
+            - name: Setup credentials for monitoring
+              uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+              with:
+              # Role to assume for accessing the AWS account
+                role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.aws_account] }}:role/modernisation-platform-oidc-cicd"
+                aws-region: eu-west-2  # AWS region to operate in
+       
+
+            - name: Setup Python
+              uses: actions/setup-python@v5
+              with:
+                python-version: '3.10'
+
+            - name: Install dependencies
+              run: |
+                python -m pip install --upgrade pip
+                pip install requests boto3                
+
+            - name: Run endpoint checks
+              run: |
+                python - <<EOF
+                import requests
+                import boto3
+                from datetime import datetime
+
+                endpoints = {
+                    'http://r1.csr.service.justice.gov.uk:7770/isps/index.html?2057': 200,
+                    'https://onr.oasys.az.justice.gov.uk/InfoViewApp': 302
+                }
+
+                cloudwatch = boto3.client('cloudwatch')
+
+                for endpoint, expected_code in endpoints.items():
+                    try:
+                        start_time = datetime.now()
+                        response = requests.get(endpoint, timeout=5) # possible allow_redirects=False
+                        end_time = datetime.now()
+                        duration = (end_time - start_time).total_seconds() * 1000 # milliseconds
+
+                        success = response.status_code == expected_code
+                        metric_value = 0 if success else 1
+
+                        print(f"Endpoint: {endpoint}")
+                        print(f"Epected status code: {expected_code}")
+                        print(f"Actual status code: {response.status_code}")
+                        print(f"Success: {'Yes' if success else 'No'}")
+                        print(f"Duration: {duration} ms")
+
+                        cloudwatch.put_metric_data(
+                            Namespace='GitHubActionsEndpointMonitoring',
+                            MetricData=[
+                                {
+                                    'MetricName': 'EndpointSuccess',
+                                    'Dimensions': [
+                                        {
+                                            'Name': 'Endpoint',
+                                            'Value': endpoint
+                                        }
+                                    ],
+                                    'Value': metric_value,
+                                    'Unit': 'Count'
+                                },
+                                {
+                                    'MetricName': 'ResponseTime',
+                                    'Dimensions': [
+                                        {
+                                            'Name': 'Endpoint',
+                                            'Value': endpoint
+                                        }
+                                    ],
+                                    'Value': duration,
+                                    'Unit': 'Milliseconds'
+                                }
+                            ]
+                        )
+
+                        if not success:
+                            print(f"Endpoint {endpoint} failed with status code {response.status_code}")
+
+                    except Exception as e:
+                        print(f"Error monitoring {endpoint}: {str(e)}")
+                        cloudwatch.put_metric_data(
+                            Namespace='GitHubActionsEndpointMonitoring',
+                            MetricData=[
+                                {
+                                    'MetricName': 'EndpointStatus',
+                                    'Dimensions': [
+                                        {
+                                            'Name': 'Endpoint',
+                                            'Value': endpoint
+                                        },
+                                    ],
+                                    'Value': 1,  # Failure
+                                    'Unit': 'Count'
+                                }
+                            ]
+                        )
+        
+                EOF        
