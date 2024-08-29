@@ -45,6 +45,7 @@ jobs:
                     import requests
                     import boto3
                     from datetime import datetime
+                    from requests.exceptions import RequestException, Timeout, ConnectionError
 
                     endpoints = {
                         'http://r1.csr.service.justice.gov.uk:7770/isps/index.html?2057': 200,
@@ -100,8 +101,20 @@ jobs:
                             if not success:
                                 print(f"Endpoint {endpoint} failed with status code {response.status_code}")
 
-                        except Exception as e:
+                        except Timeout:
+                            print(f"Error: Connection to {endpoint} timed out after 10 seconds")
+                            metric_value = 1
+                        except ConnectionError:
+                            print(f"Error: Failed to connect to {endpoint}")
+                            metric_value = 1
+                        except RequestException as e:
                             print(f"Error monitoring {endpoint}: {str(e)}")
+                            metric_value = 1
+                        except Exception as e:
+                            print(f"Unexpected error monitoring {endpoint}: {str(e)}")
+                            metric_value = 1
+
+                        if metric_value == 1:  # If there was an error
                             cloudwatch.put_metric_data(
                                 Namespace='GitHubActionsEndpointMonitoring',
                                 MetricData=[
