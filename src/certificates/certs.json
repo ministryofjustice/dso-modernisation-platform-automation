@@ -3,7 +3,8 @@
     {
       "account_name": "planetfm-preproduction",
       "domain_names": [
-        "cafmwebx.pp.planetfm.service.justice.gov.uk"
+        "cafmwebx.pp.planetfm.service.justice.gov.uk",
+        "pp-cafmwebx.az.justice.gov.uk"
       ],
       "ec2_hostname": "pp-cafm-w-4-b",
       "schedule": 0
@@ -11,7 +12,8 @@
     {
       "account_name": "planetfm-preproduction",
       "domain_names": [
-        "cafmwebx.pp.planetfm.service.justice.gov.uk"
+        "cafmwebx.pp.planetfm.service.justice.gov.uk",
+        "pp-cafmwebx.az.justice.gov.uk"
       ],
       "ec2_hostname": "pp-cafm-w-5-a",
       "schedule": 0
