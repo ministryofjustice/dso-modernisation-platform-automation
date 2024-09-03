@@ -37,7 +37,8 @@
     {
       "account_name": "planetfm-production",
       "domain_names": [
-        "cafmtrainweb.planetfm.service.justice.gov.uk"
+        "cafmtrainweb.planetfm.service.justice.gov.uk",
+        "cafmtrainweb.az.justice.gov.uk"
       ],
       "ec2_hostname": "pd-cafm-w-38-b",
       "schedule": 0
