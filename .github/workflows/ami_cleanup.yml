@@ -73,7 +73,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: strategy
     strategy:
-      fail-fast: false
       matrix: ${{ fromJson(needs.strategy.outputs.matrix) }}
       max-parallel: 1
     steps:
@@ -111,7 +110,7 @@ jobs:
         run: |
           application=$(echo "${{ matrix.account_name }}" | rev | cut -d- -f2- | rev)
           [[ -s "commands.sh" ]] && rm -f "commands.sh"
-          touch > "commands.sh"
+          touch "commands.sh"
           echo src/ami_cleanup.sh -a "$application" -s "commands.sh" ${{ needs.strategy.outputs.ami_cleanup_sh_args }}
           src/ami_cleanup.sh -a "$application" -s "commands.sh" ${{ needs.strategy.outputs.ami_cleanup_sh_args }}
           if [[ -s "commands.sh" ]]; then
