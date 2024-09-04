@@ -11,28 +11,37 @@ on:
         description: 'e.g. development or leave blank for all'
         type: string
       ami_cleanup_sh_args:
-        description: 'Command line options to ami_cleanup.sh script, e.g. "-d -m 6 delete"'
+        description: 'Command line options to ami_cleanup.sh script, -c=exclude amis referenced in code, -m <N>=exclude amis younger than <n> months'
         type: string
-        default: "-d -c -m 3 delete"
+        default: "-c -m 3"
+      dryrun:
+        type: choice
+        description: Dryrun mode (leave as false unless testing)
+        default: false
+        options:
+          - true
+          - false
 
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  strategy:
-    name: strategy
+  check-strategy:
+    name: Check Strategy
     runs-on: ubuntu-latest
     outputs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
       ami_cleanup_sh_args: "${{ steps.options.outputs.ami_cleanup_sh_args }}"
+      dryrun: "${{ steps.options.outputs.dryrun }}"
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
         with:
           ref: ${{ github.ref }}
 
-      - name: strategy
+      - name: Strategy
         id: strategy
         run: |
           echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
@@ -48,32 +57,37 @@ jobs:
           echo 'EOF' >> $GITHUB_OUTPUT
           echo "{$matrix}"
 
-      - name: options
+      - name: Options
         id: options
         run: |
+          dryrun=0
           echo "Setting options event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             ami_cleanup_sh_args="${{ github.event.inputs.ami_cleanup_sh_args }}"
+            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+              dryrun=1
+            fi
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo "ami_cleanup_sh_args=${ami_cleanup_sh_args}"
+          echo "ami_cleanup_sh_args=${ami_cleanup_sh_args} dryrun=${dryrun}"
           echo "ami_cleanup_sh_args=${ami_cleanup_sh_args}" >> $GITHUB_OUTPUT
+          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
 
-      - name: upload aws cli commands artifact
+      - name: Upload aws cli commands artifact
         uses: actions/upload-artifact@v4
         with:
           name: "aws_cli_commands.sh"
           path: aws_cli_commands.sh
           overwrite: true
 
-  ami_cleanup:
-    name: AMI Cleanup
+  check-amis-to-cleanup:
+    name: Check AMIs to Cleanup
     runs-on: ubuntu-latest
-    needs: strategy
+    needs: check-strategy
     strategy:
-      matrix: ${{ fromJson(needs.strategy.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
       max-parallel: 1
     steps:
       - name: Get Account Details
@@ -111,8 +125,8 @@ jobs:
           application=$(echo "${{ matrix.account_name }}" | rev | cut -d- -f2- | rev)
           [[ -s "commands.sh" ]] && rm -f "commands.sh"
           touch "commands.sh"
-          echo src/ami_cleanup.sh -a "$application" -s "commands.sh" ${{ needs.strategy.outputs.ami_cleanup_sh_args }}
-          src/ami_cleanup.sh -a "$application" -s "commands.sh" ${{ needs.strategy.outputs.ami_cleanup_sh_args }}
+          echo src/ami_cleanup.sh -a "$application" -s "commands.sh" -d delete ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }}
+          src/ami_cleanup.sh -a "$application" -s "commands.sh" -d delete ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }}
           if [[ -s "commands.sh" ]]; then
             echo "cleanup=1" >> $GITHUB_OUTPUT
           else
@@ -146,3 +160,45 @@ jobs:
           name: "aws_cli_commands.sh"
           path: dso-modernisation-platform-automation/aws_cli_commands.sh
           overwrite: true
+
+  cleanup-strategy:
+    name: Cleanup Strategy
+    needs: check-amis-to-cleanup
+    runs-on: ubuntu-latest
+    outputs:
+      do_update: "${{ steps.strategy.outputs.do_update }}"
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+    steps:
+      - name: Download Expiry Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: "aws_cli_commands.sh"
+
+      - name: Strategy
+        id: strategy
+        run: |
+          get_matrix() {
+            echo '{"include":['
+            (
+              for account in $@; do
+                echo '{"account_name": "'"$account"'"},'
+              done
+            ) | sed '$s/,$//'
+            echo ']}'
+          }
+          do_update=1
+          echo "Setting strategy matrix for AMI Cleanup"
+          accounts=$(grep ^aws-vault aws_cli_commands.sh  | cut -d' ' -f3)
+          matrix=$(get_matrix $accounts)
+          [[ -z $accounts ]] && do_update=0
+          echo "do_update=${do_update}"
+          echo "${matrix}"
+          echo "do_update=${do_update}" >> $GITHUB_OUTPUT
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: Print Commands
+        if: ${{ steps.strategy.outputs.do_update == 1 }}
+        run: |
+          cat aws_cli_commands.sh
