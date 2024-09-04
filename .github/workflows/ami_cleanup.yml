@@ -82,8 +82,8 @@ jobs:
           path: aws_cli_commands.sh
           overwrite: true
 
-  check-amis-to-cleanup:
-    name: Check AMIs to Cleanup
+  check-amis:
+    name: Check AMIs
     runs-on: ubuntu-latest
     needs: check-strategy
     strategy:
@@ -163,7 +163,7 @@ jobs:
 
   cleanup-strategy:
     name: Cleanup Strategy
-    needs: check-amis-to-cleanup
+    needs: check-amis
     runs-on: ubuntu-latest
     outputs:
       do_update: "${{ steps.strategy.outputs.do_update }}"
