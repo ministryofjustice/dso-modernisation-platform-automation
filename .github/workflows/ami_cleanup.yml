@@ -125,8 +125,8 @@ jobs:
           application=$(echo "${{ matrix.account_name }}" | rev | cut -d- -f2- | rev)
           [[ -s "commands.sh" ]] && rm -f "commands.sh"
           touch "commands.sh"
-          echo src/ami_cleanup.sh -a "$application" -s "commands.sh" -d delete ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }}
-          src/ami_cleanup.sh -a "$application" -s "commands.sh" -d delete ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }}
+          echo src/ami_cleanup.sh -a "$application" -s "commands.sh" -d ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }} delete
+          src/ami_cleanup.sh -a "$application" -s "commands.sh" -d ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }} delete
           if [[ -s "commands.sh" ]]; then
             echo "cleanup=1" >> $GITHUB_OUTPUT
           else
@@ -202,3 +202,39 @@ jobs:
         if: ${{ steps.strategy.outputs.do_update == 1 }}
         run: |
           cat aws_cli_commands.sh
+
+  cleanup-amis:
+    name: Cleanup AMIs
+    needs:
+      - check-strategy
+      - cleanup-strategy
+    runs-on: ubuntu-latest
+    if: ${{ needs.cleanup-strategy.outputs.do_update == 1 && needs.check-strategy.outputs.dryrun == 0 }}
+    strategy:
+      matrix: ${{ fromJson(needs.cleanup-strategy.outputs.matrix) }}
+      max-parallel: 1
+    steps:
+      - name: Get Account Details
+        id: account
+        run: |
+          echo "account name: ${{ matrix.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Download Expiry Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: "aws_cli_commands.sh"
+
+      - name: Run Commands
+        run: |
+          gsed -n '/aws-vault exec {{ matrix.account_name }}/,/exit/p' aws_cli_commands.sh | tail -n +2
