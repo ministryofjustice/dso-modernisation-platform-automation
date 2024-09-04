@@ -118,8 +118,8 @@ jobs:
           repository: ministryofjustice/modernisation-platform-environments
           path: modernisation-platform-environments
 
-      - name: Cleanup AMIs
-        id: cleanup
+      - name: Check AMIs
+        id: check
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
           application=$(echo "${{ matrix.account_name }}" | rev | cut -d- -f2- | rev)
@@ -134,14 +134,14 @@ jobs:
           fi
 
       - name: Download aws_cli_commands.sh Artifact
-        if: ${{ steps.cleanup.outputs.cleanup == 1 }}
+        if: ${{ steps.check.outputs.cleanup == 1 }}
         uses: actions/download-artifact@v4
         with:
           name: "aws_cli_commands.sh"
           path: dso-modernisation-platform-automation
 
       - name: Append aws cli commands
-        if: ${{ steps.cleanup.outputs.cleanup == 1 }}
+        if: ${{ steps.check.outputs.cleanup == 1 }}
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
           output() {
@@ -154,7 +154,7 @@ jobs:
           output >> aws_cli_commands.sh
 
       - name: Upload aws_cli_commands.sh Artifact
-        if: ${{ steps.cleanup.outputs.cleanup == 1 }}
+        if: ${{ steps.check.outputs.cleanup == 1 }}
         uses: actions/upload-artifact@v4
         with:
           name: "aws_cli_commands.sh"
