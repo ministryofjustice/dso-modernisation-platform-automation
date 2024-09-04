@@ -21,7 +21,8 @@
     {
       "account_name": "planetfm-production",
       "domain_names": [
-        "cafmwebx2.planetfm.service.justice.gov.uk"
+        "cafmwebx2.planetfm.service.justice.gov.uk",
+        "cafmwebx2.az.justice.gov.uk"
       ],
       "ec2_hostname": "pd-cafm-w-36-b",
       "schedule": 1
@@ -29,7 +30,8 @@
     {
       "account_name": "planetfm-production",
       "domain_names": [
-        "cafmwebx2.planetfm.service.justice.gov.uk"
+        "cafmwebx2.planetfm.service.justice.gov.uk",
+        "cafmwebx2.az.justice.gov.uk"
       ],
       "ec2_hostname": "pd-cafm-w-37-a",
       "schedule": 2
