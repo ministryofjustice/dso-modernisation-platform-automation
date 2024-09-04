@@ -238,5 +238,5 @@ jobs:
           for ((i=0;i<n;i++)); do
             echo "[$((i+1))/$n]: ${cmds[$i]}"
             echo "${cmds[$i]}" > command.sh
-            # . ./command.sh
+            . ./command.sh
           done
