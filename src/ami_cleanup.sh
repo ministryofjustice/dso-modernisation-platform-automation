@@ -13,6 +13,7 @@ Where <opts>:
   -c                     Also include images referenced in code
   -d                     Dryrun for delete command
   -m <months>            Exclude images younger than this number of months
+  -s <file>              Output AWS shell commands to file
 
 And:
   used                   List all images in use (and -c flag to include code)
@@ -68,7 +69,7 @@ get_date_filter() {
   date_filter=${date_filter}$(date_minus_month $((m3+1)) "+%Y-*"),
   date_filter=${date_filter}$(date_minus_month $((m3+13)) "+%Y-*"),
   date_filter=${date_filter}$(date_minus_month $((m3+25)) "+%Y-*")
-  echo $date_filter
+  echo "$date_filter"
 }
 
 get_account_images_csv() {
@@ -187,12 +188,14 @@ get_images_to_delete_csv() {
 
 delete_images() {
   local dryrun
+  local aws_cmd_file
   local i
   local id
   local ids
   local n
 
   dryrun=$1
+  aws_cmd_file=$2
   shift
   IFS=$'\n'
   ids=($(echo "$@"))
@@ -211,6 +214,9 @@ delete_images() {
       echo -n "[$((i+1))/$n] " >&2
     fi
     echo "aws ec2 deregister-image --image-id ${id[0]} # ${id[2]} ${id[4]}" >&2
+    if [[ -n $aws_cmd_file ]]; then
+      echo "aws ec2 deregister-image --image-id ${id[0]} # ${id[2]} ${id[4]}" >> "$aws_cmd_file"
+    fi
     if [[ $dryrun == 0 ]]; then
       aws ec2 deregister-image --image-id "${id[0]}" >&2
     fi
@@ -218,13 +224,14 @@ delete_images() {
 }
 
 main() {
+  aws_cmd_file=
   months=
   application=
   include_backup=0
   include_images_in_code=0
   include_images_on_ec2=1
   dryrun=0
-  while getopts "a:bcdxm:" opt; do
+  while getopts "a:bcdxm:s:" opt; do
       case $opt in
           a)
               application=${OPTARG}
@@ -243,6 +250,9 @@ main() {
               ;;
           m)
               months=${OPTARG}
+              ;;
+          s)
+              aws_cmd_file=${OPTARG}
               ;;
           :)
               echo "Error: option ${OPTARG} requires an argument" 
@@ -272,7 +282,7 @@ main() {
     get_code_image_names "$application"
   elif [[ $1 == "delete" ]]; then
     csv=$(get_images_to_delete_csv "$include_images_on_ec2" "$include_images_in_code" "$application" "$months" "$include_backup" | sort -t, -k3)
-    delete_images "$dryrun" "$csv"
+    delete_images "$dryrun" "$aws_cmd_file" "$csv"
   else
     usage >&2
     exit 1
