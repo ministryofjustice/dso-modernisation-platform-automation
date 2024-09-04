@@ -196,7 +196,7 @@ delete_images() {
 
   dryrun=$1
   aws_cmd_file=$2
-  shift
+  shift 2
   IFS=$'\n'
   ids=($(echo "$@"))
   unset IFS
