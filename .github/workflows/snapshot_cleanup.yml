@@ -80,7 +80,7 @@ jobs:
   check-snapshots:
     name: Check Snapshots
     runs-on: ubuntu-latest
-    needs: strategy
+    needs: check-strategy
     strategy:
       matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
       max-parallel: 1
