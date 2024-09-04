@@ -238,7 +238,7 @@ jobs:
       - name: Run Commands
         run: |
           IFS=$'\n'
-          cmds=($(sed -n '/aws-vault exec {{ matrix.account_name }}/,/exit/p' aws_cli_commands.sh | tail -n +2))
+          cmds=($(sed -n '/aws-vault exec ${{ matrix.account_name }}/,/exit/p' aws_cli_commands.sh | tail -n +2))
           unset IFS
           n=${#cmds[@]}
           for ((i=0;i<n;i++)); do
