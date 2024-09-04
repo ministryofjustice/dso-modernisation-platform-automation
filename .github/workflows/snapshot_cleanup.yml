@@ -10,29 +10,33 @@ on:
       environments:
         description: 'e.g. development or leave blank for all'
         type: string
-      snapshot_cleanup_sh_args:
-        description: 'Command line options to snapshot_cleanup.sh script, e.g. "-d delete"'
-        type: string
-        default: "-d delete"
+      dryrun:
+        type: choice
+        description: Dryrun mode (leave as false unless testing)
+        default: false
+        options:
+          - true
+          - false
 
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  strategy:
-    name: strategy
+  check-strategy:
+    name: Check Strategy
     runs-on: ubuntu-latest
     outputs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
       snapshot_cleanup_sh_args: "${{ steps.options.outputs.snapshot_cleanup_sh_args }}"
+      dryrun: "${{ steps.options.outputs.dryrun }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
         with:
           ref: ${{ github.ref }}
 
-      - name: strategy
+      - name: Strategy
         id: strategy
         run: |
           echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
@@ -42,31 +46,44 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
+          echo '' > aws_cli_commands.sh
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
           echo "${matrix}" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
           echo "{$matrix}"
 
-      - name: options
+      - name: Options
         id: options
         run: |
-          echo "Setting options event=${GITHUB_EVENT_NAME}"
+          dryrun=0
+          echo "Seitting options event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            snapshot_cleanup_sh_args="${{ github.event.inputs.snapshot_cleanup_sh_args }}"
+            snapshot_cleanup_sh_args=""
+            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+              dryrun=1
+            fi
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo "snapshot_cleanup_sh_args=${snapshot_cleanup_sh_args}"
+          echo "snapshot_cleanup_sh_args=${snapshot_cleanup_sh_args} dryrun=${dryrun}"
           echo "snapshot_cleanup_sh_args=${snapshot_cleanup_sh_args}" >> $GITHUB_OUTPUT
+          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
 
-  snapshot_cleanup:
-    name: Snapshot Cleanup
+      - name: Upload aws cli commands artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "aws_cli_commands.sh"
+          path: aws_cli_commands.sh
+          overwrite: true
+
+  check-snapshots:
+    name: Check Snapshots
     runs-on: ubuntu-latest
     needs: strategy
     strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.strategy.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
+      max-parallel: 1
     steps:
       - name: Get Account Details
         id: account
@@ -96,8 +113,130 @@ jobs:
           repository: ministryofjustice/modernisation-platform-environments
           path: modernisation-platform-environments
 
-      - name: Cleanup Snapshots
+      - name: Check Snapshots
+        id: check
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
-          echo src/snapshot_cleanup.sh ${{ needs.strategy.outputs.snapshot_cleanup_sh_args }}
-          src/snapshot_cleanup.sh ${{ needs.strategy.outputs.snapshot_cleanup_sh_args }}
+          [[ -s "commands.sh" ]] && rm -f "commands.sh"
+          touch "commands.sh"
+          echo src/snapshot_cleanup.sh -s "commands.sh" -d ${{ needs.check-strategy.outputs.snapshot_cleanup_sh_args }} delete
+          src/snapshot_cleanup.sh -s "commands.sh" -d ${{ needs.check-strategy.outputs.snapshot_cleanup_sh_args }} delete
+          if [[ -s "commands.sh" ]]; then
+            echo "cleanup=1" >> $GITHUB_OUTPUT
+          else
+            echo "cleanup=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download aws_cli_commands.sh Artifact
+        if: ${{ steps.check.outputs.cleanup == 1 }}
+        uses: actions/download-artifact@v4
+        with:
+          name: "aws_cli_commands.sh"
+          path: dso-modernisation-platform-automation
+
+      - name: Append aws cli commands
+        if: ${{ steps.check.outputs.cleanup == 1 }}
+        working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
+        run: |
+          output() {
+            echo "aws-vault exec ${{ matrix.account_name }}"
+            cat ./commands.sh
+            echo "exit"
+            echo ""
+          }
+          output
+          output >> aws_cli_commands.sh
+
+      - name: Upload aws_cli_commands.sh Artifact
+        if: ${{ steps.check.outputs.cleanup == 1 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: "aws_cli_commands.sh"
+          path: dso-modernisation-platform-automation/aws_cli_commands.sh
+          overwrite: true
+
+  cleanup-strategy:
+    name: Cleanup Strategy
+    needs: check-snapshots
+    runs-on: ubuntu-latest
+    outputs:
+      do_update: "${{ steps.strategy.outputs.do_update }}"
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+    steps:
+      - name: Download Expiry Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: "aws_cli_commands.sh"
+
+      - name: Strategy
+        id: strategy
+        run: |
+          get_matrix() {
+            echo '{"include":['
+            (
+              for account in $@; do
+                echo '{"account_name": "'"$account"'"},'
+              done
+            ) | sed '$s/,$//'
+            echo ']}'
+          }
+          do_update=1
+          echo "Setting strategy matrix for Snapshot Cleanup"
+          accounts=$(grep ^aws-vault aws_cli_commands.sh  | cut -d' ' -f3)
+          matrix=$(get_matrix $accounts)
+          [[ -z $accounts ]] && do_update=0
+          echo "do_update=${do_update}"
+          echo "${matrix}"
+          echo "do_update=${do_update}" >> $GITHUB_OUTPUT
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: Print Commands
+        if: ${{ steps.strategy.outputs.do_update == 1 }}
+        run: |
+          cat aws_cli_commands.sh
+
+  cleanup-snapshots:
+    name: Cleanup Snapshots
+    needs:
+      - check-strategy
+      - cleanup-strategy
+    runs-on: ubuntu-latest
+    if: ${{ needs.cleanup-strategy.outputs.do_update == 1 && needs.check-strategy.outputs.dryrun == 0 }}
+    strategy:
+      matrix: ${{ fromJson(needs.cleanup-strategy.outputs.matrix) }}
+      max-parallel: 1
+    steps:
+      - name: Get Account Details
+        id: account
+        run: |
+          echo "account name: ${{ matrix.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Download Expiry Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: "aws_cli_commands.sh"
+
+      - name: Run Commands
+        run: |
+          IFS=$'\n'
+          cmds=($(sed -n '/aws-vault exec ${{ matrix.account_name }}/,/exit/p' aws_cli_commands.sh | tail -n +2 | grep -v exit))
+          unset IFS
+          n=${#cmds[@]}
+          for ((i=0;i<n;i++)); do
+            echo "[$((i+1))/$n]: ${cmds[$i]}"
+            echo "${cmds[$i]}" > command.sh
+            # . ./command.sh
+          done
