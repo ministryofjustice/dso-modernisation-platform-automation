@@ -145,9 +145,9 @@ jobs:
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
           output() {
-            echo "aws-vault exec ${{ matrix.account_name }}"
+            echo "export AWS_DEFAULT_PROFILE=${{ matrix.account_name }}"
             cat ./commands.sh
-            echo "exit"
+            echo "unset AWS_DEFAULT_PROFILE"
             echo ""
           }
           output
@@ -188,7 +188,7 @@ jobs:
           }
           do_update=1
           echo "Setting strategy matrix for AMI Cleanup"
-          accounts=$(grep ^aws-vault aws_cli_commands.sh  | cut -d' ' -f3)
+          accounts=$(grep '^export AWS_DEFAULT_PROFILE=' aws_cli_commands.sh | cut -d= -f2)
           matrix=$(get_matrix $accounts)
           [[ -z $accounts ]] && do_update=0
           echo "do_update=${do_update}"
@@ -238,7 +238,7 @@ jobs:
       - name: Run Commands
         run: |
           IFS=$'\n'
-          cmds=($(sed -n '/aws-vault exec ${{ matrix.account_name }}/,/exit/p' aws_cli_commands.sh | tail -n +2 | grep -v exit))
+          cmds=($(sed -n '/export AWS_DEFAULT_PROFILE=${{ matrix.account_name }}/,/unset AWS_DEFAULT_PROFILE/p' aws_cli_commands.sh | grep -v AWS_DEFAULT_PROFILE))
           unset IFS
           n=${#cmds[@]}
           for ((i=0;i<n;i++)); do
