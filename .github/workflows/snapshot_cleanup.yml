@@ -140,7 +140,6 @@ jobs:
         run: |
           output() {
             echo "export AWS_DEFAULT_PROFILE=${{ matrix.account_name }}"
-            echo "aws-vault exec ${{ matrix.account_name }}"
             cat ./commands.sh
             echo "unset AWS_DEFAULT_PROFILE"
             echo ""
@@ -183,7 +182,7 @@ jobs:
           }
           do_update=1
           echo "Setting strategy matrix for Snapshot Cleanup"
-          accounts=$(grep ^aws-vault aws_cli_commands.sh  | cut -d' ' -f3)
+          accounts=$(grep '^export AWS_DEFAULT_PROFILE=' aws_cli_commands.sh | cut -d= -f2)
           matrix=$(get_matrix $accounts)
           [[ -z $accounts ]] && do_update=0
           echo "do_update=${do_update}"
