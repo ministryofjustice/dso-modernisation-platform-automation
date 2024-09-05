@@ -9,6 +9,7 @@ usage() {
 
 Where <opts>:
   -d                     Dryrun for delete command
+  -s <file>              Output AWS shell commands to file
 
 And:
   list                   List all snapshots along with associated AMI
@@ -96,13 +97,15 @@ append_image_csv() {
 
 delete_snapshots() {
   local dryrun
+  local aws_cmd_file
   local i
   local n
   local snapshot
   local snapshots
 
   dryrun=$1
-  shift
+  aws_cmd_file=$2
+  shift 2
   IFS=$'\n'
   snapshots=($(echo "$@"))
   unset IFS
@@ -120,6 +123,9 @@ delete_snapshots() {
       echo -n "[$((i+1))/$n] " >&2
     fi
     echo "aws ec2 delete-snapshot --snapshot-id ${snapshot[0]} # ${snapshot[2]} ${snapshot[4]} ${snapshot[5]} ${snapshot[6]}" >&2
+    if [[ -n $aws_cmd_file ]]; then
+      echo "aws ec2 delete-snapshot --snapshot-id ${snapshot[0]} # ${snapshot[2]} ${snapshot[4]} ${snapshot[5]} ${snapshot[6]}" >> "$aws_cmd_file"
+    fi
     if [[ $dryrun == 0 ]]; then
       aws ec2 delete-snapshot --snapshot-id "${snapshot[0]}" >&2
     fi
@@ -127,15 +133,20 @@ delete_snapshots() {
 }
 
 main() {
+  local aws_cmd_file
   local snapshots
   local opt
   local dryrun
 
+  aws_cmd_file=
   dryrun=0
-  while getopts "d" opt; do
+  while getopts "ds:" opt; do
       case $opt in
           d)
               dryrun=1
+              ;;
+          s)
+              aws_cmd_file=${OPTARG}
               ;;
           :)
               echo "Error: option ${OPTARG} requires an argument" 
@@ -167,7 +178,7 @@ main() {
   elif [[ $1 == "delete" ]]; then
     snapshots=$(parse_snapshot_description_csv "$(get_snapshots_csv)")
     delete_snapshots_csv=$(append_image_csv "$snapshots" | grep ",NoAmi" | grep 'vol-ffffffff' || true)
-    delete_snapshots "$dryrun" "$delete_snapshots_csv"
+    delete_snapshots "$dryrun" "$aws_cmd_file" "$delete_snapshots_csv"
   else
     usage >&2
     exit 1
