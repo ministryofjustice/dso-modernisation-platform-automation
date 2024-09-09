@@ -59,8 +59,8 @@ jobs:
       - name: Parse Workflow Inputs
         id: parseinput
         run: |
-          echo ::add-mask::$account_id
           echo "account_id=${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['nomis-combined-reporting-test'] }}" >> "$GITHUB_OUTPUT"
+          echo ::add-mask::$account_id
 
   list-eligible-instances:
     name: List Eligible Instances
@@ -80,14 +80,19 @@ jobs:
           echo "Listing instances for environment ${{ needs.setup.outputs.environment }}"
           INSTANCES=$(aws ec2 describe-instances --filters "Name=tag-key,Values=server-name" --query 'Reservations[*].Instances[*].{InstanceId:InstanceId, ServerName:Tags[?Key==`server-name`].Value | [0]}' --output json \
           | jq -r '.[] | .[] | select(.ServerName | contains("-db-") | not)')
-          echo "${INSTANCES}"
-          echo "instances=${INSTANCES}" >> "$GITHUB_OUTPUT"
+          if [[ -z "$INSTANCES" ]]; then
+            echo "No instances found"
+            echo "instances=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "${INSTANCES}"
+            echo "instances=${INSTANCES}" >> "$GITHUB_OUTPUT"
+          fi
 
   stop:
     name: Stop Environment
     needs: [setup, list-eligible-instances]
     runs-on: ubuntu-latest
-    if: ${{ needs.setup.outputs.action == 'stop' }}
+    if: ${{ needs.setup.outputs.action == 'stop' && needs.list-eligible-instances.outputs.instances != '0' }}
     steps:
       - name: Stop Environment
         run: |
@@ -99,7 +104,7 @@ jobs:
     name: Start Environment
     needs: [setup, list-eligible-instances]
     runs-on: ubuntu-latest
-    if: ${{ needs.setup.outputs.action == 'start' }}
+    if: ${{ needs.setup.outputs.action == 'start' && needs.list-eligible-instances.outputs.instances != '0' }}
     steps:
       - name: Start Environment
         run: |
@@ -111,7 +116,7 @@ jobs:
     name: Environment Status
     needs: [setup, list-eligible-instances]
     runs-on: ubuntu-latest
-    if: ${{ needs.setup.outputs.action == 'status' }}
+    if: ${{ needs.setup.outputs.action == 'status' && needs.list-eligible-instances.outputs.instances != '0' }}
     steps:
       - name: Environment Status
         run: |
