@@ -62,24 +62,18 @@ jobs:
           echo ::add-mask::$account_id
           echo "account_id=${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['nomis-combined-reporting-test'] }}" >> "$GITHUB_OUTPUT"
 
-  authenticate:
-    name: Authenticate
+  list-eligible-instances:
+    name: List Eligible Instances
     runs-on: ubuntu-latest
     needs: setup
+    outputs:
+      instances: ${{ steps.list-instances.outputs.INSTANCES }}
     steps:
       - name: Set AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: "arn:aws:iam::${{ needs.setup.outputs.account_id }}:role/modernisation-platform-oidc-cicd" 
-          aws-region: eu-west-2  
-  
-  list-eligible-instances:
-    name: List Eligible Instances
-    runs-on: ubuntu-latest
-    needs: [setup, authenticate]
-    outputs:
-      instances: ${{ steps.list-instances.outputs.INSTANCES }}
-    steps:
+          role-to-assume: "arn:aws:iam::${{ needs.setup.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
+          aws-region: eu-west-2
       - name: List Instances
         id: list-instances
         run: |
@@ -91,7 +85,7 @@ jobs:
 
   stop:
     name: Stop Environment
-    needs: setup
+    needs: [setup, list-eligible-instances]
     runs-on: ubuntu-latest
     if: ${{ needs.setup.outputs.action == 'stop' }}
     steps:
@@ -103,7 +97,7 @@ jobs:
           done
   start:
     name: Start Environment
-    needs: setup
+    needs: [setup, list-eligible-instances]
     runs-on: ubuntu-latest
     if: ${{ needs.setup.outputs.action == 'start' }}
     steps:
@@ -115,7 +109,7 @@ jobs:
           done
   status:
     name: Environment Status
-    needs: setup
+    needs: [setup, list-eligible-instances]
     runs-on: ubuntu-latest
     if: ${{ needs.setup.outputs.action == 'status' }}
     steps:
