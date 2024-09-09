@@ -1,0 +1,120 @@
+---
+
+name: Nomis Combined Reporting Environment Control
+
+on:
+  workflow_dispatch:
+    inputs:
+      account:
+        description: 'Account to control'
+        type: choice
+        required: true
+        options:
+          - 'nomis-combined-reporting-preproduction'
+          - 'nomis-combined-reporting-test'
+      environment:
+        description: 'Environment to control'
+        type: choice
+        required: true
+        default: 'preprod'
+        options:
+          - 'preprod'
+          - 'lsast'
+          - 't1'
+      action:
+        description: 'Action to perform'
+        type: choice
+        required: true
+        default: 'stop'
+        options:
+          - 'stop'
+          - 'start'
+          - 'status'
+
+permissions:
+  id-token: write
+  contents: read
+
+run-name: "NOMIS Combined Reporting Environment Control (${{ inputs.environment }})"
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+      action: "${{ inputs.action }}"
+      environment: "${{ inputs.environment }}"
+      account_id: "${{ steps.parseinput.outputs.account_id }}"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          ref: ${{ github.ref }}
+      - name: Parse Workflow Inputs
+        id: parseinput
+        run: |
+          echo ::add-mask::$account_id
+          echo "account_id=${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[inputs.account] }}" >> "$GITHUB_OUTPUT"
+
+  authenticate:
+    name: Authenticate
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Set AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: "arn:aws:iam::${{ needs.setup.outputs.account_id }}:role/modernisation-platform-oidc-cicd" 
+          aws-region: eu-west-2  
+  
+  list-eligible-instances:
+    name: List Eligible Instances
+    runs-on: ubuntu-latest
+    needs: [setup, authenticate]
+    outputs:
+      instances: ${{ steps.list-instances.outputs.INSTANCES }}
+    steps:
+      - name: List Instances
+        id: list-instances
+        run: |
+          echo "Listing instances for environment ${{ needs.setup.outputs.environment }}"
+          INSTANCES=$(aws ec2 describe-instances --filters "Name=tag-key,Values=server-name" --query 'Reservations[*].Instances[*].{InstanceId:InstanceId, ServerName:Tags[?Key==`server-name`].Value | [0]}' --output json \
+          | jq -r '.[] | .[] | select(.ServerName | contains("-db-") | not)')
+          echo "instances=${INSTANCES}" >> "$GITHUB_OUTPUT"
+
+  stop:
+    name: Stop Environment
+    needs: setup
+    runs-on: ubuntu-latest
+    if: ${{ needs.setup.outputs.action == 'stop' }}
+    steps:
+      - name: Stop Environment
+        run: |
+          echo "Stopping environment ${{ needs.setup.outputs.environment }}"
+          for INSTANCE in ${{ needs.list-eligible-instances.outputs.instances }}; do
+            echo "Stopping instance $INSTANCE"
+          done
+  start:
+    name: Start Environment
+    needs: setup
+    runs-on: ubuntu-latest
+    if: ${{ needs.setup.outputs.action == 'start' }}
+    steps:
+      - name: Start Environment
+        run: |
+          echo "Starting environment ${{ needs.setup.outputs.environment }}"
+          for INSTANCE in ${{ needs.list-eligible-instances.outputs.instances }}; do
+            echo "Starting instance $INSTANCE"
+          done
+  status:
+    name: Environment Status
+    needs: setup
+    runs-on: ubuntu-latest
+    if: ${{ needs.setup.outputs.action == 'status' }}
+    steps:
+      - name: Environment Status
+        run: |
+          echo "Checking status of environment ${{ needs.setup.outputs.environment }}"
+          for INSTANCE in ${{ needs.list-eligible-instances.outputs.instances }}; do
+            echo "Checking status of instance $INSTANCE"
+          done
