@@ -59,8 +59,9 @@ jobs:
       - name: Parse Workflow Inputs
         id: parseinput
         run: |
-          echo "account_id=${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['nomis-combined-reporting-test'] }}" >> "$GITHUB_OUTPUT"
+          account_id=${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['nomis-combined-reporting-test'] }}
           echo ::add-mask::$account_id
+          echo "account_id=${account_id}" >> "$GITHUB_OUTPUT"
 
   list-eligible-instances:
     name: List Eligible Instances
