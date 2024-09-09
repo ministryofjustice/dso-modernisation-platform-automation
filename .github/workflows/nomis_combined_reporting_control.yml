@@ -30,6 +30,9 @@ on:
           - 'stop'
           - 'start'
           - 'status'
+  push:
+    branches:
+      - '*'
 
 permissions:
   id-token: write
@@ -80,6 +83,7 @@ jobs:
           echo "Listing instances for environment ${{ needs.setup.outputs.environment }}"
           INSTANCES=$(aws ec2 describe-instances --filters "Name=tag-key,Values=server-name" --query 'Reservations[*].Instances[*].{InstanceId:InstanceId, ServerName:Tags[?Key==`server-name`].Value | [0]}' --output json \
           | jq -r '.[] | .[] | select(.ServerName | contains("-db-") | not)')
+          echo "${INSTANCES}"
           echo "instances=${INSTANCES}" >> "$GITHUB_OUTPUT"
 
   stop:
