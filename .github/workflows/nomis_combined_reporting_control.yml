@@ -38,6 +38,9 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  AWS_DEFAULT_REGION: eu-west-2
+
 run-name: "NOMIS Combined Reporting Environment Control (${{ inputs.environment }})"
 
 jobs:
