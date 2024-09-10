@@ -99,7 +99,7 @@ jobs:
     name: Stop Environment
     needs: [setup, list-eligible-instances]
     runs-on: ubuntu-latest
-    if: ${{ needs.setup.outputs.action == 'stop' && needs.list-eligible-instances.outputs.instances != '0' }}
+    if: ${{ needs.list-eligible-instances.outputs.instances != '0' }}
     steps:
       - name: Stop Environment
         run: |
