@@ -104,7 +104,8 @@ jobs:
       - name: Stop Environment
         run: |
           echo "Stopping environment ${{ needs.setup.outputs.environment }}"
-          for INSTANCE in ${{ needs.list-eligible-instances.outputs.instances }}; do
+          INSTANCES=( ${{ needs.list-eligible-instances.outputs.instances }} )
+          for INSTANCE in $INSTANCES; do
             echo "Stopping instance $INSTANCE"
           done
   start:
