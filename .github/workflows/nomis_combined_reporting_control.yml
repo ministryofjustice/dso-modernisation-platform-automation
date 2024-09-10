@@ -80,7 +80,7 @@ jobs:
           echo "Listing instances for environment ${{ needs.setup.outputs.environment }}"
           INSTANCES=$(aws ec2 describe-instances --filters "Name=tag-key,Values=shutdown-order" \
             --query "Reservations[*].Instances[*].[Tags[?Key=='shutdown-order'].Value | [0], InstanceId, Tags[?Key=='server-type'].Value | [0]]" \
-            --output text
+            --output text)
           if [[ -z "$INSTANCES" ]]; then
             echo "No instances found"
             echo "instances=0" >> "$GITHUB_OUTPUT"
