@@ -104,10 +104,9 @@ jobs:
       - name: Stop Environment
         run: |
           echo "Stopping environment ${{ needs.setup.outputs.environment }}"
-          IFS=$'\n' read -r -d '' -a INSTANCES <<< "${{ needs.list-eligible-instances.outputs.instances }}"
-          for INSTANCE in "${INSTANCES[@]}"; do
+          while IFS= read -f INSTANCE; do
             echo "Stopping instance $INSTANCE"
-          done
+          done <<< ${{ needs.list-eligible-instances.outputs.instances }}
   start:
     name: Start Environment
     needs: [setup, list-eligible-instances]
