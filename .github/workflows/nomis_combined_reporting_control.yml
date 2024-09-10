@@ -86,7 +86,13 @@ jobs:
             echo "instances=0" >> "$GITHUB_OUTPUT"
           else
             echo "${INSTANCES}"
-            echo "instances=${INSTANCES}" >> "$GITHUB_OUTPUT"
+            if (( $(grep -c . <<<"$INSTANCES") > 1 )); then
+              echo "instances<<EOF" >> "$GITHUB_OUTPUT"
+              echo "${INSTANCES}" >> "$GITHUB_OUTPUT"
+              echo "EOF" >> "$GITHUB_OUTPUT"
+            else
+              echo "instances=${INSTANCES}" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
   stop:
