@@ -56,7 +56,7 @@ jobs:
       - name: Parse Workflow Inputs
         id: parseinput
         run: |
-          account_id=${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[ inputs.environment ] }}
+          account_id=${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[ inputs.account ] }}
           echo "account_id=${account_id}" >> "$GITHUB_OUTPUT"
 
   list-eligible-instances:
