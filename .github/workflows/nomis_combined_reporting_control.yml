@@ -98,7 +98,7 @@ jobs:
     name: Stop Environment
     needs: [setup, list-eligible-instances]
     runs-on: ubuntu-latest
-    if: ${{ needs.setup.outputs.action == 'start' && needs.list-eligible-instances.outputs.instances != '0' }}
+    if: ${{ needs.setup.outputs.action == 'stop' && needs.list-eligible-instances.outputs.instances != '0' }}
     steps:
       - name: Stop Environment
         run: |
@@ -110,6 +110,11 @@ jobs:
               echo "Shutdown Group: ${INSTANCE_DETAIL[0]}"
             fi
             echo "Stopping instance ${INSTANCE_DETAIL[1]}"
+            if [[ "${INSTANCE_DETAIL[2]}" == "running" ]]; then
+              aws ec2 stop-instances --instance-ids ${INSTANCE_DETAIL[1]}
+            else
+              echo "Instance ${INSTANCE_DETAIL[1]} is already stopped"
+            fi
             LAST_INSTANCE_GROUP=${INSTANCE_DETAIL[0]}
           done <<< "${{ needs.list-eligible-instances.outputs.instances }}"
   start:
@@ -128,6 +133,11 @@ jobs:
               echo "Startup Group: ${INSTANCE_DETAIL[0]}"
             fi
             echo "Starting instance ${INSTANCE_DETAIL[1]}"
+            if [[ "${INSTANCE_DETAIL[2]}" == "stopped" ]]; then
+              aws ec2 start-instances --instance-ids ${INSTANCE_DETAIL[1]}
+            else
+              echo "Instance ${INSTANCE_DETAIL[1]} is already running"
+            fi
             LAST_INSTANCE_GROUP=${INSTANCE_DETAIL[0]}
           done <<< "${{ needs.list-eligible-instances.outputs.instances }}"
   status:
@@ -141,5 +151,5 @@ jobs:
           echo "Reporting status for ${{ inputs.account }} - environment: ${{ needs.setup.outputs.environment }}"
           while IFS= read -r INSTANCE; do
             INSTANCE_DETAIL=($INSTANCE)
-            echo "${INSTANCE_DETAIL[1]} - ${INSTANCE_DETAIL[3]}"
+            echo "${INSTANCE_DETAIL[1]} - ${INSTANCE_DETAIL[2]}"
           done <<< "${{ needs.list-eligible-instances.outputs.instances }}"
