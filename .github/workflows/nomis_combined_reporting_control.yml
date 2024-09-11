@@ -104,8 +104,14 @@ jobs:
       - name: Stop Environment
         run: |
           echo "Stopping environment ${{ needs.setup.outputs.environment }}"
+          LAST_INSTANCE_GROUP=0
           while IFS= read -r INSTANCE; do
-            echo "Stopping instance $INSTANCE"
+            INSTANCE_DETAIL=($INSTANCE)
+            if (( ${INSTANCE_DETAIL[0]} > $LAST_INSTANCE_GROUP )); then
+              echo "Shutdown Group: ${INSTANCE_DETAIL[0]}"
+            fi
+            echo "Stopping instance ${INSTANCE_DETAIL[1]}"
+            LAST_INSTANCE_GROUP=${INSTANCE_DETAIL[0]}
           done <<< "${{ needs.list-eligible-instances.outputs.instances }}"
   start:
     name: Start Environment
