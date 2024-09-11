@@ -89,9 +89,9 @@ jobs:
             INSTANCES_SORTED=$(echo "${INSTANCES}" | sort -n -k1,1)
             echo "Sorted by shutdown order:"
             echo "${INSTANCES_SORTED}"
-            if (( $(grep -c . <<<"$INSTANCES") > 1 )); then
+            if (( $(grep -c . <<<"$INSTANCES_SORTED") > 1 )); then
               echo "instances<<EOF" >> "$GITHUB_OUTPUT"
-              echo "${INSTANCES}" >> "$GITHUB_OUTPUT"
+              echo "${INSTANCES_SORTED}" >> "$GITHUB_OUTPUT"
               echo "EOF" >> "$GITHUB_OUTPUT"
             else
               echo "instances=${INSTANCES}" >> "$GITHUB_OUTPUT"
