@@ -59,7 +59,7 @@ jobs:
       - name: Parse Workflow Inputs
         id: parseinput
         run: |
-          account_id=${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['nomis-combined-reporting-preproduction'] }}
+          account_id=${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[ inputs.environment ] }}
           echo "account_id=${account_id}" >> "$GITHUB_OUTPUT"
 
   list-eligible-instances:
@@ -79,7 +79,7 @@ jobs:
         run: |
           echo "Listing instances for environment ${{ needs.setup.outputs.environment }}"
           INSTANCES=$(aws ec2 describe-instances --filters "Name=tag-key,Values=shutdown-order" \
-            --query "Reservations[*].Instances[*].[Tags[?Key=='shutdown-order'].Value | [0], InstanceId, Tags[?Key=='server-type'].Value | [0]]" \
+            --query "Reservations[*].Instances[*].[Tags[?Key=='shutdown-order'].Value | [0], InstanceId, Tags[?Key=='server-type'].Value | [0], State.Name]" \
             --output text)
           if [[ -z "$INSTANCES" ]]; then
             echo "No instances found"
@@ -97,16 +97,15 @@ jobs:
               echo "instances=${INSTANCES}" >> "$GITHUB_OUTPUT"
             fi
           fi
-
   stop:
     name: Stop Environment
     needs: [setup, list-eligible-instances]
     runs-on: ubuntu-latest
-    if: ${{ needs.list-eligible-instances.outputs.instances != '0' }}
+    if: ${{ needs.setup.outputs.action == 'start' && needs.list-eligible-instances.outputs.instances != '0' }}
     steps:
       - name: Stop Environment
         run: |
-          echo "Stopping environment ${{ needs.setup.outputs.environment }}"
+          echo "Stopping environment ${{ needs.setup.outputs.environment }} in account ${{ inputs.account }}"
           LAST_INSTANCE_GROUP=0
           while IFS= read -r INSTANCE; do
             INSTANCE_DETAIL=($INSTANCE)
@@ -124,10 +123,16 @@ jobs:
     steps:
       - name: Start Environment
         run: |
-          echo "Starting environment ${{ needs.setup.outputs.environment }}"
-          for INSTANCE in ${{ needs.list-eligible-instances.outputs.instances }}; do
-            echo "Starting instance $INSTANCE"
-          done
+          echo "Starting environment ${{ needs.setup.outputs.environment }} in account ${{ inputs.account }}"
+          LAST_INSTANCE_GROUP=0
+          while IFS= read -r INSTANCE; do
+            INSTANCE_DETAIL=($INSTANCE)
+            if (( ${INSTANCE_DETAIL[0]} > $LAST_INSTANCE_GROUP )); then
+              echo "Startup Group: ${INSTANCE_DETAIL[0]}"
+            fi
+            echo "Starting instance ${INSTANCE_DETAIL[1]}"
+            LAST_INSTANCE_GROUP=${INSTANCE_DETAIL[0]}
+          done <<< "${{ needs.list-eligible-instances.outputs.instances }}"
   status:
     name: Environment Status
     needs: [setup, list-eligible-instances]
@@ -136,7 +141,8 @@ jobs:
     steps:
       - name: Environment Status
         run: |
-          echo "Checking status of environment ${{ needs.setup.outputs.environment }}"
-          for INSTANCE in ${{ needs.list-eligible-instances.outputs.instances }}; do
-            echo "Checking status of instance $INSTANCE"
-          done
+          echo "Reporting status for ${{ inputs.account }} - environment: ${{ needs.setup.outputs.environment }}"
+          while IFS= read -r INSTANCE; do
+            INSTANCE_DETAIL=($INSTANCE)
+            echo "${INSTANCE_DETAIL[1]} - ${INSTANCE_DETAIL[3]}"
+          done <<< "${{ needs.list-eligible-instances.outputs.instances }}"
