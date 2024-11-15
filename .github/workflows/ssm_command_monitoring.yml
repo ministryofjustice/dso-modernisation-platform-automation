@@ -60,13 +60,11 @@ jobs:
       - name: Options
         id: options
         run: |
-          dryrun=0
+          dryrun=false
           historyseconds=21600
           echo "Setting options event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
-              dryrun=1
-            fi
+            dryrun="${{ github.event.inputs.dryrun }}"
             historyseconds="${{ github.event.inputs.historyseconds }}"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
