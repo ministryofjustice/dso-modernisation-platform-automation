@@ -1,5 +1,5 @@
 ---
-name: AMI Cleanup
+name: SSM Command Monitoring
 
 on:
   workflow_dispatch:
@@ -125,22 +125,22 @@ jobs:
           echo "ignoredcount=${ignoredcount}" >> $GITHUB_OUTPUT
 
       - name: Dryrun SSM Commands
-        when: ${{ needs.check-strategy.outputs.dryrun == 'true' }}
+        if: ${{ needs.check-strategy.outputs.dryrun == 'true' }}
         run: |
           cat output.txt | grep "^DRYRUN: " | cut -d" " -f2-
 
       - name: Debug Failed SSM Commands
-        when: ${{ steps.monitor.outputs.failedcount != 0 }}
+        if: ${{ steps.monitor.outputs.failedcount != 0 }}
         run: |
           cat output.txt | grep "^Verbose1: " | cut -d" " -f2-
 
       - name: Debug Ignored SSM Commands
-        when: ${{ steps.monitor.outputs.ignoredcount != 0 }}
+        if: ${{ steps.monitor.outputs.ignoredcount != 0 }}
         run: |
           cat output.txt | grep "^Verbose2: " | cut -d" " -f2-
 
       - name: Debug Error
-        when: ${{ steps.monitor.outputs.exitcode != 0 }}
+        if: ${{ steps.monitor.outputs.exitcode != 0 }}
         env:
           exitcode: ${{ steps.monitor.outputs.exitcode }}
         run: |
