@@ -10,6 +10,10 @@ on:
       environments:
         description: 'e.g. development or leave blank for all'
         type: string
+      historyseconds:
+        description: 'how far back to check for in seconds, default 6 hours'
+        type: number
+        default: 21600
       dryrun:
         type: choice
         description: Dryrun mode (leave as false unless testing)
@@ -28,6 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
+      historyseconds: "${{ steps.options.outputs.historyseconds }}"
       dryrun: "${{ steps.options.outputs.dryrun }}"
 
     steps:
@@ -56,16 +61,20 @@ jobs:
         id: options
         run: |
           dryrun=0
+          historyseconds=21600
           echo "Setting options event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
               dryrun=1
             fi
+            historyseconds="${{ github.event.inputs.historyseconds }}"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
+          echo "dryrun=${dryrun} historyseconds=${historyseconds}"
           echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
+          echo "historyseconds=${historyseconds}" >> $GITHUB_OUTPUT
 
   ssm-commands-monitor:
     name: Monitor SSM Commands
@@ -100,8 +109,9 @@ jobs:
         id: monitor
         env:
           dryrun: ${{ needs.check-strategy.outputs.dryrun }}
+          historyseconds: ${{ needs.check-strategy.outputs.historyseconds }}
         run: |
-          options='-s 3600 -c'
+          options="-s $historyseconds -c"
           if [[ $dryrun == "true" ]]; then
             options="$options -d"
           fi
