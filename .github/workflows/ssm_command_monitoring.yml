@@ -1,0 +1,148 @@
+---
+name: AMI Cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      applications:
+        description: 'e.g. nomis or leave blank for all'
+        type: string
+      environments:
+        description: 'e.g. development or leave blank for all'
+        type: string
+      historyseconds:
+        description: 'how far back to check for in seconds, default 6 hours'
+        type: number
+        default: 21600
+      dryrun:
+        type: choice
+        description: Dryrun mode (leave as false unless testing)
+        default: false
+        options:
+          - true
+          - false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  check-strategy:
+    name: Check Strategy
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+      historyseconds: "${{ steps.options.outputs.historyseconds }}"
+      dryrun: "${{ steps.options.outputs.dryrun }}"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Strategy
+        id: strategy
+        run: |
+          echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo '' > aws_cli_commands.sh
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+          echo "{$matrix}"
+
+      - name: Options
+        id: options
+        run: |
+          dryrun=0
+          historyseconds=21600
+          echo "Setting options event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+              dryrun=1
+            fi
+            historyseconds="${{ github.event.inputs.historyseconds }}"
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo "dryrun=${dryrun} historyseconds=${historyseconds}"
+          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
+          echo "historyseconds=${historyseconds}" >> $GITHUB_OUTPUT
+
+  ssm-commands-monitor:
+    name: Monitor SSM Commands
+    runs-on: ubuntu-latest
+    needs: check-strategy
+    strategy:
+      matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
+      max-parallel: 1
+    steps:
+      - name: Get Account Details
+        id: account
+        run: |
+          echo "account name: ${{ matrix.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Monitor SSM Commands
+        id: monitor
+        env:
+          dryrun: ${{ needs.check-strategy.outputs.dryrun }}
+          historyseconds: ${{ needs.check-strategy.outputs.historyseconds }}
+        run: |
+          options="-s $historyseconds -c"
+          if [[ $dryrun == "true" ]]; then
+            options="$options -d"
+          fi
+          echo src/ssm-command-monitoring/ssm-command-monitor.sh $options
+          src/ssm-command-monitoring/ssm-command-monitor.sh $options 2>output.txt || exitcode=$?
+          failedcount=$(cat output.txt | grep "^Verbose1: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
+          ignoredcount=$(cat output.txt | grep "^Verbose2: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
+          echo "exitcode=${exitcode} failedcount=${failedcount} ignoredcount=${ignoredcount}"
+          echo "exitcode=${exitcode}" >> $GITHUB_OUTPUT
+          echo "failedcount=${failedcount}" >> $GITHUB_OUTPUT
+          echo "ignoredcount=${ignoredcount}" >> $GITHUB_OUTPUT
+
+      - name: Dryrun SSM Commands
+        when: ${{ needs.check-strategy.outputs.dryrun == 'true' }}
+        run: |
+          cat output.txt | grep "^DRYRUN: " | cut -d" " -f2-
+
+      - name: Debug Failed SSM Commands
+        when: ${{ steps.monitor.outputs.failedcount != 0 }}
+        run: |
+          cat output.txt | grep "^Verbose1: " | cut -d" " -f2-
+
+      - name: Debug Ignored SSM Commands
+        when: ${{ steps.monitor.outputs.ignoredcount != 0 }}
+        run: |
+          cat output.txt | grep "^Verbose2: " | cut -d" " -f2-
+
+      - name: Debug Error
+        when: ${{ steps.monitor.outputs.exitcode != 0 }}
+        env:
+          exitcode: ${{ steps.monitor.outputs.exitcode }}
+        run: |
+          cat output.txt | grep -v "^Verbose" | grep -v "^DRYRUN"
+          exit $exitcode
