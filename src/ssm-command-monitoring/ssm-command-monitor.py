@@ -287,11 +287,11 @@ def main():
 
     parser = argparse.ArgumentParser(
         description='Check SSM command invocations status')
-    parser.add_argument('-s',
-                        '--seconds',
+    parser.add_argument('-i',
+                        '--interval',
                         required=True,
                         type=int,
-                        help='Only check SSM commands run this time ago')
+                        help='Check SSM commands for this time interval in seconds')
     parser.add_argument('-p',
                         '--profile',
                         type=str,
@@ -299,7 +299,7 @@ def main():
     parser.add_argument('-r',
                         '--round',
                         action='store_true',
-                        help='Round the time period checked, e.g. if 3600, check from 14:00 to 15:00')
+                        help='Round the time interval checked, e.g. if 3600, check from 14:00 to 15:00')
     parser.add_argument(
         '-v',
         '--verbose',
@@ -315,12 +315,12 @@ def main():
     timestamp = timestamp.replace(microsecond=0)
     if args.round:
       epoch_time = datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC)
-      delta = int((timestamp - epoch_time).total_seconds()) % args.seconds
+      delta = int((timestamp - epoch_time).total_seconds()) % args.interval
       end_timestamp = timestamp - datetime.timedelta(seconds=delta)
-      start_timestamp = end_timestamp - datetime.timedelta(seconds=args.seconds)
+      start_timestamp = end_timestamp - datetime.timedelta(seconds=args.interval)
       invoke_after_timestamp = start_timestamp - datetime.timedelta(seconds=60)
     else:
-      start_timestamp = timestamp - datetime.timedelta(seconds=args.seconds)
+      start_timestamp = timestamp - datetime.timedelta(seconds=args.interval)
       end_timestamp = timestamp
       invoke_after_timestamp = start_timestamp
 

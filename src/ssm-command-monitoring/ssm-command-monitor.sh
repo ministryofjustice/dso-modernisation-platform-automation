@@ -8,10 +8,10 @@ BASEDIR=$(dirname "$0")
 CLOUDWATCH=0
 DRYRUN=0
 ROUND=0
-HISTORYSECONDS=
+INTERVAL=
 
 usage() {
-  echo "Usage $0: [<opts>] -s <history_to_check_in_seconds>
+  echo "Usage $0: [<opts>] -i <interval>
 
 Where <opts>:
   -c                     Upload metrics to cloudwatch
@@ -67,7 +67,7 @@ main() {
   round_arg=""
   verbose_arg=""
 
-  while getopts "cdrs:v" opt; do
+  while getopts "cdi:rv" opt; do
       case $opt in
           c)
               CLOUDWATCH=1
@@ -75,8 +75,8 @@ main() {
           d)
               DRYRUN=1
               ;;
-          s)
-              HISTORYSECONDS=${OPTARG}
+          i)
+              INTERVAL=${OPTARG}
               ;;
           r)
               round_arg="-r"
@@ -103,16 +103,16 @@ main() {
     usage >&2
     exit 1
   fi
-  if [[ -z $HISTORYSECONDS ]]; then
+  if [[ -z $INTERVAL ]]; then
     usage >&2
     exit 1
   fi
 
   if [[ $CLOUDWATCH == 0 ]]; then
-    python3 "$BASEDIR"/ssm-command-monitor.py --seconds "$HISTORYSECONDS" $round_arg $verbose_arg
+    python3 "$BASEDIR"/ssm-command-monitor.py --interval "$INTERVAL" $round_arg $verbose_arg
   else
     IFS=$'\n'
-    ssm_documents=($(python3 "$BASEDIR"/ssm-command-monitor.py --seconds "$HISTORYSECONDS" $round_arg $verbose_arg))
+    ssm_documents=($(python3 "$BASEDIR"/ssm-command-monitor.py --interval "$INTERVAL" $round_arg $verbose_arg))
     unset IFS
 
     num_ssm_documents=${#ssm_documents[@]}
