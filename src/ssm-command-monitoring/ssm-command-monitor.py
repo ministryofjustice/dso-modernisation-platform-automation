@@ -22,7 +22,7 @@ IGNORE_FAILURES_WITHOUT_ASSOCIATION = {
 }
 
 IGNORE_FAILURES_BY_TAGS = {
-    # This seems to fail when windows server comes back up
+    # This seems to fail when windows server comes back up
     "AmazonInspector2-InvokeInspectorSsmPlugin": [
         { "os-type": "Linux" },
         { "environment-name": "nomis-development", "server-type": "NomisClient" },
@@ -178,17 +178,25 @@ def add_commands_stat(commands_summary, instance_id, document_name, status):
     commands_summary[instance_id][document_name][status] += 1
 
 
-def get_commands_summary(commands_json, tags_dict, associations_dict, verbose):
+def get_commands_summary(commands_json, tags_dict, associations_dict, verbose, start_timestamp, end_timestamp):
     """Aggregate all SSM command stats"""
 
     commands_summary = {}
     for command in commands_json['CommandInvocations']:
+        timestamp = datetime.datetime.strptime(command['RequestedDateTime'], '%Y-%m-%dT%H:%M:%S.%f%z')
         command_id = command['CommandId']
         document_name = command['DocumentName']
         instance_id = command['InstanceId']
         comment = command['Comment']
         status = command['Status']
         comment_ids = comment.split(':')
+
+        if timestamp < start_timestamp or timestamp >= end_timestamp:
+            if verbose >= 5:
+                sys.stderr.write(
+                    f'Verbose5: InstanceId={instance_id} CommandId={command_id}: skipping {document_name} {timestamp} - outside time range'
+                    + os.linesep)
+            continue
 
         instance_tags = None
         if instance_id in tags_dict:
@@ -220,7 +228,7 @@ def get_commands_summary(commands_json, tags_dict, associations_dict, verbose):
                     f'Verbose2: InstanceId={instance_id} CommandId={command_id}: ignoring {document_name} {status} - still running'
                     + os.linesep)
             continue
-        if instance_tags is None:
+
             add_commands_stat(commands_summary, instance_id, document_name,
                               'ignore')
             if verbose >= 2:
@@ -239,6 +247,10 @@ def get_commands_summary(commands_json, tags_dict, associations_dict, verbose):
         if status == 'Success':
             add_commands_stat(commands_summary, instance_id, document_name,
                               'success')
+            if verbose >= 6:
+                sys.stderr.write(
+                    textwrap.indent(json.dumps(command, indent=1),
+                                    'Verbose6: ') + os.linesep)
         else:
             add_commands_stat(commands_summary, instance_id, document_name,
                               'failed')
@@ -257,15 +269,15 @@ def get_commands_summary(commands_json, tags_dict, associations_dict, verbose):
     return commands_summary
 
 
-def print_commands_summary_csv(commands_summary):
+def print_commands_summary_csv(commands_summary, timestamp):
     """Print SSM command stats in CSV"""
 
-    print('InstanceId,DocumentName,SuccessCount,FailedCount,IgnoreCount')
+    print('Timestamp,InstanceId,DocumentName,SuccessCount,FailedCount,IgnoreCount')
     for instance_id in commands_summary.keys():
         for command_key in commands_summary[instance_id].keys():
             command = commands_summary[instance_id][command_key]
             print(
-                f'{instance_id},{command_key},{command["success"]},{command["failed"]},{command["ignore"]}'
+                f'{timestamp},{instance_id},{command_key},{command["success"]},{command["failed"]},{command["ignore"]}'
             )
 
 
@@ -284,6 +296,10 @@ def main():
                         '--profile',
                         type=str,
                         help='Optional profile to use for aws cli')
+    parser.add_argument('-r',
+                        '--round',
+                        action='store_true',
+                        help='Round the time period checked, e.g. if 3600, check from 14:00 to 15:00')
     parser.add_argument(
         '-v',
         '--verbose',
@@ -295,20 +311,34 @@ def main():
 
     args = parser.parse_args()
 
-    timestamp = datetime.datetime.now()
-    timestamp = timestamp - datetime.timedelta(seconds=args.seconds)
+    timestamp = datetime.datetime.now(datetime.UTC)
+    timestamp = timestamp.replace(microsecond=0)
+    if args.round:
+      epoch_time = datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC)
+      delta = int((timestamp - epoch_time).total_seconds()) % args.seconds
+      end_timestamp = timestamp - datetime.timedelta(seconds=delta)
+      start_timestamp = end_timestamp - datetime.timedelta(seconds=args.seconds)
+      invoke_after_timestamp = start_timestamp - datetime.timedelta(seconds=60)
+    else:
+      start_timestamp = timestamp - datetime.timedelta(seconds=args.seconds)
+      end_timestamp = timestamp
+      invoke_after_timestamp = start_timestamp
+
     if args.profile:
         AWSCLI_COMMON_ARGS += ["--profile", args.profile]
 
     tags_json = describe_tags()
     tags_dict = tags_json_to_instance_dict(tags_json)
     associations_json = list_associations()
-    associations_dict = associations_json_to_associations_dict(
-        associations_json)
-    commands_json = list_command_invocations(timestamp)
-    commands_summary = get_commands_summary(commands_json, tags_dict,
-                                            associations_dict, args.verbose)
-    print_commands_summary_csv(commands_summary)
+    associations_dict = associations_json_to_associations_dict(associations_json)
+    commands_json = list_command_invocations(invoke_after_timestamp)
+    commands_summary = get_commands_summary(commands_json,
+                                            tags_dict,
+                                            associations_dict,
+                                            args.verbose,
+                                            start_timestamp,
+                                            end_timestamp)
+    print_commands_summary_csv(commands_summary, end_timestamp.strftime("%Y-%m-%dT%TZ"))
 
 
 main()
