@@ -96,7 +96,7 @@ jobs:
     needs: check-strategy
     strategy:
       matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
-      max-parallel: 1
+      fail-fast: false
     steps:
       - name: Get Account Details
         id: account

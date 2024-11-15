@@ -311,10 +311,10 @@ def main():
 
     args = parser.parse_args()
 
-    timestamp = datetime.datetime.now(datetime.UTC)
+    timestamp = datetime.datetime.now(datetime.timezone.utc)
     timestamp = timestamp.replace(microsecond=0)
     if args.round:
-      epoch_time = datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC)
+      epoch_time = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
       delta = int((timestamp - epoch_time).total_seconds()) % args.interval
       end_timestamp = timestamp - datetime.timedelta(seconds=delta)
       start_timestamp = end_timestamp - datetime.timedelta(seconds=args.interval)
