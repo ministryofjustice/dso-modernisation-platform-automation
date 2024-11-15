@@ -1,76 +1,138 @@
-name: AWS SSM Command Invocation Monitoring
+---
+name: AMI Cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      applications:
+        description: 'e.g. nomis or leave blank for all'
+        type: string
+      environments:
+        description: 'e.g. development or leave blank for all'
+        type: string
+      dryrun:
+        type: choice
+        description: Dryrun mode (leave as false unless testing)
+        default: false
+        options:
+          - true
+          - false
 
 permissions:
   id-token: write
   contents: read
 
-on:
-  schedule:
-    - cron: '0 0/15 * * *'  # Run every 15 minutes
-
 jobs:
-  SSMCommandInvocationMonitoring:
-    strategy:
-      matrix:
-        account: ['nomis', 'oasys', 'hmpps-domain-services', 'corporate-staff-rostering', 'nomis-combined-reporting', 'nomis-data-hub', 'oasys-national-reporting', 'planetfm', 'hmpps-oem']
-        environment: ['test', 'development', 'production', 'preproduction']  # Different environments per account
+  check-strategy:
+    name: Check Strategy
     runs-on: ubuntu-latest
-    env:
-      # Construct environment-specific AWS account identifiers
-      aws_account: "${{ matrix.account }}-${{ matrix.environment }}"
-      aws_monitoring_account: "hmpps-oem-${{ matrix.environment }}"
+    outputs:
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+      dryrun: "${{ steps.options.outputs.dryrun }}"
+
     steps:
-      - name: Setup AWS Credentials for Command Invocation Monitoring
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
         with:
-          # Role to assume for accessing the AWS account
-          role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.aws_account] }}:role/modernisation-platform-oidc-cicd"
-          aws-region: eu-west-2  # AWS region to operate in
+          ref: ${{ github.ref }}
 
-      - name: Get SSM Command Invocation Failures
-        id: get_ssm_command_invocation_failures
+      - name: Strategy
+        id: strategy
         run: |
-          # Get the date 24 hours ago in ISO 8601 format
-          DATE=$(date -d '1 day ago' '+%Y-%m-%dT%TZ')
-
-          # List failed SSM command invocations after the given date
-          FAILED_COMMAND_INVOCATIONS=$(aws ssm list-command-invocations --filters 'key=Status,value=Failed' 'key=InvokedAfter,value='$DATE | jq -r '.CommandInvocations | length')
-
-          # Check if the command failed
-          if [ $? -ne 0 ]; then
-            echo "Failed to get SSM command invocations"
+          echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
+          echo '' > aws_cli_commands.sh
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+          echo "{$matrix}"
 
-          # Output the number of failed invocations
-          if [ $FAILED_COMMAND_INVOCATIONS -gt 0 ]; then
-            echo "${{ env.aws_account }} has $FAILED_COMMAND_INVOCATIONS failed SSM command invocations in the last 24 hours"
-            echo "FAILED_COMMAND_INVOCATIONS=$FAILED_COMMAND_INVOCATIONS" >> $GITHUB_OUTPUT
-          else
-            echo "${{ env.aws_account }} has no failed SSM command invocations in the last 24 hours"
-            echo "FAILED_COMMAND_INVOCATIONS=0" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Set Metric Timestamp
-        id: set_metric_timestamp
+      - name: Options
+        id: options
         run: |
-          # Record the current timestamp in ISO 8601 format
-          echo "TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          dryrun=0
+          echo "Setting options event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+              dryrun=1
+            fi
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
 
-      - name: Setup AWS Credentials for Metric Write - Per Environment
+  ssm-commands-monitor:
+    name: Monitor SSM Commands
+    runs-on: ubuntu-latest
+    needs: check-strategy
+    strategy:
+      matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
+      max-parallel: 1
+    steps:
+      - name: Get Account Details
+        id: account
+        run: |
+          echo "account name: ${{ matrix.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
         with:
-          # Role to assume for writing metrics to the monitoring account
-          role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.aws_monitoring_account] }}:role/modernisation-platform-oidc-cicd"
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
 
-      - name: Update CloudWatch Metric with Failed SSM Command Invocations
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Monitor SSM Commands
+        id: monitor
+        env:
+          dryrun: ${{ needs.check-strategy.outputs.dryrun }}
         run: |
-          # Publish a custom metric for failed SSM command invocations to CloudWatch
-          aws cloudwatch put-metric-data \
-            --metric-name FailedSSMCommandInvocations \
-            --namespace CustomMetrics \
-            --value ${{ steps.get_ssm_command_invocation_failures.outputs.FAILED_COMMAND_INVOCATIONS }} \
-            --dimensions Account=${{ env.aws_account }} \
-            --timestamp ${{ steps.set_metric_timestamp.outputs.TIMESTAMP }} \
-            --region eu-west-2
+          options='-s 3600 -c'
+          if [[ $dryrun == "true" ]]; then
+            options="$options -d"
+          fi
+          echo src/ssm-command-monitoring/ssm-command-monitor.sh $options
+          src/ssm-command-monitoring/ssm-command-monitor.sh $options 2>output.txt || exitcode=$?
+          failedcount=$(cat output.txt | grep "^Verbose1: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
+          ignoredcount=$(cat output.txt | grep "^Verbose2: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
+          echo "exitcode=${exitcode} failedcount=${failedcount} ignoredcount=${ignoredcount}"
+          echo "exitcode=${exitcode}" >> $GITHUB_OUTPUT
+          echo "failedcount=${failedcount}" >> $GITHUB_OUTPUT
+          echo "ignoredcount=${ignoredcount}" >> $GITHUB_OUTPUT
+
+      - name: Dryrun SSM Commands
+        when: ${{ needs.check-strategy.outputs.dryrun == 'true' }}
+        run: |
+          cat output.txt | grep "^DRYRUN: " | cut -d" " -f2-
+
+      - name: Debug Failed SSM Commands
+        when: ${{ steps.monitor.outputs.failedcount != 0 }}
+        run: |
+          cat output.txt | grep "^Verbose1: " | cut -d" " -f2-
+
+      - name: Debug Ignored SSM Commands
+        when: ${{ steps.monitor.outputs.ignoredcount != 0 }}
+        run: |
+          cat output.txt | grep "^Verbose2: " | cut -d" " -f2-
+
+      - name: Debug Error
+        when: ${{ steps.monitor.outputs.exitcode != 0 }}
+        env:
+          exitcode: ${{ steps.monitor.outputs.exitcode }}
+        run: |
+          cat output.txt | grep -v "^Verbose" | grep -v "^DRYRUN"
+          exit $exitcode
