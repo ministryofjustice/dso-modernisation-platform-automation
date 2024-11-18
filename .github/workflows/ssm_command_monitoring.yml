@@ -61,7 +61,6 @@ jobs:
             matrix=$(src/get_dso_aws_accounts.sh gha "nomis" "test")
             round=true
           else
-          else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
