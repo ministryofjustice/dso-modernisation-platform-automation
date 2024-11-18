@@ -192,10 +192,6 @@ def get_commands_summary(commands_json, tags_dict, associations_dict, verbose, s
         comment_ids = comment.split(':')
 
         if timestamp < start_timestamp or timestamp >= end_timestamp:
-            if verbose >= 5:
-                sys.stderr.write(
-                    f'Verbose5: InstanceId={instance_id} CommandId={command_id}: skipping {document_name} {timestamp} - outside time range'
-                    + os.linesep)
             continue
 
         instance_tags = None
@@ -247,10 +243,6 @@ def get_commands_summary(commands_json, tags_dict, associations_dict, verbose, s
         if status == 'Success':
             add_commands_stat(commands_summary, instance_id, document_name,
                               'success')
-            if verbose >= 6:
-                sys.stderr.write(
-                    textwrap.indent(json.dumps(command, indent=1),
-                                    'Verbose6: ') + os.linesep)
         else:
             add_commands_stat(commands_summary, instance_id, document_name,
                               'failed')
