@@ -29,7 +29,7 @@ on:
           - true
           - false
   schedule:
-    - cron: "5 * * * *"
+    - cron: "0 * * * *"
 
 permissions:
   id-token: write
@@ -57,6 +57,10 @@ jobs:
           echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            matrix=$(src/get_dso_aws_accounts.sh gha "nomis" "test")
+            round=true
+          else
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
