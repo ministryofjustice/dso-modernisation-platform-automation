@@ -94,8 +94,21 @@ def list_associations():
     return run_aws_cli(cmd)
 
 
-def list_command_invocations(timestamp):
+def list_commands(timestamp):
     """Get SSM Command history"""
+
+    cmd = [
+        'aws',
+        'ssm',
+        'list-commands',
+        '--filters',
+        'key=InvokedAfter,value=' + timestamp.strftime("%Y-%m-%dT%TZ"),
+    ]
+    return run_aws_cli(cmd)
+
+
+def list_command_invocations(timestamp):
+    """Get SSM Command Invocation history"""
 
     cmd = [
         'aws',
@@ -165,24 +178,33 @@ def add_commands_stat(commands_summary, instance_id, document_name, status):
     if 'all' not in commands_summary:
         commands_summary['all'] = {}
         commands_summary['all']['all'] = zeroed_stats.copy()
-    if instance_id not in commands_summary:
-        commands_summary[instance_id] = {}
-        commands_summary[instance_id]['all'] = zeroed_stats.copy()
     if document_name not in commands_summary['all']:
         commands_summary['all'][document_name] = zeroed_stats.copy()
-    if document_name not in commands_summary[instance_id]:
-        commands_summary[instance_id][document_name] = zeroed_stats.copy()
-    commands_summary['all']['all'][status] += 1
-    commands_summary['all'][document_name][status] += 1
-    commands_summary[instance_id]['all'][status] += 1
-    commands_summary[instance_id][document_name][status] += 1
+    if instance_id is not None:
+        if instance_id not in commands_summary:
+            commands_summary[instance_id] = {}
+            commands_summary[instance_id]['all'] = zeroed_stats.copy()
+        if document_name not in commands_summary[instance_id]:
+            commands_summary[instance_id][document_name] = zeroed_stats.copy()
+    if status is not None:
+        commands_summary['all']['all'][status] += 1
+        commands_summary['all'][document_name][status] += 1
+        if instance_id is not None:
+            commands_summary[instance_id]['all'][status] += 1
+            commands_summary[instance_id][document_name][status] += 1
 
 
-def get_commands_summary(commands_json, tags_dict, associations_dict, verbose, start_timestamp, end_timestamp):
+def get_commands_summary(commands_json, command_invocations_json, tags_dict, associations_dict, verbose, start_timestamp, end_timestamp):
     """Aggregate all SSM command stats"""
 
     commands_summary = {}
-    for command in commands_json['CommandInvocations']:
+
+    # add zeroed stats for all documents. To ensure cloudwatch metric widgets/alarms work properly
+    for command in commands_json['Commands']:
+        document_name = command['DocumentName']
+        add_commands_stat(commands_summary, None, document_name, None)
+
+    for command in command_invocations_json['CommandInvocations']:
         timestamp = datetime.datetime.strptime(command['RequestedDateTime'], '%Y-%m-%dT%H:%M:%S.%f%z')
         command_id = command['CommandId']
         document_name = command['DocumentName']
@@ -224,7 +246,7 @@ def get_commands_summary(commands_json, tags_dict, associations_dict, verbose, s
                     f'Verbose2: InstanceId={instance_id} CommandId={command_id}: ignoring {document_name} {status} - still running'
                     + os.linesep)
             continue
-
+        if instance_tags is None:
             add_commands_stat(commands_summary, instance_id, document_name,
                               'ignore')
             if verbose >= 2:
@@ -306,15 +328,16 @@ def main():
     timestamp = datetime.datetime.now(datetime.timezone.utc)
     timestamp = timestamp.replace(microsecond=0)
     if args.round:
-      epoch_time = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
-      delta = int((timestamp - epoch_time).total_seconds()) % args.interval
-      end_timestamp = timestamp - datetime.timedelta(seconds=delta)
-      start_timestamp = end_timestamp - datetime.timedelta(seconds=args.interval)
-      invoke_after_timestamp = start_timestamp - datetime.timedelta(seconds=60)
+        epoch_time = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+        delta = int((timestamp - epoch_time).total_seconds()) % args.interval
+        end_timestamp = timestamp - datetime.timedelta(seconds=delta)
+        start_timestamp = end_timestamp - datetime.timedelta(seconds=args.interval)
+        invoke_after_timestamp = start_timestamp - datetime.timedelta(seconds=60)
     else:
-      start_timestamp = timestamp - datetime.timedelta(seconds=args.interval)
-      end_timestamp = timestamp
-      invoke_after_timestamp = start_timestamp
+        start_timestamp = timestamp - datetime.timedelta(seconds=args.interval)
+        end_timestamp = timestamp
+        invoke_after_timestamp = start_timestamp
+    one_day_ago_timestamp = timestamp - datetime.timedelta(days=1)
 
     if args.profile:
         AWSCLI_COMMON_ARGS += ["--profile", args.profile]
@@ -323,8 +346,10 @@ def main():
     tags_dict = tags_json_to_instance_dict(tags_json)
     associations_json = list_associations()
     associations_dict = associations_json_to_associations_dict(associations_json)
-    commands_json = list_command_invocations(invoke_after_timestamp)
+    commands_json = list_commands(one_day_ago_timestamp)
+    command_invocations_json = list_command_invocations(invoke_after_timestamp)
     commands_summary = get_commands_summary(commands_json,
+                                            command_invocations_json,
                                             tags_dict,
                                             associations_dict,
                                             args.verbose,
