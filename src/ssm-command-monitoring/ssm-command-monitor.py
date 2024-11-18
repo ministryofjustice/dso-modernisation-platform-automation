@@ -355,7 +355,6 @@ def main():
                                             args.verbose,
                                             start_timestamp,
                                             end_timestamp)
-    add_commands_stat(commands_summary, None, 'FakeDocToTriggerAlarm', 'failed')
     print_commands_summary_csv(commands_summary, end_timestamp.strftime("%Y-%m-%dT%TZ"))
 
 
