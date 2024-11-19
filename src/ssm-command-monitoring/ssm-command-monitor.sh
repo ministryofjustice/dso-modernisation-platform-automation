@@ -1,4 +1,5 @@
 #!/bin/bash
+# Get AWS SSM Command Run stats and upload to cloudwatch metrics
 # Don't forget to set your default profile
 # export AWS_DEFAULT_PROFILE=nomis-development
 
@@ -7,7 +8,6 @@ set -eo pipefail
 BASEDIR=$(dirname "$0")
 CLOUDWATCH=0
 DRYRUN=0
-ROUND=0
 INTERVAL=
 
 usage() {
@@ -98,8 +98,8 @@ main() {
 
   shift $((OPTIND-1))
 
-  if [[ -n $2 ]]; then
-    echo "Unexpected argument: $1 $2"
+  if [[ -n $1 ]]; then
+    echo "Unexpected arguments: $@"
     usage >&2
     exit 1
   fi
