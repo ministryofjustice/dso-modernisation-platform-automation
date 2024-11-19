@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
-      repos: "${{ steps.strategy.outputs.repos }}"
+      repos: "${{ steps.options.outputs.repos }}"
       interval: "${{ steps.options.outputs.interval }}"
       round: "${{ steps.options.outputs.round }}"
       dryrun: "${{ steps.options.outputs.dryrun }}"

@@ -1,24 +1,15 @@
-name: GitHub Workflow Monitoring
-
-permissions:
-  id-token: write
-  contents: read
+---
+name: SSM Command Monitoring
 
 on:
   workflow_dispatch:
     inputs:
-      repos:
-        description: 'e.g. all'
-        type: string
-        default: all
       applications:
-        description: 'e.g. hmpps-oem'
+        description: 'e.g. nomis or leave blank for all'
         type: string
-        default: hmpps-oem
       environments:
-        description: 'e.g. test'
+        description: 'e.g. development or leave blank for all'
         type: string
-        default: test
       interval:
         description: 'time interval to check in seconds, default 6 hours'
         type: number
@@ -40,13 +31,16 @@ on:
   schedule:
     - cron: "0 * * * *"
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   check-strategy:
     name: Check Strategy
     runs-on: ubuntu-latest
     outputs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
-      repos: "${{ steps.options.outputs.repos }}"
       interval: "${{ steps.options.outputs.interval }}"
       round: "${{ steps.options.outputs.round }}"
       dryrun: "${{ steps.options.outputs.dryrun }}"
@@ -79,16 +73,14 @@ jobs:
       - name: Options
         id: options
         run: |
-          echo "Setting options event=${GITHUB_EVENT_NAME}"
           dryrun=false
           round=false
           interval=21600
-          repos=all
+          echo "Setting options event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             dryrun="${{ github.event.inputs.dryrun }}"
             round="${{ github.event.inputs.round }}"
             interval="${{ github.event.inputs.interval }}"
-            repos="${{ github.event.inputs.repos }}"
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             interval=3600
             round=true
@@ -96,14 +88,13 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo "dryrun=${dryrun} interval=${interval} round=${round} repos=${repos}"
+          echo "dryrun=${dryrun} interval=${interval} round=${round}"
           echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
           echo "interval=${interval}" >> $GITHUB_OUTPUT
           echo "round=${round}" >> $GITHUB_OUTPUT
-          echo "repos=${repos}" >> $GITHUB_OUTPUT
 
-  check-github:
-    name: Check GHA Runs
+  check-ssm:
+    name: Check SSM
     runs-on: ubuntu-latest
     needs: check-strategy
     strategy:
@@ -131,14 +122,12 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      - name: Monitor GitHub Workflow Runs
+      - name: Monitor SSM Commands
         id: monitor
         env:
           dryrun: ${{ needs.check-strategy.outputs.dryrun }}
           round: ${{ needs.check-strategy.outputs.round }}
           interval: ${{ needs.check-strategy.outputs.interval }}
-          repos: ${{ needs.check-strategy.outputs.repos }}
-          GITHUB_TOKEN: ${{ secrets.DSO_GITHUB_PAT }}
         run: |
           options="-i $interval -c -v"
           if [[ $dryrun == "true" ]]; then
@@ -148,12 +137,14 @@ jobs:
             options="$options -r"
           fi
           exitcode=0
-          echo src/github-workflow-monitoring/github-workflow-monitor.sh $options $repos
-          src/github-workflow-monitoring/github-workflow-monitor.sh $options $repos 2>output.txt || exitcode=$?
+          echo src/ssm-command-monitoring/ssm-command-monitor.sh $options
+          src/ssm-command-monitoring/ssm-command-monitor.sh $options 2>output.txt || exitcode=$?
           failedcount=$(cat output.txt | grep "^Verbose1: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
-          echo "exitcode=${exitcode} failedcount=${failedcount}"
+          ignoredcount=$(cat output.txt | grep "^Verbose2: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
+          echo "exitcode=${exitcode} failedcount=${failedcount} ignoredcount=${ignoredcount}"
           echo "exitcode=${exitcode}" >> $GITHUB_OUTPUT
           echo "failedcount=${failedcount}" >> $GITHUB_OUTPUT
+          echo "ignoredcount=${ignoredcount}" >> $GITHUB_OUTPUT
 
       - name: Dryrun SSM Commands
         if: ${{ needs.check-strategy.outputs.dryrun == 'true' }}
@@ -164,6 +155,11 @@ jobs:
         if: ${{ steps.monitor.outputs.failedcount != 0 }}
         run: |
           cat output.txt | grep "^Verbose1: " | cut -d" " -f2-
+
+      - name: Debug Ignored SSM Commands
+        if: ${{ steps.monitor.outputs.ignoredcount != 0 }}
+        run: |
+          cat output.txt | grep "^Verbose2: " | cut -d" " -f2-
 
       - name: Debug Error
         if: ${{ steps.monitor.outputs.exitcode != 0 }}
