@@ -129,13 +129,14 @@ jobs:
           round: ${{ needs.check-strategy.outputs.round }}
           interval: ${{ needs.check-strategy.outputs.interval }}
         run: |
-          options="-i $interval -c"
+          options="-i $interval -c -v"
           if [[ $dryrun == "true" ]]; then
             options="$options -d"
           fi
           if [[ $round == "true" ]]; then
             options="$options -r"
           fi
+          exitcode=0
           echo src/ssm-command-monitoring/ssm-command-monitor.sh $options
           src/ssm-command-monitoring/ssm-command-monitor.sh $options 2>output.txt || exitcode=$?
           failedcount=$(cat output.txt | grep "^Verbose1: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
