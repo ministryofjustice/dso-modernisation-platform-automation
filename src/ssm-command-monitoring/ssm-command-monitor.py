@@ -205,7 +205,11 @@ def get_commands_summary(commands_json, command_invocations_json, tags_dict, ass
         add_commands_stat(commands_summary, None, document_name, None)
 
     for command in command_invocations_json['CommandInvocations']:
-        timestamp = datetime.datetime.strptime(command['RequestedDateTime'], '%Y-%m-%dT%H:%M:%S.%f%z')
+        requested_datetime = command['RequestedDateTime']
+        if "." in requested_datetime:
+            timestamp = datetime.datetime.strptime(requested_datetime, '%Y-%m-%dT%H:%M:%S.%f%z')
+        else:
+            timestamp = datetime.datetime.strptime(requested_datetime, '%Y-%m-%dT%H:%M:%S%z')
         command_id = command['CommandId']
         document_name = command['DocumentName']
         instance_id = command['InstanceId']
