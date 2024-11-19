@@ -5,72 +5,170 @@ permissions:
   contents: read
 
 on:
+  workflow_dispatch:
+    inputs:
+      repos:
+        description: 'e.g. all'
+        type: string
+        default: all
+      applications:
+        description: 'e.g. hmpps-oem'
+        type: string
+        default: hmpps-oem
+      environments:
+        description: 'e.g. test'
+        type: string
+        default: test
+      interval:
+        description: 'time interval to check in seconds, default 6 hours'
+        type: number
+        default: 21600
+      round:
+        type: choice
+        description: 'round the time interval checked to the nearest interval'
+        default: false
+        options:
+          - true
+          - false
+      dryrun:
+        type: choice
+        description: Dryrun mode (leave as false unless testing)
+        default: false
+        options:
+          - true
+          - false
   schedule:
-    - cron: '*/5 * * * *' # every 5 minutes
+    - cron: "0 * * * *"
 
 jobs:
-  GetFailedWorkflowRunsAndUpdateCloudMetric:
-    name: Get Failed Workflow Runs and Update CloudMetric
-    strategy:
-      matrix:
-        repository:
-          - 'dso-infra-azure-ad'
-          - 'dso-certificates'
-          - 'dso-infra-azure-fixngo'
-          - 'dso-modernisation-platform-automation'
+  check-strategy:
+    name: Check Strategy
     runs-on: ubuntu-latest
+    outputs:
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+      repos: "${{ steps.strategy.outputs.repos }}"
+      interval: "${{ steps.options.outputs.interval }}"
+      round: "${{ steps.options.outputs.round }}"
+      dryrun: "${{ steps.options.outputs.dryrun }}"
+
     steps:
-      - name: Setup AWS Credemtials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
         with:
-          role-to-assume: "arn:aws:iam::${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['hmpps-oem-test'] }}:role/modernisation-platform-oidc-cicd"
-          aws-region: eu-west-2
+          ref: ${{ github.ref }}
 
-      - name: Get Workflow Runs
-        id: get_failed_workflow_runs
+      - name: Strategy
+        id: strategy
         run: |
-          # Get the date 24 hours ago in ISO 8601 format
-          DATE=$(date -d '1 day ago' '+%Y-%m-%dT%H:%M:%SZ')
-
-          # List failed workflow runs after the given date
-          WORKFLOW_RUNS=$(curl -s -H "Authorization: Bearer ${{ secrets.DSO_GITHUB_PAT }}" \
-            'https://api.github.com/repos/ministryofjustice/${{ matrix.repository }}/actions/runs?event=schedule&created=>='"$DATE")
-          FAILED_WORKFLOW_RUN_COUNT=$(echo $WORKFLOW_RUNS | jq '[.workflow_runs[] | select(.conclusion == "failure") | .id] | length')
-
-          # Check if the command failed
-          if [ $? -ne 0 ]; then
-            echo "Failed to get workflow runs"
+          echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            matrix=$(src/get_dso_aws_accounts.sh gha "" "")
+            round=true
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
+          echo '' > aws_cli_commands.sh
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+          echo "{$matrix}"
 
-          # Output the number of failed workflow runs
-          if [ $FAILED_WORKFLOW_RUN_COUNT -gt 0 ]; then
-            echo "${{ matrix.repository }} has ${FAILED_WORKFLOW_RUNS} failed workflow runs"
-            echo "FAILED_WORKFLOW_RUNS=1" >> $GITHUB_OUTPUT
-            echo "FAILED_WORKFLOW_RUN_COUNT=${FAILED_WORKFLOW_RUN_COUNT}" >> $GITHUB_OUTPUT
+      - name: Options
+        id: options
+        run: |
+          echo "Setting options event=${GITHUB_EVENT_NAME}"
+          dryrun=false
+          round=false
+          interval=21600
+          repos=all
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            dryrun="${{ github.event.inputs.dryrun }}"
+            round="${{ github.event.inputs.round }}"
+            interval="${{ github.event.inputs.interval }}"
+            repos="${{ github.event.inputs.repos }}"
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            interval=3600
+            round=true
           else
-            echo "FAILED_WORKFLOW_RUNS=0" >> $GITHUB_OUTPUT
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
           fi
+          echo "dryrun=${dryrun} interval=${interval} round=${round} repos=${repos}"
+          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
+          echo "interval=${interval}" >> $GITHUB_OUTPUT
+          echo "round=${round}" >> $GITHUB_OUTPUT
+          echo "repos=${repos}" >> $GITHUB_OUTPUT
 
-      - name: Set Metric Timestamp
-        id: set_metric_timestamp
-        run: echo "TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
-
-      - name: Update CloudMetric with Failed Workflow Runs - Per Repository
+  check-github:
+    name: Check GHA Runs
+    runs-on: ubuntu-latest
+    needs: check-strategy
+    strategy:
+      matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
+      fail-fast: false
+    steps:
+      - name: Get Account Details
+        id: account
         run: |
-          aws cloudwatch put-metric-data \
-            --metric-name FailedWorkflowRuns \
-            --namespace CustomMetrics \
-            --value ${{ steps.get_failed_workflow_runs.outputs.FAILED_WORKFLOW_RUNS }} \
-            --dimensions Repository=${{ matrix.repository }} \
-            --timestamp ${{ steps.set_metric_timestamp.outputs.TIMESTAMP }} \
-            --region eu-west-2
+          echo "account name: ${{ matrix.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
 
-      - name: Update CloudMetric with Failed Workflow Runs - Total
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Monitor GitHub Workflow Runs
+        id: monitor
+        env:
+          dryrun: ${{ needs.check-strategy.outputs.dryrun }}
+          round: ${{ needs.check-strategy.outputs.round }}
+          interval: ${{ needs.check-strategy.outputs.interval }}
+          repos: ${{ needs.check-strategy.outputs.repos }}
+          GITHUB_TOKEN: ${{ secrets.DSO_GITHUB_PAT }}
         run: |
-          aws cloudwatch put-metric-data \
-            --metric-name FailedWorkflowRuns \
-            --namespace CustomMetrics \
-            --value ${{ steps.get_failed_workflow_runs.outputs.FAILED_WORKFLOW_RUNS }} \
-            --timestamp ${{ steps.set_metric_timestamp.outputs.TIMESTAMP }} \
-            --region eu-west-2
+          options="-i $interval -c -v"
+          if [[ $dryrun == "true" ]]; then
+            options="$options -d"
+          fi
+          if [[ $round == "true" ]]; then
+            options="$options -r"
+          fi
+          exitcode=0
+          echo src/github-workflow-monitoring/github-workflow-monitor.sh $options $repos
+          src/github-workflow-monitoring/github-workflow-monitor.sh $options $repos 2>output.txt || exitcode=$?
+          failedcount=$(cat output.txt | grep "^Verbose1: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
+          echo "exitcode=${exitcode} failedcount=${failedcount}"
+          echo "exitcode=${exitcode}" >> $GITHUB_OUTPUT
+          echo "failedcount=${failedcount}" >> $GITHUB_OUTPUT
+
+      - name: Dryrun SSM Commands
+        if: ${{ needs.check-strategy.outputs.dryrun == 'true' }}
+        run: |
+          cat output.txt | grep "^DRYRUN: " | cut -d" " -f2-
+
+      - name: Debug Failed SSM Commands
+        if: ${{ steps.monitor.outputs.failedcount != 0 }}
+        run: |
+          cat output.txt | grep "^Verbose1: " | cut -d" " -f2-
+
+      - name: Debug Error
+        if: ${{ steps.monitor.outputs.exitcode != 0 }}
+        env:
+          exitcode: ${{ steps.monitor.outputs.exitcode }}
+        run: |
+          cat output.txt | grep -v "^Verbose" | grep -v "^DRYRUN"
+          exit $exitcode
