@@ -102,8 +102,8 @@ jobs:
           echo "round=${round}" >> $GITHUB_OUTPUT
           echo "repos=${repos}" >> $GITHUB_OUTPUT
 
-  check-github:
-    name: Check GHA Runs
+  check-runs:
+    name: Check Runs
     runs-on: ubuntu-latest
     needs: check-strategy
     strategy:
