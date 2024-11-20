@@ -64,7 +64,7 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            matrix=$(src/get_dso_aws_accounts.sh gha "" "")
+            matrix=$(src/get_dso_aws_accounts.sh gha "hmpps-oem" "test")
             round=true
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
