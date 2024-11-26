@@ -6,6 +6,7 @@ import subprocess
 import datetime
 import os
 import textwrap
+import re
 import sys
 
 AWSCLI_TIMEOUT_SECS = 30
@@ -25,12 +26,15 @@ IGNORE_FAILURES_BY_TAGS = {
     # This seems to fail when windows server comes back up
     "AmazonInspector2-InvokeInspectorSsmPlugin": [
         { "os-type": "Linux" },
-        { "environment-name": "nomis-development", "server-type": "NomisClient" },
+        { "environment-name": ".*-development$" },
+        { "environment-name": ".*-test$" },
         { "environment-name": "nomis-preproduction", "server-type": "NomisClient"},
         { "server-type": "NartClient" },  # doesn't support windows 2012
     ],
     "AmazonInspector2-InvokeInspectorSsmPluginLinux": [
         { "os-type": "Windows" },
+        { "environment-name": ".*-development$" },
+        { "environment-name": ".*-test$" },
         { "server-type": "nomis-web" },  # doesn't support RHEL6
         { "server-type": "onr-boe" },  # doesn't support RHEL6
         { "server-type": "onr-web" },  # doesn't support RHEL6
@@ -150,7 +154,7 @@ def is_taglist_match(instance_tags, match_tags):
     for match_tag in match_tags.keys():
         if match_tag not in instance_tags.keys():
             return False
-        if instance_tags[match_tag] != match_tags[match_tag]:
+        if not re.match(match_tags[match_tag], instance_tags[match_tag]):
             return False
     return True
 
