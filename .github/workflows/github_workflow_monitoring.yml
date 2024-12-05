@@ -42,7 +42,7 @@ on:
           - true
           - false
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0,30 * * * *"
 
 jobs:
   check-strategy:
@@ -94,8 +94,8 @@ jobs:
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             dryrun=false
             round=true
-            interval=3600
-            number=168 # 7 days as some pipelines only run weekly
+            interval=1800
+            number=336 # 7 days as some pipelines only run weekly
             repos=all
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
