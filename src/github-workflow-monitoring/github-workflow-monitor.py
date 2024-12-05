@@ -207,7 +207,8 @@ def main():
                 sys.stderr.write(f'page {page}: {num_workflows_processed}/{total_count}{os.linesep}')
                 raise ValueError(f'API did not return all workflow page={page} processed={num_workflows_processed}/{total_count}')
 
-    print_workflow_summary_csv(workflow_summary, end_timestamp.strftime("%Y-%m-%dT%TZ"))
+    csv_timestamp = end_timestamp - datetime.timedelta(seconds=1)
+    print_workflow_summary_csv(workflow_summary, csv_timestamp.strftime("%Y-%m-%dT%TZ"))
 
 
 main()
