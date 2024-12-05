@@ -9,6 +9,8 @@ import textwrap
 import sys
 
 CURL_TIMEOUT_SECS = 10
+API_PAGE_SIZE = 100
+PIPELINE_TIMEOUT_SECS = 216000
 
 GITHUB_REPOS = [
     "dso-certificates",
@@ -135,6 +137,11 @@ def main():
                         required=True,
                         type=int,
                         help='Check SSM workflow for this time interval in seconds')
+    parser.add_argument('-n',
+                        '--number',
+                        type=int,
+                        default=1,
+                        help='How many intervals to check back for')
     parser.add_argument('-r',
                         '--round',
                         action='store_true',
@@ -156,14 +163,13 @@ def main():
         epoch_time = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
         delta = int((timestamp - epoch_time).total_seconds()) % args.interval
         end_timestamp = timestamp - datetime.timedelta(seconds=delta)
-        start_timestamp = end_timestamp - datetime.timedelta(seconds=args.interval)
-        invoke_after_timestamp = start_timestamp - datetime.timedelta(seconds=60)
+        start_timestamp = end_timestamp - datetime.timedelta(seconds=args.interval*args.number)
     else:
-        start_timestamp = timestamp - datetime.timedelta(seconds=args.interval)
+        start_timestamp = timestamp - datetime.timedelta(seconds=args.interval*args.number)
         end_timestamp = timestamp
-        invoke_after_timestamp = start_timestamp
+    created_after_timestamp = start_timestamp - datetime.timedelta(seconds=PIPELINE_TIMEOUT_SECS)
     one_day_ago_timestamp = timestamp - datetime.timedelta(days=1)
-    invoke_after_timestamp = min(one_day_ago_timestamp, invoke_after_timestamp)
+    created_after_timestamp = min(one_day_ago_timestamp, created_after_timestamp)
 
     if os.environ.get('GITHUB_TOKEN') is None:
         raise ValueError('please set GITHUB_TOKEN environment variable')
@@ -175,14 +181,31 @@ def main():
         repos = GITHUB_REPOS
 
     for repo in repos:
-        date = invoke_after_timestamp.strftime("%Y-%m-%dT%TZ")
-        workflow_runs = run_github_api(f'https://api.github.com/repos/ministryofjustice/{repo}/actions/runs?event=schedule&updated=>={date}', github_token)
-        if 'workflow_runs' not in workflow_runs:
-            sys.stderr.write(json.dumps(workflow_runs, indent=1))
-            raise ValueError('API response error')
+        date = created_after_timestamp.strftime("%Y-%m-%dT%TZ")
+        num_workflows_processed = 0
+        for page in range(1,10000):
+            uri = f'https://api.github.com/repos/ministryofjustice/{repo}/actions/runs?event=schedule&created=>={date}&per_page={API_PAGE_SIZE}&page={page}'
+            if args.verbose >= 4:
+                sys.stderr.write(f'Verbose4: {uri}{os.linesep}')
+            workflow_runs = run_github_api(uri, github_token)
 
-        for workflow_run in workflow_runs['workflow_runs']:
-            check_workflow_run(workflow_summary, repo, workflow_run, args.verbose, start_timestamp, end_timestamp)
+            if 'workflow_runs' not in workflow_runs or 'total_count' not in workflow_runs:
+                sys.stderr.write(json.dumps(workflow_runs, indent=1))
+                raise ValueError('API response error')
+
+            total_count = workflow_runs["total_count"]
+            num_workflows = len(workflow_runs['workflow_runs'])
+            num_workflows_processed += num_workflows
+            if args.verbose >= 4:
+                sys.stderr.write(f'Verbose4: page {page}: got {num_workflows} workflows; {num_workflows_processed}/{total_count}{os.linesep}')
+
+            for workflow_run in workflow_runs['workflow_runs']:
+                check_workflow_run(workflow_summary, repo, workflow_run, args.verbose, start_timestamp, end_timestamp)
+            if num_workflows_processed == total_count:
+                break
+            if num_workflows == 0:
+                sys.stderr.write(f'page {page}: {num_workflows_processed}/{total_count}{os.linesep}')
+                raise ValueError(f'API did not return all workflow page={page} processed={num_workflows_processed}/{total_count}')
 
     print_workflow_summary_csv(workflow_summary, end_timestamp.strftime("%Y-%m-%dT%TZ"))
 

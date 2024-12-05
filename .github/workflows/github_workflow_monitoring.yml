@@ -20,9 +20,13 @@ on:
         type: string
         default: test
       interval:
-        description: 'time interval to check in seconds, default 6 hours'
+        description: 'time interval to check in seconds, default 1 hour'
         type: number
-        default: 21600
+        default: 3600
+      number:
+        description: 'number of historic intervals to check'
+        type: number
+        default: 168
       round:
         type: choice
         description: 'round the time interval checked to the nearest interval'
@@ -38,7 +42,7 @@ on:
           - true
           - false
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0,30 * * * *"
 
 jobs:
   check-strategy:
@@ -48,6 +52,7 @@ jobs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
       repos: "${{ steps.options.outputs.repos }}"
       interval: "${{ steps.options.outputs.interval }}"
+      number: "${{ steps.options.outputs.number }}"
       round: "${{ steps.options.outputs.round }}"
       dryrun: "${{ steps.options.outputs.dryrun }}"
 
@@ -80,25 +85,26 @@ jobs:
         id: options
         run: |
           echo "Setting options event=${GITHUB_EVENT_NAME}"
-          dryrun=false
-          round=false
-          interval=21600
-          repos=all
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             dryrun="${{ github.event.inputs.dryrun }}"
             round="${{ github.event.inputs.round }}"
             interval="${{ github.event.inputs.interval }}"
+            number="${{ github.event.inputs.number }}"
             repos="${{ github.event.inputs.repos }}"
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            interval=3600
+            dryrun=false
             round=true
+            interval=1800
+            number=336 # 7 days as some pipelines only run weekly
+            repos=all
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo "dryrun=${dryrun} interval=${interval} round=${round} repos=${repos}"
+          echo "dryrun=${dryrun} interval=${interval} number=${number} round=${round} repos=${repos}"
           echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
           echo "interval=${interval}" >> $GITHUB_OUTPUT
+          echo "number=${number}" >> $GITHUB_OUTPUT
           echo "round=${round}" >> $GITHUB_OUTPUT
           echo "repos=${repos}" >> $GITHUB_OUTPUT
 
@@ -137,10 +143,11 @@ jobs:
           dryrun: ${{ needs.check-strategy.outputs.dryrun }}
           round: ${{ needs.check-strategy.outputs.round }}
           interval: ${{ needs.check-strategy.outputs.interval }}
+          number: ${{ needs.check-strategy.outputs.number }}
           repos: ${{ needs.check-strategy.outputs.repos }}
           GITHUB_TOKEN: ${{ secrets.DSO_GITHUB_PAT }}
         run: |
-          options="-i $interval -c -v"
+          options="-i $interval -n $number -c -v"
           if [[ $dryrun == "true" ]]; then
             options="$options -d"
           fi

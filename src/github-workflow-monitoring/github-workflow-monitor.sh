@@ -12,7 +12,7 @@ DRYRUN=0
 INTERVAL=
 
 usage() {
-  echo "Usage $0: [<opts>] -i <interval> [<repo1>] .. [<repoN>]
+  echo "Usage $0: [<opts>] -i <interval_in_seconds> -n <number_of_intervals> [<repo1>] .. [<repoN>]
 
 Where <opts>:
   -c                     Upload metrics to cloudwatch
@@ -67,7 +67,7 @@ main() {
   round_arg=""
   verbose_arg=""
 
-  while getopts "cdi:rv" opt; do
+  while getopts "cdi:n:rv" opt; do
       case $opt in
           c)
               CLOUDWATCH=1
@@ -78,11 +78,14 @@ main() {
           i)
               INTERVAL=${OPTARG}
               ;;
+          n)
+              NUMBER=${OPTARG}
+              ;;
           r)
               round_arg="-r"
               ;;
           v)
-              verbose_arg="-vvv"
+              verbose_arg="-vvvvv"
               ;;
           :)
               echo "Error: option ${OPTARG} requires an argument"
@@ -103,10 +106,10 @@ main() {
   fi
 
   if [[ $CLOUDWATCH == 0 ]]; then
-    python3 "$BASEDIR"/github-workflow-monitor.py --interval "$INTERVAL" $round_arg $verbose_arg "$@"
+    python3 "$BASEDIR"/github-workflow-monitor.py --interval "$INTERVAL" --number "$NUMBER" $round_arg $verbose_arg "$@"
   else
     IFS=$'\n'
-    workflow_stats=($(python3 "$BASEDIR"/github-workflow-monitor.py --interval "$INTERVAL" $round_arg $verbose_arg "$@"))
+    workflow_stats=($(python3 "$BASEDIR"/github-workflow-monitor.py --interval "$INTERVAL" --number "$NUMBER" $round_arg $verbose_arg "$@"))
     unset IFS
 
     num_stats=${#workflow_stats[@]}
