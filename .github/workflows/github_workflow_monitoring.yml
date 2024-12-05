@@ -162,12 +162,12 @@ jobs:
           echo "exitcode=${exitcode}" >> $GITHUB_OUTPUT
           echo "failedcount=${failedcount}" >> $GITHUB_OUTPUT
 
-      - name: Dryrun SSM Commands
+      - name: Debug Dryrun AWS Commands
         if: ${{ needs.check-strategy.outputs.dryrun == 'true' }}
         run: |
           cat output.txt | grep "^DRYRUN: " | cut -d" " -f2-
 
-      - name: Debug Failed SSM Commands
+      - name: Debug Failed GitHub Workflow Runs
         if: ${{ steps.monitor.outputs.failedcount != 0 }}
         run: |
           cat output.txt | grep "^Verbose1: " | cut -d" " -f2-
