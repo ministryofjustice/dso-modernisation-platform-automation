@@ -1,0 +1,39 @@
+name: Windows Connection Test
+
+on:
+    workflow_dispatch:
+        inputs:
+            computer_name:
+                description: 'Computer name to test connection to'
+                required: true
+                type: string
+
+jobs:
+    windows-job:
+        runs-on: windows-latest
+
+        steps:
+        - uses: actions/checkout@v4
+
+        - name: Connect to Instance
+          shell: powershell
+          run: |
+            # Service account credentials
+            $username = 'svc_nart'
+            $password = ConvertTo-SecureString "${{ secrets.SERVICE_ACCOUNT_PASSOWORD }}" -AsPlainText -Force
+            $credential = New-Object System.Management.Automation.PSCredential($username, $password)
+            $computername = "${{ inputs.computer_name }}"
+            $psversion = $PSVersionTable.PSVersion.Major    
+
+            Write-Host "PowerShell version: $psversion"
+            Write-Host "Testing connection to $computername"
+            Test-NetConnection -ComputerName $computername -Port 3389 -InformationLevel Detailed
+
+            $session = New-PSSession -ComputerName $computername -Credential $credential
+
+            Invoke-Command -Session $session -ScriptBlock {
+                Write-Host "Connection successful"
+                Get-ComputerInfo
+            }
+
+            Remove-PSSession -Session $session
