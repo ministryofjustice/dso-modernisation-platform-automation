@@ -60,15 +60,25 @@ jobs:
             'Write-Host "Connection successful"',
             'Get-ComputerInfo | Out-String'
           )
-          $parameters = @{ commands = $commands } | ConvertTo-Json
 
-          $commandId = (aws ssm send-command `
-            --instance-ids $instanceId `
-            --document-name "AWS-RunPowerShellScript" `
-            --parameters $parameters `
-            --comment "Test connection to $instanceId" `
+          $sendCommandInput = @{
+            InstanceIds = @($instanceId)
+            DocumentName = 'AWS-RunPowerShellScript'
+            Parameters = @{
+              commands = $commands
+            }
+            Comment = "Test connection to $instanceId"
+          }
+
+          $jsonInput = $sendCommandInput | ConvertTo-Json -Compress
+
+          $jsonFile = Join-Path $env:RUNNER_TEMP 'send-command-input.json'
+          Set-Content -Path $jsonFile -Value $jsonInput -Encoding utf8
+
+          $commandId = aws ssm send-command `
+            --cli-input-json file://$jsonFile `
             --query "Command.CommandId" `
-            --output text).Trim()
+            --output text
 
           Write-Host "Command sent with Command ID: $commandId"
 
@@ -82,7 +92,6 @@ jobs:
             --output json | ConvertFrom-Json
 
           if ($invocation.Status -eq 'Success') {
-            Write-Host "Connection successful"
             Write-Host $invocation.StandardOutputContent
           } else {
             Write-Host "Command failed with status: $($invocation.Status)"
