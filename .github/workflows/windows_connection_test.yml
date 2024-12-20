@@ -34,14 +34,20 @@ jobs:
           ref: ${{ github.ref }}
       - name: Parse Workflow Inputs
         id: parseinput
+        shell: powershell
+        env:
+          MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
+          account_input: ${{ inputs.account }}
         run: |
-          account_id=${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[ inputs.account ] }}
-          echo "account_id=${account_id}" >> "$GITHUB_OUTPUT"
+          $json = $env:MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT | ConvertFrom-Json
+          $accountId = $json.account_ids.$($env:account_input)
+          Write-Host "account_id=$accountId"
+          "account_id=$accountId" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Set AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: "arn:aws:iam::${{ needs.setup.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
+          role-to-assume: "arn:aws:iam::${{ steps.parseinput.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
           aws-region: ${{ env.AWS_DEFAULT_REGION }}
 
       - name: Connect to Instance via AWS Systems Manager
