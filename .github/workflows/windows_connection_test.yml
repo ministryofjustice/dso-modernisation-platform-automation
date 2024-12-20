@@ -1,0 +1,78 @@
+name: Windows Connection Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_id:
+        description: 'EC2 instance ID to test connection to'
+        required: true
+        type: string
+      account:
+        description: 'Account to control'
+        type: choice
+        required: true
+        options:
+          - 'oasys-national-reporting-production'
+          - 'oasys-national-reporting-preproduction'
+          - 'oasys-national-reporting-test'
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_DEFAULT_REGION: eu-west-2
+
+jobs:
+  windows-job:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          ref: ${{ github.ref }}
+      - name: Parse Workflow Inputs
+        id: parseinput
+        run: |
+          account_id=${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[ inputs.account ] }}
+          echo "account_id=${account_id}" >> "$GITHUB_OUTPUT"
+
+      - name: Set AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: "arn:aws:iam::${{ needs.setup.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Connect to Instance via AWS Systems Manager
+        shell: powershell
+        run: |
+          $instanceId = "${{ inputs.instance_id }}"
+          Write-Host "Testing connection to EC2 instance $instanceId"
+
+          $commandId = (aws ssm send-command `
+            --instance-ids $instanceId `
+            --document-name "AWS-RunPowerShellScript" `
+            --parameters '{"commands":["Write-Host \\"Connection successful\\"","Get-ComputerInfo | Out-String"]}' `
+            --comment "Test connection to $instanceId" `
+            --query "Command.CommandId" `
+            --output text).Trim()
+
+          Write-Host "Command sent with Command ID: $commandId"
+
+          # Wait for the command to complete
+          Start-Sleep -Seconds 10
+
+          # Get command output
+          $invocation = aws ssm get-command-invocation `
+            --command-id $commandId `
+            --instance-id $instanceId `
+            --output json | ConvertFrom-Json
+
+          if ($invocation.Status -eq 'Success') {
+            Write-Host "Connection successful"
+            Write-Host $invocation.StandardOutputContent
+          } else {
+            Write-Host "Command failed with status: $($invocation.Status)"
+            Write-Host "Error: $($invocation.StandardErrorContent)"
+          }
