@@ -56,34 +56,34 @@ jobs:
           $instanceId = "${{ inputs.instance_id }}"
           Write-Host "Testing connection to EC2 instance $instanceId"
 
-          $commands = @(
-            'Write-Host "Connection successful"',
-            'Get-ComputerInfo | Out-String'
-          )
+          # Define the command with proper escaping
+          $commandJson = @{
+            commands = @(
+              "Write-Host 'Connection successful'",
+              "Get-ComputerInfo"
+            )
+          } | ConvertTo-Json -Compress
 
-          $sendCommandInput = @{
-            InstanceIds = @($instanceId)
-            DocumentName = 'AWS-RunPowerShellScript'
-            Parameters = @{
-              commands = $commands
-            }
-            Comment = "Test connection to $instanceId"
-          }
-
-          $jsonInput = $sendCommandInput | ConvertTo-Json -Compress
-
-          $jsonFile = Join-Path $env:RUNNER_TEMP 'send-command-input.json'
-          Set-Content -Path $jsonFile -Value $jsonInput -Encoding utf8
+          Write-Host "Command JSON: $commandJson"
 
           $commandId = aws ssm send-command `
-            --cli-input-json file://$jsonFile `
-            --query "Command.CommandId" `
-            --output text
+            --instance-ids $instanceId `
+            --document-name "AWS-RunPowerShellScript" `
+            --parameters $commandJson `
+            --output text `
+            --query "Command.CommandId"
+
+          if (-not $commandId) {
+            Write-Error "Failed to get command ID"
+            exit 1
+          }
 
           Write-Host "Command sent with Command ID: $commandId"
 
           # Wait for the command to complete
           Start-Sleep -Seconds 10
+
+          Write-Host "Checking command status for ID: $commandId"
 
           # Get command output
           $invocation = aws ssm get-command-invocation `
@@ -92,8 +92,10 @@ jobs:
             --output json | ConvertFrom-Json
 
           if ($invocation.Status -eq 'Success') {
+            Write-Host "Command succeeded:"
             Write-Host $invocation.StandardOutputContent
           } else {
             Write-Host "Command failed with status: $($invocation.Status)"
             Write-Host "Error: $($invocation.StandardErrorContent)"
+            exit 1
           }
