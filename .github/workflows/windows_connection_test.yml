@@ -56,24 +56,13 @@ jobs:
           $instanceId = "${{ inputs.instance_id }}"
           Write-Host "Testing connection to EC2 instance $instanceId"
 
-          # Create parameters object with properly escaped commands
-          $params = @{
-            commands = @(
-              'Get-ComputerInfo'
-            )
-          }
-
-          # Convert to JSON string with proper escaping
-          $jsonString = ConvertTo-Json $params -Depth 10 -Compress
-          Write-Host "Parameters JSON: $jsonString"
-
-          # Execute SSM command
+          # Execute SSM command with correct parameter format
           $ssmCommand = aws ssm send-command `
             --instance-ids "$instanceId" `
             --document-name "AWS-RunPowerShellScript" `
-            --parameters "@{`"commands`"=$($params.commands | ConvertTo-Json)}" `
-            --output text `
-            --query "Command.CommandId"
+            --parameters commands=["Get-ComputerInfo"] `
+            --query 'Command.CommandId' `
+            --output text
 
           if (-not $ssmCommand) {
             Write-Error "Failed to get command ID"
