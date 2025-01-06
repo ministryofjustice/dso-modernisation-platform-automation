@@ -96,8 +96,10 @@ jobs:
             exit 1
           }
 
-# NOTE: Important settings in here are --document-name and --parameters
+# NOTE: Important settings in here are --document-name and --parameters, see also use of exection_timeout below.
 
 # --parameters must be in JSON format, values must be in an array, even for single values, for Windows paths use double back slashes, enclose the entire JSON in single quotes
 
-# In this example --parameters '{"workingDirectory":["C:\\Temp"],"executionTimeout":["${{ inputs.execution_timeout }}"]}' supplis an exection_timeout value to the ssm document as well as being used in the script so that if the ssm document being called is a long running one, it won't check for success until it should have already completed.
+# Because of the JSON format requirements it's a lot easier to reference another ssm document and call it but only supplying the parameters. Otherwise,if you were to use the 'command' parameter above and try to correcly escape quotes on a huge powershell script it'll be a challenge. Much better to follow the approach below: 
+
+# --parameters '{"workingDirectory":["C:\\Temp"],"executionTimeout":["${{ inputs.execution_timeout }}"]}' supplis an exection_timeout value to the ssm document as well as being used in the script so that if the ssm document being called is a long running one, it won't check for success until it should have already completed.
