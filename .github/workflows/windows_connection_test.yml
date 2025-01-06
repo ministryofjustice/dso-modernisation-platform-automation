@@ -15,6 +15,10 @@ on:
           - 'oasys-national-reporting-production'
           - 'oasys-national-reporting-preproduction'
           - 'oasys-national-reporting-test'
+      execution_timeout:
+        description: 'How long should the document run for'
+        default: '3000'
+        required: false
 
 permissions:
   id-token: write
@@ -34,14 +38,20 @@ jobs:
           ref: ${{ github.ref }}
       - name: Parse Workflow Inputs
         id: parseinput
+        shell: powershell
+        env:
+          MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
+          account_input: ${{ inputs.account }}
         run: |
-          account_id=${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[ inputs.account ] }}
-          echo "account_id=${account_id}" >> "$GITHUB_OUTPUT"
+          $json = $env:MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT | ConvertFrom-Json
+          $accountId = $json.account_ids.$($env:account_input)
+          Write-Host "account_id=$accountId"
+          "account_id=$accountId" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Set AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: "arn:aws:iam::${{ needs.setup.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
+          role-to-assume: "arn:aws:iam::${{ steps.parseinput.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
           aws-region: ${{ env.AWS_DEFAULT_REGION }}
 
       - name: Connect to Instance via AWS Systems Manager
@@ -50,18 +60,26 @@ jobs:
           $instanceId = "${{ inputs.instance_id }}"
           Write-Host "Testing connection to EC2 instance $instanceId"
 
-          $commandId = (aws ssm send-command `
-            --instance-ids $instanceId `
+          # Execute SSM command with correct parameter format
+          $ssmCommand = aws ssm send-command `
+            --instance-ids "$instanceId" `
             --document-name "AWS-RunPowerShellScript" `
-            --parameters '{"commands":["Write-Host \\"Connection successful\\"","Get-ComputerInfo | Out-String"]}' `
-            --comment "Test connection to $instanceId" `
-            --query "Command.CommandId" `
-            --output text).Trim()
+            --parameters commands=["Get-ComputerInfo"] `
+            --query 'Command.CommandId' `
+            --output text
 
+          if (-not $ssmCommand) {
+            Write-Error "Failed to get command ID"
+            exit 1
+          }
+
+          $commandId = $ssmCommand.Trim()
           Write-Host "Command sent with Command ID: $commandId"
 
           # Wait for the command to complete
-          Start-Sleep -Seconds 10
+          Start-Sleep -Seconds "${{ inputs.execution_timeout }}"
+
+          Write-Host "Checking command status for ID: $commandId"
 
           # Get command output
           $invocation = aws ssm get-command-invocation `
@@ -70,9 +88,18 @@ jobs:
             --output json | ConvertFrom-Json
 
           if ($invocation.Status -eq 'Success') {
-            Write-Host "Connection successful"
+            Write-Host "Command succeeded:"
             Write-Host $invocation.StandardOutputContent
           } else {
             Write-Host "Command failed with status: $($invocation.Status)"
             Write-Host "Error: $($invocation.StandardErrorContent)"
+            exit 1
           }
+
+# NOTE: Important settings in here are --document-name and --parameters, see also use of exection_timeout below.
+
+# --parameters must be in JSON format, values must be in an array, even for single values, for Windows paths use double back slashes, enclose the entire JSON in single quotes
+
+# Because of the JSON format requirements it's a lot easier to reference another ssm document and call it but only supplying the parameters. Otherwise,if you were to use the 'command' parameter above and try to correcly escape quotes on a huge powershell script it'll be a challenge. Much better to follow the approach below: 
+
+# --parameters '{"workingDirectory":["C:\\Temp"],"executionTimeout":["${{ inputs.execution_timeout }}"]}' supplis an exection_timeout value to the ssm document as well as being used in the script so that if the ssm document being called is a long running one, it won't check for success until it should have already completed.
