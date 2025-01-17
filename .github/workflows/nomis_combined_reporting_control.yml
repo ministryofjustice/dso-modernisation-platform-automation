@@ -11,6 +11,10 @@ on:
         options:
           - t1
           - preprod
+      pipeline_stages:
+        type: string
+        description: limit which stages of the start process to run, 0-8 or all
+        default: all
       dryrun:
         type: choice
         description: Dryrun mode (leave as false unless testing)
@@ -18,13 +22,20 @@ on:
         options:
           - true
           - false
+      verbose:
+        type: choice
+        description: Enable verbose output
+        default: false
+        options:
+          - true
+          - false
 
-  # schedule:
-    # runs at 06:30 and 09:30 local time. 2 entries to deal with BST/GMT
-    # - cron: "30 5 * * 1-5"
-    # - cron: "30 6 * * 1-5"
-    # - cron: "30 8 * * 1-5"
-    # - cron: "30 9 * * 1-5"
+# schedule:
+# runs at 06:30 and 09:30 local time. 2 entries to deal with BST/GMT
+# - cron: "30 5 * * 1-5"
+# - cron: "30 6 * * 1-5"
+# - cron: "30 8 * * 1-5"
+# - cron: "30 9 * * 1-5"
 
 permissions:
   id-token: write
@@ -37,10 +48,10 @@ jobs:
     name: Setup
     runs-on: ubuntu-latest
     outputs:
-      dryrun: "${{ steps.parseinput.outputs.dryrun }}"
       matrix: "${{ steps.parseinput.outputs.matrix }}"
       ncr_environments: "${{ steps.parseinput.outputs.ncr_environments }}"
       script_flags: "${{ steps.parseinput.outputs.script_flags }}"
+      pipeline_stages: "${{ steps.parseinput.outputs.pipeline_stages }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
@@ -61,12 +72,15 @@ jobs:
           }
           ncr_environments=
           script_flags=
-          dryrun=0
+          pipeline_stages=all
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             ncr_environments="${{ github.event.inputs.ncr_environment }}"
+            pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
             if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
               script_flags="$script_flags -d"
-              dryrun=1
+            fi
+            if [[ "${{ github.event.inputs.verbose }}" == "true" ]]; then
+              script_flags="$script_flags -v"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             cron_time="${{ github.event.schedule }}"
@@ -76,7 +90,7 @@ jobs:
             fi
             if [[ "${cron_time}" == '30 5 * * 1-5' || "${cron_time}" == '30 8 * * 1-5' ]]; then
               if ((is_bst == 1)); then
-                ncr_environments="t1" # space separated list                
+                ncr_environments="t1" # space separated list
               fi
             elif [[ "${cron_time}" == '30 6 * * 1-5' || "${cron_time}" == '30 9 * * 1-5' ]]; then
               if ((is_bst == 0)); then
@@ -90,11 +104,11 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo "ncr_environments=${ncr_environments} script_flags=${script_flags} dryrun=${dryrun}"
-          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
+          echo "ncr_environments=${ncr_environments} script_flags=${script_flags} pipeline_stages=${pipeline_stages}"
           echo "matrix=$(get_strategy_matrix $ncr_environments | jq -c)" >> $GITHUB_OUTPUT
           echo "ncr_environments=${ncr_environments}" >> $GITHUB_OUTPUT
           echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT
+          echo "pipeline_stages=${pipeline_stages}" >> $GITHUB_OUTPUT
 
   start:
     name: Start
@@ -132,3 +146,11 @@ jobs:
           role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ncr_environment }}-1"
           aws-region: eu-west-2
+
+      - name: Start
+        env:
+          ncr_environment: "${{ matrix.ncr_environment }}"
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
+          pipeline_stages: "${{ needs.setup.outputs.pipeline_stages }}"
+        run: |
+          src/nomis-combined-reporting/ncr_control.sh -e "$ncr_environment" $script_flags pipeline start "$pipeline_stages"
