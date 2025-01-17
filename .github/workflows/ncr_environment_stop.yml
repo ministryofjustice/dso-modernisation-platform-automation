@@ -10,7 +10,7 @@ on:
         default: t1
         options:
           - t1
-          - preprod
+          - pp
       stop_or_shutdown:
         type: choice
         description: Choose stop to leave the EC2s running, or shutdown to powerdown EC2s

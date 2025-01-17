@@ -10,7 +10,7 @@ on:
         default: t1
         options:
           - t1
-          - preprod
+          - pp
       pipeline_stages:
         type: string
         description: limit which stages of the start process to run, 0-8 or all
