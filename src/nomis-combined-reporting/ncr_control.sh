@@ -9,11 +9,13 @@ DRYRUN=0
 VERBOSE=0
 LBS=
 EC2_RUN_SCRIPT=$(dirname "$0")/../run_script_on_ec2.sh
+STAGE3_WAIT_SECS=600
 
 usage() {
   echo "Usage $0: <opts> <cmd>
 
 Where <opts>:
+  -3 wait_secs              Override default pipeline stage 3 wait time
   -d                        Enable dryrun for maintenance mode commands
   -e <env>                  Set nomis-combined-reporting environment
   -l public|private|admin   Select LB endpoint(s)
@@ -774,6 +776,7 @@ pipeline_stage_bip() {
   local ec2status
   local opts
   local stage
+  local waitsecs
 
   set -eo pipefail
 
@@ -782,6 +785,7 @@ pipeline_stage_bip() {
   stage=$3
   export TIMEOUT_SECS=$4
   ec2=$(echo "$5" | cut -d\  -f1)
+  waitsecs=$6
 
   if ((VERBOSE == 0)); then
     export SHOW_PROGRESS=0
@@ -801,7 +805,12 @@ pipeline_stage_bip() {
     if ((DRYRUN != 0)); then
       opts="$opts -d"
     fi
-    echo "${logprefix}running:  bip_control.sh $opts pipeline $bipcmd $stage"
+    if [[ -n $waitsecs ]]; then
+      opts="$opts -3 $waitsecs"
+      echo "${logprefix}running:  bip_control.sh $opts pipeline $bipcmd $stage (waits for up to ${waitsecs}s)"
+    else
+      echo "${logprefix}running:  bip_control.sh $opts pipeline $bipcmd $stage"
+    fi
     debug "${logprefix}run_script_on_ec2.sh shell '$ec2id' 'bip_control.sh pipeline $bipcmd $stage' 'sudo su bobj -c \"/home/bobj/bip_control.sh $opts pipeline $bipcmd $stage\"'"
     $EC2_RUN_SCRIPT shell "$ec2id" "bip_control.sh pipeline $bipcmd" "sudo su bobj -c '/home/bobj/bip_control.sh $opts pipeline $bipcmd $stage'" "$logprefix"
   else
@@ -835,7 +844,7 @@ do_pipeline() {
       pipeline_stage_bip "STAGE 4: " start 4 300 "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *3* ]]; then
-      pipeline_stage_bip "STAGE 3: " start 3 900 "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 3: " start 3 300 "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *2* ]]; then
       pipeline_stage_bip "STAGE 2: " start 2 300 "$CMS_EC2_INFO"
@@ -867,7 +876,7 @@ do_pipeline() {
       pipeline_stage_bip "STAGE 2: " stop 2 300 "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *3* ]]; then
-      pipeline_stage_bip "STAGE 3: " stop 3 900 "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 3: " stop 3 $((STAGE3_WAIT_SECS+300)) "$CMS_EC2_INFO" "$STAGE3_WAIT_SECS"
     fi
     if [[ $2 == "all" || $2 == *4* ]]; then
       pipeline_stage_bip "STAGE 4: " stop 4 300 "$CMS_EC2_INFO"
@@ -895,8 +904,11 @@ do_pipeline() {
 
 main() {
   set -eo pipefail
-  while getopts "de:l:v" opt; do
+  while getopts "3:de:l:v" opt; do
       case $opt in
+          3)
+              STAGE3_WAIT_SECS=${OPTARG}
+              ;;
           d)
               DRYRUN=1
               ;;
