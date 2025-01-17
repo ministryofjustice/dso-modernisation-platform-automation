@@ -19,7 +19,7 @@ on:
           - true
           - false
 
-  schedule:
+  # schedule:
     # runs at 06:30 and 09:30 local time. 2 entries to deal with BST/GMT
     # - cron: "30 5 * * 1-5"
     # - cron: "30 6 * * 1-5"
