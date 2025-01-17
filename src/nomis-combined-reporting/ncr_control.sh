@@ -171,8 +171,8 @@ set_env_ec2_info() {
     return 1
   fi
 
-  EXPECTED_WEBADMIN_EC2_COUNT=$(echo "$WEBADMIN_EC2_INFO" | wc -w | tr -d "[[:space:]]")
-  EXPECTED_WEB_EC2_COUNT=$(echo "$WEB_EC2_INFO" | wc -w | tr -d "[[:space:]]")
+  EXPECTED_WEBADMIN_EC2_COUNT=$(echo "$WEBADMIN_EC2_INFO" | wc -w | tr -d " ")
+  EXPECTED_WEB_EC2_COUNT=$(echo "$WEB_EC2_INFO" | wc -w | tr -d " ")
 }
 
 set_env_lb() {
