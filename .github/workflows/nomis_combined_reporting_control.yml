@@ -115,7 +115,7 @@ jobs:
           ncr_environment: "${{ matrix.ncr_environment }}"
         id: account_name
         run: |
-          account_name=$(src/nomis_combined_reporting/ncr_control.sh -e "$ncr_environment" env account)
+          account_name=$(src/nomis-combined-reporting/ncr_control.sh -e "$ncr_environment" env account)
           echo "account_name=${account_name}"
           echo "account_name=${account_name}" >> $GITHUB_OUTPUT
 
