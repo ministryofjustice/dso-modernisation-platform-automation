@@ -604,13 +604,13 @@ pipeline_stage_ec2_start() {
       debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
       output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
       if [[ $output == active ]]; then
-        echo "${logprefix}${ec2name}: complete: sapbobj $1"
+        echo "${logprefix}${ec2name}: skipping: sapbobj service already active"
       elif ((DRYRUN == 0 )); then
         echo "${logprefix}${ec2name}: running:  systemctl start sapbobj"
         debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl start sapbobj' 'sudo systemctl start sapbobj'"
         $EC2_RUN_SCRIPT shell "$ec2id" "systemctl start sapbobj" "sudo systemctl start sapbobj" "${logprefix}${ec2name}: " || true
       else
-        echo "${logprefix}${ec2name}: DRYRUN:   systemctl $2 sapbobj"
+        echo "${logprefix}${ec2name}: DRYRUN:   systemctl start sapbobj"
       fi
     fi
   done
