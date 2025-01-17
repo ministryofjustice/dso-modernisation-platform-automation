@@ -20,10 +20,11 @@ Where <opts>:
   -v                        Enable verbose debug
 
 Where <cmd>:
+  ec2        display                                  - display status of ec2s
+  env        aws-account                              - display aws account name
   lb         maintenance-mode    enable|disable|check - enable, disable or check maintenance mode on given LB
   lb         get-target-group    arn|health|name      - get target group ARN, health or name on given LB
   lb         get-json            rules|rule           - debug lb json
-  ec2        display                                  - display status of ec2s
   pipeline   start|stop|shutdown all|012345678        - start and stop services with given stages/steps, use dryrun flag to check, shutdown stops EC2 as well
 
 For pipeline stop and shutdown, below steps are run 0 through to 8
@@ -75,6 +76,7 @@ set_env_variables() {
   ADMIN_LB_BACKEND_PORT=7010
 
   if [[ $NCR_ENVIRONMENT == t1 ]]; then
+    AWS_ACCOUNT=nomis-combined-reporting-test
     ADMIN_URL=t1.test.reporting.nomis.service.justice.gov.uk
     PUBLIC_LB_URL=t1.test.reporting.nomis.service.justice.gov.uk
     PRIVATE_LB_URL=t1-int.test.reporting.nomis.service.justice.gov.uk
@@ -84,6 +86,7 @@ set_env_variables() {
       LBS="private public"
     fi
   elif [[ $NCR_ENVIRONMENT == ls ]]; then
+    AWS_ACCOUNT=nomis-combined-reporting-preproduction
     ADMIN_URL=ls.preproduction.reporting.nomis.service.justice.gov.uk
     PUBLIC_LB_URL=ls.preproduction.reporting.nomis.service.justice.gov.uk
     PRIVATE_LB_URL=ls-int.preproduction.reporting.nomis.service.justice.gov.uk
@@ -93,6 +96,7 @@ set_env_variables() {
       LBS="private public"
     fi
   elif [[ $NCR_ENVIRONMENT == pp ]]; then
+    AWS_ACCOUNT=nomis-combined-reporting-preproduction
     ADMIN_URL=admin.preproduction.reporting.nomis.service.justice.gov.uk
     PUBLIC_LB_URL=preproduction.reporting.nomis.service.justice.gov.uk
     PRIVATE_LB_URL=int.preproduction.reporting.nomis.service.justice.gov.uk
@@ -102,6 +106,7 @@ set_env_variables() {
       LBS="private public admin"
     fi
   elif [[ $NCR_ENVIRONMENT == pd ]]; then
+    AWS_ACCOUNT=nomis-combined-reporting-production
     ADMIN_URL=admin.reporting.nomis.service.justice.gov.uk
     PUBLIC_LB_URL=reporting.nomis.service.justice.gov.uk
     PRIVATE_LB_URL=int.reporting.nomis.service.justice.gov.uk
@@ -430,6 +435,16 @@ lb_wait_for_target_group_health() {
   done
   error "${logprefix}timed out waiting $healthy_ec2_count/$expected_healthy_ec2_count healthy EC2(s)"
   return 1
+}
+
+do_env() {
+  set -eo pipefail
+
+  if [[ $1 == "aws-account" ]]; then
+    echo "$AWS_ACCOUNT"
+  else
+    usage
+  fi
 }
 
 do_ec2() {
@@ -918,7 +933,10 @@ main() {
 
   set_env_variables
 
-  if [[ $1 == "ec2" ]]; then
+  if [[ $1 == "env" ]]; then
+    shift
+    do_env "$@"
+  elif [[ $1 == "ec2" ]]; then
     shift
     do_ec2 "$@"
   elif [[ $1 == "lb" ]]; then
