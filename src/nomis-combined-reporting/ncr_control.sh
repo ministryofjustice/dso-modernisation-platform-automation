@@ -854,19 +854,19 @@ do_pipeline() {
       set_env_ec2_info
     fi
     if [[ $2 == "all" || $2 == *0* ]]; then
-      pipeline_stage_lb "STAGE 0: public-lb:    " disable public  -1
-      pipeline_stage_lb "STAGE 0: private-lb:   " disable private "$EXPECTED_WEB_EC2_COUNT"
       if (( EXPECTED_WEBADMIN_EC2_COUNT != 0 )); then
         pipeline_stage_lb "STAGE 0: admin-lb:     " disable admin   "$EXPECTED_WEBADMIN_EC2_COUNT"
       fi
+      pipeline_stage_lb "STAGE 0: public-lb:    " disable public  "$EXPECTED_WEB_EC2_COUNT"
+      pipeline_stage_lb "STAGE 0: private-lb:   " disable private "$EXPECTED_WEB_EC2_COUNT"
     fi
   elif [[ $1 == "stop" || $1 == "shutdown" ]]; then
     if [[ $2 == "all" || $2 == *0* ]]; then
+      pipeline_stage_lb "STAGE 0: private-lb:   " enable  private -1
+      pipeline_stage_lb "STAGE 0: public-lb:    " enable  public  -1
       if (( EXPECTED_WEBADMIN_EC2_COUNT != 0 )); then
         pipeline_stage_lb "STAGE 0: admin-lb:     " enable  admin   -1
       fi
-      pipeline_stage_lb "STAGE 0: private-lb:   " enable  private -1
-      pipeline_stage_lb "STAGE 0: public-lb:    " enable  public  -1
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
       pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$WEB_EC2_INFO $WEBADMIN_EC2_INFO"
