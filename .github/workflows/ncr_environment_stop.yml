@@ -10,7 +10,7 @@ on:
         default: t1
         options:
           - t1
-          - preprod
+          - pp
       stop_or_shutdown:
         type: choice
         description: Choose stop to leave the EC2s running, or shutdown to powerdown EC2s
@@ -103,11 +103,11 @@ jobs:
             fi
             if [[ "${cron_time}" == '05 18 * * 1-5' ]]; then
               if ((is_bst == 1)); then
-                ncr_environments="t1" # space separated list
+                ncr_environments="t1 pp" # space separated list
               fi
             elif [[ "${cron_time}" == '05 19 * * 1-5' ]]; then
               if ((is_bst == 0)); then
-                ncr_environments="t1" # space separated list
+                ncr_environments="t1 pp" # space separated list
               fi
             else
               echo "Unsupported schedule cron ${cron_time}"
