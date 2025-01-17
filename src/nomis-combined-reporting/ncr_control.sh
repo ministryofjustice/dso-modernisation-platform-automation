@@ -82,8 +82,6 @@ set_env_variables() {
     ADMIN_URL=t1.test.reporting.nomis.service.justice.gov.uk
     PUBLIC_LB_URL=t1.test.reporting.nomis.service.justice.gov.uk
     PRIVATE_LB_URL=t1-int.test.reporting.nomis.service.justice.gov.uk
-    EXPECTED_WEBADMIN_EC2_COUNT=0
-    EXPECTED_WEB_EC2_COUNT=1
     if [[ -z $LBS ]]; then
       LBS="private public"
     fi
@@ -92,8 +90,6 @@ set_env_variables() {
     ADMIN_URL=ls.preproduction.reporting.nomis.service.justice.gov.uk
     PUBLIC_LB_URL=ls.preproduction.reporting.nomis.service.justice.gov.uk
     PRIVATE_LB_URL=ls-int.preproduction.reporting.nomis.service.justice.gov.uk
-    EXPECTED_WEBADMIN_EC2_COUNT=0
-    EXPECTED_WEB_EC2_COUNT=1
     if [[ -z $LBS ]]; then
       LBS="private public"
     fi
@@ -102,8 +98,6 @@ set_env_variables() {
     ADMIN_URL=admin.preproduction.reporting.nomis.service.justice.gov.uk
     PUBLIC_LB_URL=preproduction.reporting.nomis.service.justice.gov.uk
     PRIVATE_LB_URL=int.preproduction.reporting.nomis.service.justice.gov.uk
-    EXPECTED_WEBADMIN_EC2_COUNT=1
-    EXPECTED_WEB_EC2_COUNT=1
     if [[ -z $LBS ]]; then
       LBS="private public admin"
     fi
@@ -112,8 +106,6 @@ set_env_variables() {
     ADMIN_URL=admin.reporting.nomis.service.justice.gov.uk
     PUBLIC_LB_URL=reporting.nomis.service.justice.gov.uk
     PRIVATE_LB_URL=int.reporting.nomis.service.justice.gov.uk
-    EXPECTED_WEBADMIN_EC2_COUNT=1
-    EXPECTED_WEB_EC2_COUNT=4
     if [[ -z $LBS ]]; then
       LBS="private public admin"
     fi
@@ -173,10 +165,14 @@ set_env_ec2_info() {
   if ! WEBADMIN_EC2_INFO=$(get_ec2_server_info "server-type" "ncr-webadmin"); then
     return 1
   fi
+
   if [[ -z $APP_EC2_INFO && -z $CMS_EC2_INFO ]]; then
     error "Error retrieving EC2 info with ncr-bip-cms and ncr-bip-app tags"
     return 1
   fi
+
+  EXPECTED_WEBADMIN_EC2_COUNT=$(echo "$WEBADMIN_EC2_INFO" | wc -w | tr -d "[[:space:]]")
+  EXPECTED_WEB_EC2_COUNT=$(echo "$WEB_EC2_INFO" | wc -w | tr -d "[[:space:]]")
 }
 
 set_env_lb() {
@@ -458,6 +454,7 @@ do_ec2() {
     echo "app:      $APP_EC2_INFO"
     echo "web:      $WEB_EC2_INFO"
     echo "webadmin: $WEBADMIN_EC2_INFO"
+    echo "expected: webadmin=$EXPECTED_WEBADMIN_EC2_COUNT web=$EXPECTED_WEB_EC2_COUNT"
   else
     usage
   fi
@@ -630,7 +627,7 @@ pipeline_stage_ec2_start() {
       ec2name=$(cut -d: -f1 <<< "$ec2")
       ec2id=$(cut -d: -f2 <<< "$ec2")
       ec2status=$(cut -d: -f3 <<< "$ec2")
-      
+
       if [[ $ec2status != "running" ]]; then
         if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
           ec2name=$(cut -d: -f1 <<< "$ec2update")
