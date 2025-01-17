@@ -103,7 +103,7 @@ set_env_variables() {
     PUBLIC_LB_URL=preproduction.reporting.nomis.service.justice.gov.uk
     PRIVATE_LB_URL=int.preproduction.reporting.nomis.service.justice.gov.uk
     EXPECTED_WEBADMIN_EC2_COUNT=1
-    EXPECTED_WEB_EC2_COUNT=2
+    EXPECTED_WEB_EC2_COUNT=1
     if [[ -z $LBS ]]; then
       LBS="private public admin"
     fi
