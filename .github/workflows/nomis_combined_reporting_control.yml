@@ -1,155 +1,134 @@
 ---
-
-name: Nomis Combined Reporting Environment Control
+name: NCR Environment Start
 
 on:
   workflow_dispatch:
     inputs:
-      account:
-        description: 'Account to control'
+      ncr_environment:
         type: choice
-        required: true
+        description: Which nomis combined reporting environment to start
+        default: t1
         options:
-          - 'nomis-combined-reporting-preproduction'
-          - 'nomis-combined-reporting-test'
-      environment:
-        description: 'Environment to control'
+          - t1
+          - preprod
+      dryrun:
         type: choice
-        required: true
-        default: 'preprod'
+        description: Dryrun mode (leave as false unless testing)
+        default: false
         options:
-          - 'preprod'
-          - 'lsast'
-          - 't1'
-      action:
-        description: 'Action to perform'
-        type: choice
-        required: true
-        default: 'stop'
-        options:
-          - 'stop'
-          - 'start'
-          - 'status'
+          - true
+          - false
+
+  schedule:
+    # runs at 06:30 and 09:30 local time. 2 entries to deal with BST/GMT
+    # - cron: "30 5 * * 1-5"
+    # - cron: "30 6 * * 1-5"
+    # - cron: "30 8 * * 1-5"
+    # - cron: "30 9 * * 1-5"
 
 permissions:
   id-token: write
   contents: read
 
-env:
-  AWS_DEFAULT_REGION: eu-west-2
-
-run-name: "NOMIS Combined Reporting Environment Control (${{ inputs.environment }})"
+run-name: "NCR Environent Start (${{ inputs.ncr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
 
 jobs:
   setup:
     name: Setup
     runs-on: ubuntu-latest
     outputs:
-      action: "${{ inputs.action }}"
-      environment: "${{ inputs.environment }}"
-      account_id: "${{ steps.parseinput.outputs.account_id }}"
+      dryrun: "${{ steps.parseinput.outputs.dryrun }}"
+      matrix: "${{ steps.parseinput.outputs.matrix }}"
+      ncr_environments: "${{ steps.parseinput.outputs.ncr_environments }}"
+      script_flags: "${{ steps.parseinput.outputs.script_flags }}"
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
         with:
           ref: ${{ github.ref }}
+
       - name: Parse Workflow Inputs
         id: parseinput
         run: |
-          account_id=${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[ inputs.account ] }}
-          echo "account_id=${account_id}" >> "$GITHUB_OUTPUT"
-
-  list-eligible-instances:
-    name: List Eligible Instances
-    runs-on: ubuntu-latest
-    needs: setup
-    outputs:
-      instances: ${{ steps.list-instances.outputs.INSTANCES }}
-    steps:
-      - name: Set AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: "arn:aws:iam::${{ needs.setup.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
-          aws-region: eu-west-2
-      - name: List Instances
-        id: list-instances
-        run: |
-          echo "Listing instances for environment ${{ needs.setup.outputs.environment }}"
-          INSTANCES=$(aws ec2 describe-instances --filters "Name=tag-key,Values=shutdown-order" \
-            --query "Reservations[*].Instances[*].[Tags[?Key=='shutdown-order'].Value | [0], InstanceId, State.Name]" \
-            --output text)
-          if [[ -z "$INSTANCES" ]]; then
-            echo "No instances found"
-            echo "instances=0" >> "$GITHUB_OUTPUT"
+          get_strategy_matrix() {
+            echo '{"include":['
+            (
+              for ncr_environment in $@; do
+                echo '{"ncr_environment": "'$ncr_environment'"},'
+              done
+            ) | sed '$s/,$//'
+            echo ']}'
+          }
+          ncr_environments=
+          script_flags=
+          dryrun=0
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            ncr_environments="${{ github.event.inputs.ncr_environment }}"
+            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+              script_flags="$script_flags -d"
+              dryrun=1
+            fi
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            cron_time="${{ github.event.schedule }}"
+            is_bst=1
+            if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
+              is_bst=0
+            fi
+            if [[ "${cron_time}" == '30 5 * * 1-5' || "${cron_time}" == '30 8 * * 1-5' ]]; then
+              if ((is_bst == 1)); then
+                ncr_environments="t1" # space separated list                
+              fi
+            elif [[ "${cron_time}" == '30 6 * * 1-5' || "${cron_time}" == '30 9 * * 1-5' ]]; then
+              if ((is_bst == 0)); then
+                ncr_environments="t1" # space separated list
+              fi
+            else
+              echo "Unsupported schedule cron ${cron_time}"
+              exit 1
+            fi
           else
-            echo "${INSTANCES}"
-            INSTANCES_SORTED=$(echo "${INSTANCES}" | sort -n -k1,1)
-            echo "Sorted by shutdown order:"
-            echo "${INSTANCES_SORTED}"
-            if (( $(grep -c . <<<"$INSTANCES_SORTED") > 1 )); then
-              echo "instances<<EOF" >> "$GITHUB_OUTPUT"
-              echo "${INSTANCES_SORTED}" >> "$GITHUB_OUTPUT"
-              echo "EOF" >> "$GITHUB_OUTPUT"
-            else
-              echo "instances=${INSTANCES}" >> "$GITHUB_OUTPUT"
-            fi
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
           fi
-  stop:
-    name: Stop Environment
-    needs: [setup, list-eligible-instances]
-    runs-on: ubuntu-latest
-    if: ${{ needs.setup.outputs.action == 'stop' && needs.list-eligible-instances.outputs.instances != '0' }}
-    steps:
-      - name: Stop Environment
-        run: |
-          echo "Stopping environment ${{ needs.setup.outputs.environment }} in account ${{ inputs.account }}"
-          LAST_INSTANCE_GROUP=0
-          while IFS= read -r INSTANCE; do
-            INSTANCE_DETAIL=($INSTANCE)
-            if (( ${INSTANCE_DETAIL[0]} > $LAST_INSTANCE_GROUP )); then
-              echo "Shutdown Group: ${INSTANCE_DETAIL[0]}"
-            fi
-            echo "Stopping instance ${INSTANCE_DETAIL[1]}"
-            if [[ "${INSTANCE_DETAIL[2]}" == "running" ]]; then
-              aws ec2 stop-instances --instance-ids ${INSTANCE_DETAIL[1]}
-            else
-              echo "Instance ${INSTANCE_DETAIL[1]} is already stopped"
-            fi
-            LAST_INSTANCE_GROUP=${INSTANCE_DETAIL[0]}
-          done <<< "${{ needs.list-eligible-instances.outputs.instances }}"
+          echo "ncr_environments=${ncr_environments} script_flags=${script_flags} dryrun=${dryrun}"
+          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
+          echo "matrix=$(get_strategy_matrix $ncr_environments | jq -c)" >> $GITHUB_OUTPUT
+          echo "ncr_environments=${ncr_environments}" >> $GITHUB_OUTPUT
+          echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT
+
   start:
-    name: Start Environment
-    needs: [setup, list-eligible-instances]
+    name: Start
+    needs: setup
+    if: ${{ needs.setup.outputs.ncr_environments != '' }}
     runs-on: ubuntu-latest
-    if: ${{ needs.setup.outputs.action == 'start' && needs.list-eligible-instances.outputs.instances != '0' }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     steps:
-      - name: Start Environment
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Get Account Name
+        env:
+          ncr_environment: "${{ matrix.ncr_environment }}"
+        id: account_name
         run: |
-          echo "Starting environment ${{ needs.setup.outputs.environment }} in account ${{ inputs.account }}"
-          LAST_INSTANCE_GROUP=0
-          while IFS= read -r INSTANCE; do
-            INSTANCE_DETAIL=($INSTANCE)
-            if (( ${INSTANCE_DETAIL[0]} > $LAST_INSTANCE_GROUP )); then
-              echo "Startup Group: ${INSTANCE_DETAIL[0]}"
-            fi
-            echo "Starting instance ${INSTANCE_DETAIL[1]}"
-            if [[ "${INSTANCE_DETAIL[2]}" == "stopped" ]]; then
-              aws ec2 start-instances --instance-ids ${INSTANCE_DETAIL[1]}
-            else
-              echo "Instance ${INSTANCE_DETAIL[1]} is already running"
-            fi
-            LAST_INSTANCE_GROUP=${INSTANCE_DETAIL[0]}
-          done <<< "${{ needs.list-eligible-instances.outputs.instances }}"
-  status:
-    name: Environment Status
-    needs: [setup, list-eligible-instances]
-    runs-on: ubuntu-latest
-    if: ${{ needs.setup.outputs.action == 'status' && needs.list-eligible-instances.outputs.instances != '0' }}
-    steps:
-      - name: Environment Status
+          account_name=$(src/nomis_combined_reporting/ncr_control.sh -e "$ncr_environment" env account)
+          echo "account_name=${account_name}"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+
+      - name: Get Account Id
+        id: account_id
         run: |
-          echo "Reporting status for ${{ inputs.account }} - environment: ${{ needs.setup.outputs.environment }}"
-          while IFS= read -r INSTANCE; do
-            INSTANCE_DETAIL=($INSTANCE)
-            echo "${INSTANCE_DETAIL[1]} - ${INSTANCE_DETAIL[2]}"
-          done <<< "${{ needs.list-eligible-instances.outputs.instances }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.account_name.outputs.account_name] }}"
+          echo "account_id=${account_id}"
+          echo "account_id=${account_id}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ncr_environment }}-1"
+          aws-region: eu-west-2
