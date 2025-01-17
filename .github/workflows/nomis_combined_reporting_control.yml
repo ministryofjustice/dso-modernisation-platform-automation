@@ -1,20 +1,31 @@
 ---
-name: NCR Environment Start
+name: NCR Environment Stop
 
 on:
   workflow_dispatch:
     inputs:
       ncr_environment:
         type: choice
-        description: Which nomis combined reporting environment to start
+        description: Which nomis combined reporting environment to stop
         default: t1
         options:
           - t1
           - preprod
+      stop_or_shutdown:
+        type: choice
+        description: Choose stop to leave the EC2s running, or shutdown to powerdown EC2s
+        default: shutdown
+        options:
+          - stop
+          - shutdown
       pipeline_stages:
         type: string
-        description: limit which stages of the start process to run, 0-8 or all
+        description: Limit which stages of the stop process to run, 0-8 or all
         default: all
+      pipeline_stage3_wait_secs:
+        type: number
+        description: How many seconds to wait in stage 3 after disabling of services
+        default: 600
       dryrun:
         type: choice
         description: Dryrun mode (leave as false unless testing)
@@ -31,18 +42,15 @@ on:
           - false
 
   schedule:
-    # runs at 06:45 local time, 2 entries to deal with BST/GMT
-    # second cron at 07:50 is a failsafe, in case something went wrong with the first run
-    - cron: "45 5 * * 1-5"
-    - cron: "45 6 * * 1-5"
-    - cron: "50 6 * * 1-5"
-    - cron: "50 7 * * 1-5"
+    # runs at 7pm local time. 2 entries to deal with BST/GMT
+    - cron: "05 18 * * 1-5"
+    - cron: "05 19 * * 1-5"
 
 permissions:
   id-token: write
   contents: read
 
-run-name: "NCR Environent Start (${{ inputs.ncr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+run-name: "NCR Environent Stop (${{ inputs.ncr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
 
 jobs:
   setup:
@@ -53,6 +61,7 @@ jobs:
       ncr_environments: "${{ steps.parseinput.outputs.ncr_environments }}"
       script_flags: "${{ steps.parseinput.outputs.script_flags }}"
       pipeline_stages: "${{ steps.parseinput.outputs.pipeline_stages }}"
+      stop_or_shutdown: "${{ steps.parseinput.outputs.stop_or_shutdown }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
@@ -74,9 +83,12 @@ jobs:
           ncr_environments=
           script_flags=
           pipeline_stages=all
+          stop_or_shutdown=shutdown
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             ncr_environments="${{ github.event.inputs.ncr_environment }}"
             pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
+            stop_or_shutdown="${{ github.event.inputs.stop_or_shutdown }}"
+            script_flags="$script_flags -3 ${{ github.event.inputs.pipeline_stage3_wait_secs }}"
             if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
               script_flags="$script_flags -d"
             fi
@@ -89,11 +101,11 @@ jobs:
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
             fi
-            if [[ "${cron_time}" == '45 5 * * 1-5' || "${cron_time}" == '50 6 * * 1-5' ]]; then
+            if [[ "${cron_time}" == '05 18 * * 1-5' ]]; then
               if ((is_bst == 1)); then
                 ncr_environments="t1" # space separated list
               fi
-            elif [[ "${cron_time}" == '45 6 * * 1-5' || "${cron_time}" == '50 7 * * 1-5' ]]; then
+            elif [[ "${cron_time}" == '05 19 * * 1-5' ]]; then
               if ((is_bst == 0)); then
                 ncr_environments="t1" # space separated list
               fi
@@ -105,14 +117,15 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo "ncr_environments=${ncr_environments} script_flags=${script_flags} pipeline_stages=${pipeline_stages}"
+          echo "ncr_environments=${ncr_environments} script_flags=${script_flags} pipeline_stages=${pipeline_stages} stop_or_shutdown=${stop_or_shutdown}"
           echo "matrix=$(get_strategy_matrix $ncr_environments | jq -c)" >> $GITHUB_OUTPUT
           echo "ncr_environments=${ncr_environments}" >> $GITHUB_OUTPUT
           echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT
           echo "pipeline_stages=${pipeline_stages}" >> $GITHUB_OUTPUT
+          echo "stop_or_shutdown=${stop_or_shutdown}" >> $GITHUB_OUTPUT
 
-  start:
-    name: Start
+  stop:
+    name: Stop
     needs: setup
     if: ${{ needs.setup.outputs.ncr_environments != '' }}
     runs-on: ubuntu-latest
@@ -148,10 +161,11 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ncr_environment }}-1"
           aws-region: eu-west-2
 
-      - name: Start
+      - name: Stop
         env:
           ncr_environment: "${{ matrix.ncr_environment }}"
           script_flags: "${{ needs.setup.outputs.script_flags }}"
+          stop_or_shutdown: "${{ needs.setup.outputs.stop_or_shutdown }}"
           pipeline_stages: "${{ needs.setup.outputs.pipeline_stages }}"
         run: |
-          src/nomis-combined-reporting/ncr_control.sh -e "$ncr_environment" $script_flags pipeline start "$pipeline_stages"
+          src/nomis-combined-reporting/ncr_control.sh -e "$ncr_environment" $script_flags pipeline "$stop_or_shutdown" "$pipeline_stages"
