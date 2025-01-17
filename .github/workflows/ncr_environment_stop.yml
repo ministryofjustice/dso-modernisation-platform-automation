@@ -22,6 +22,10 @@ on:
         type: string
         description: Limit which stages of the stop process to run, 0-8 or all
         default: all
+      pipeline_stage3_wait_secs:
+        type: number
+        description: How many seconds to wait in stage 3 after disabling of services
+        default: 600
       dryrun:
         type: choice
         description: Dryrun mode (leave as false unless testing)
@@ -48,7 +52,7 @@ permissions:
   id-token: write
   contents: read
 
-run-name: "NCR Environent Start (${{ inputs.ncr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+run-name: "NCR Environent Stop (${{ inputs.ncr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
 
 jobs:
   setup:
@@ -86,6 +90,7 @@ jobs:
             ncr_environments="${{ github.event.inputs.ncr_environment }}"
             pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
             stop_or_shutdown="${{ github.event.inputs.stop_or_shutdown }}"
+            script_flags="$script_flags -3 ${{ pipeline_stage3_wait_secs }}"
             if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
               script_flags="$script_flags -d"
             fi
