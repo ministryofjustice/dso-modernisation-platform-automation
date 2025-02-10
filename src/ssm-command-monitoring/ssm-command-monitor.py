@@ -8,6 +8,7 @@ import os
 import textwrap
 import re
 import sys
+import time
 
 AWSCLI_TIMEOUT_SECS = 30
 AWSCLI_COMMON_ARGS = []
@@ -26,6 +27,7 @@ IGNORE_FAILURES_BY_TAGS = {
     # This seems to fail when windows server comes back up
     "AmazonInspector2-InvokeInspectorSsmPlugin": [
         { "os-type": "Linux" },
+        { "os-type": "Windows" }, # this is failing a lot on windows so disabling for now
         { "environment-name": ".*-development$" },
         { "environment-name": ".*-test$" },
         { "environment-name": "nomis-preproduction", "server-type": "NomisClient"},
@@ -33,6 +35,7 @@ IGNORE_FAILURES_BY_TAGS = {
     ],
     "AmazonInspector2-InvokeInspectorSsmPluginLinux": [
         { "os-type": "Windows" },
+        { "os-type": "Linux" }, # this is failing a lot on linux so disabling for now
         { "environment-name": ".*-development$" },
         { "environment-name": ".*-test$" },
         { "server-type": "nomis-web" },  # doesn't support RHEL6
@@ -41,23 +44,30 @@ IGNORE_FAILURES_BY_TAGS = {
     ],
     "AmazonInspector2-ConfigureInspectorSsmPlugin": [
         { "os-type": "Linux" },
+        { "os-type": "Windows" }, # this is failing a lot on windows so disabling for now
         { "server-type": "NartClient" },  # doesn't support windows 2012
     ],
     "AmazonInspector2-ConfigureInspectorSsmPluginLinux": [
         { "os-type": "Windows" },
+        { "os-type": "Linux" }, # this is failing a lot on linux so disabling for now
         { "server-type": "nomis-web" },  # doesn't support RHEL6
         { "server-type": "onr-boe" },  # doesn't support RHEL6
         { "server-type": "onr-web" },  # doesn't support RHEL6
     ],
-    "AWSEC2-CreateVssSnapshot": [
-        { "application": "corporate-staff-rostering" },  # fix the backup policy
-        { "application": "nomis-data-hub" },
-        { "application": "oasys-national-reporting" },
-        { "application": "Oasys National Reporting/ONR" },
-        { "application": "planetfm"  },
+    "AWS-RunRemoteScript": [
+        { "application": "oasys" },  # remove after TM-935 fix
     ],
 }
 
+IGNORE_FAILURES_BY_COMMENT = {
+    "AWS-RunShellScript": [ # these failures will be picked up by failed pipeline so can be ignored here
+        "bip_control.sh pipeline start",
+        "bip_control.sh pipeline stop",
+        "systemctl is-active sapbobj",
+        "systemctl start sapbobj",
+        "systemctl stop sapbobj",
+    ],
+}
 
 def run_aws_cli(cmd):
     """Invoke AWS CLI and raise exception on error"""
@@ -69,8 +79,16 @@ def run_aws_cli(cmd):
                             check=False,
                             timeout=AWSCLI_TIMEOUT_SECS)
     if result.returncode != 0:
-        raise ValueError(f'exit code {result.returncode} for cmd' +
-                         ' '.join(cmd) + os.linesep + result.stderr)
+        # Can fail due to rate limiting. Sleep and try again
+        time.sleep(2)
+        result = subprocess.run(cmd,
+                                capture_output=True,
+                                text=True,
+                                check=False,
+                                timeout=AWSCLI_TIMEOUT_SECS)
+        if result.returncode != 0:
+            raise ValueError(f'exit code {result.returncode} for cmd' +
+                             ' '.join(cmd) + os.linesep + result.stderr)
     return json.loads(result.stdout)
 
 
@@ -159,16 +177,20 @@ def is_taglist_match(instance_tags, match_tags):
     return True
 
 
-def is_status_ignorable(document_name, status, instance_tags):
+def is_status_ignorable(document_name, status, comment, instance_tags):
     """Check whether to skip over a failed SSM doc as defined in global variables"""
-
-    if document_name not in IGNORE_FAILURES_BY_TAGS:
-        return False
     if status != 'Failed':
         return False
-    for tag_list in IGNORE_FAILURES_BY_TAGS[document_name]:
-        if is_taglist_match(instance_tags, tag_list):
+
+    if document_name in IGNORE_FAILURES_BY_COMMENT:
+        if comment in IGNORE_FAILURES_BY_COMMENT[document_name]:
             return True
+
+    if document_name in IGNORE_FAILURES_BY_TAGS:
+        for tag_list in IGNORE_FAILURES_BY_TAGS[document_name]:
+            if is_taglist_match(instance_tags, tag_list):
+                return True
+
     return False
 
 
@@ -234,7 +256,7 @@ def get_commands_summary(commands_json, command_invocations_json, tags_dict, ass
                               'ignore')
             if verbose >= 2:
                 sys.stderr.write(
-                    f'Verbose2: InstanceId={instance_id} CommandId={command_id}: ignoring {document_name} {status} {comment} - not scheduled'
+                    f'Verbose2: InstanceId={instance_id} CommandId={command_id}: ignoring {document_name} {status} "{comment}" - not scheduled'
                     + os.linesep)
             continue
         if document_name in IGNORE_FAILURES_WITHOUT_ASSOCIATION and comment_ids[
@@ -243,7 +265,7 @@ def get_commands_summary(commands_json, command_invocations_json, tags_dict, ass
                               'ignore')
             if verbose >= 2:
                 sys.stderr.write(
-                    f'Verbose2: InstanceId={instance_id} CommandId={command_id}: ignoring {document_name} {status} {comment} - association not found'
+                    f'Verbose2: InstanceId={instance_id} CommandId={command_id}: ignoring {document_name} {status} "{comment}" - association not found'
                     + os.linesep)
             continue
         if status == 'InProgress':
@@ -251,7 +273,7 @@ def get_commands_summary(commands_json, command_invocations_json, tags_dict, ass
                               'ignore')
             if verbose >= 2:
                 sys.stderr.write(
-                    f'Verbose2: InstanceId={instance_id} CommandId={command_id}: ignoring {document_name} {status} - still running'
+                    f'Verbose2: InstanceId={instance_id} CommandId={command_id}: ignoring {document_name} {status} "{comment}" - still running'
                     + os.linesep)
             continue
         if instance_tags is None:
@@ -259,15 +281,15 @@ def get_commands_summary(commands_json, command_invocations_json, tags_dict, ass
                               'ignore')
             if verbose >= 2:
                 sys.stderr.write(
-                    f'Verbose2: InstanceId={instance_id} CommandId={command_id}: ignoring {document_name} {status} - EC2 not found'
+                    f'Verbose2: InstanceId={instance_id} CommandId={command_id}: ignoring {document_name} {status} "{comment}" - EC2 not found'
                     + os.linesep)
             continue
-        if is_status_ignorable(document_name, status, instance_tags):
+        if is_status_ignorable(document_name, status, comment, instance_tags):
             add_commands_stat(commands_summary, instance_id, document_name,
                               'ignore')
             if verbose >= 2:
                 sys.stderr.write(
-                    f'Verbose2: InstanceId={instance_id} CommandId={command_id}: ignoring {document_name} {status} - in ignore list'
+                    f'Verbose2: InstanceId={instance_id} CommandId={command_id}: ignoring {document_name} {status} "{comment}" - in ignore list'
                     + os.linesep)
             continue
         if status == 'Success':
@@ -278,7 +300,7 @@ def get_commands_summary(commands_json, command_invocations_json, tags_dict, ass
                               'failed')
             if verbose >= 1:
                 sys.stderr.write(
-                    f'Verbose1: InstanceId={instance_id} CommandId={command_id}: {document_name} {status}'
+                    f'Verbose1: InstanceId={instance_id} CommandId={command_id}: {document_name} {status} "{comment}"'
                     + os.linesep)
             if verbose >= 3:
                 sys.stderr.write(
