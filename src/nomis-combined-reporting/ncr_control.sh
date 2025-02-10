@@ -10,6 +10,14 @@ VERBOSE=0
 LBS=
 EC2_RUN_SCRIPT=$(dirname "$0")/../run_script_on_ec2.sh
 STAGE3_WAIT_SECS=600
+STAGE1_TIMEOUT_SECS=600
+STAGE2_TIMEOUT_SECS=600
+STAGE3_TIMEOUT_SECS=$((STAGE3_WAIT_SECS+300))
+STAGE4_TIMEOUT_SECS=600
+STAGE5_TIMEOUT_SECS=600
+STAGE6_TIMEOUT_SECS=600
+STAGE7_TIMEOUT_SECS=600
+STAGE8_TIMEOUT_SECS=600
 
 usage() {
   echo "Usage $0: <opts> <cmd>
@@ -573,16 +581,15 @@ pipeline_stage_ec2_start() {
   set -eo pipefail
 
   logprefix="$1"
-  ec2s=$2
+  export TIMEOUT_SECS=$2
+  ec2s=$3
   ec2wait=
-  shift 1
 
   if ((VERBOSE == 0)); then
     export SHOW_PROGRESS=0
   else
     export SHOW_PROGRESS=1
   fi
-  export TIMEOUT_SECS=120
   for ec2 in $ec2s; do
     ec2name=$(cut -d: -f1 <<< "$ec2")
     ec2id=$(cut -d: -f2 <<< "$ec2")
@@ -665,16 +672,15 @@ pipeline_stage_ec2_stop_or_shutdown() {
 
   logprefix="$1"
   stop_or_shutdown=$2
-  ec2s=$3
+  export TIMEOUT_SECS=$3
+  ec2s=$4
   ec2wait=
-  shift 2
 
   if ((VERBOSE == 0)); then
     export SHOW_PROGRESS=0
   else
     export SHOW_PROGRESS=1
   fi
-  export TIMEOUT_SECS=120
 
   for ec2 in $ec2s; do
     ec2name=$(cut -d: -f1 <<< "$ec2")
@@ -817,32 +823,32 @@ do_pipeline() {
 
   if [[ $1 == "start" ]]; then
     if [[ $2 == "all" || $2 == *8* ]]; then
-      pipeline_stage_ec2_start "STAGE 8: " "$CMS_EC2_INFO"
+      pipeline_stage_ec2_start "STAGE 8: " "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"
       if [[ -n $APP_EC2_INFO ]]; then
-        pipeline_stage_ec2_start "STAGE 8: " "$APP_EC2_INFO"
+        pipeline_stage_ec2_start "STAGE 8: " "$STAGE8_TIMEOUT_SECS" "$APP_EC2_INFO"
       fi
       set_env_ec2_info
     fi
     if [[ $2 == "all" || $2 == *7* ]]; then
-      pipeline_stage_bip "STAGE 7: " start 7 300 "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 7: " start 7 "$STAGE7_TIMEOUT_SECS" "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *6* ]]; then
-      pipeline_stage_bip "STAGE 6: " start 6 300 "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 6: " start 6 "$STAGE6_TIMEOUT_SECS" "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *5* ]]; then
-      pipeline_stage_bip "STAGE 5: " start 5 300 "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 5: " start 5 "$STAGE5_TIMEOUT_SECS" "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *4* ]]; then
-      pipeline_stage_bip "STAGE 4: " start 4 300 "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 4: " start 4 "$STAGE4_TIMEOUT_SECS" "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *3* ]]; then
-      pipeline_stage_bip "STAGE 3: " start 3 300 "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 3: " start 3 "$STAGE3_TIMEOUT_SECS" "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *2* ]]; then
-      pipeline_stage_bip "STAGE 2: " start 2 300 "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 2: " start 2 "$STAGE2_TIMEOUT_SECS" "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
-      pipeline_stage_ec2_start "STAGE 1: " "$WEB_EC2_INFO $WEBADMIN_EC2_INFO"
+      pipeline_stage_ec2_start "STAGE 1: " "$STAGE1_TIMEOUT_SECS" "$WEB_EC2_INFO $WEBADMIN_EC2_INFO"
       set_env_ec2_info
     fi
     if [[ $2 == "all" || $2 == *0* ]]; then
@@ -861,32 +867,32 @@ do_pipeline() {
       fi
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
-      pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$WEB_EC2_INFO $WEBADMIN_EC2_INFO"
+      pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO $WEBADMIN_EC2_INFO"
       set_env_ec2_info
     fi
     if [[ $2 == "all" || $2 == *2* ]]; then
-      pipeline_stage_bip "STAGE 2: " stop 2 300 "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 2: " stop 2 "$STAGE2_TIMEOUT_SECS" "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *3* ]]; then
-      pipeline_stage_bip "STAGE 3: " stop 3 $((STAGE3_WAIT_SECS+300)) "$CMS_EC2_INFO" "$STAGE3_WAIT_SECS"
+      pipeline_stage_bip "STAGE 3: " stop 3 "$STAGE3_TIMEOUT_SECS" "$CMS_EC2_INFO" "$STAGE3_WAIT_SECS"
     fi
     if [[ $2 == "all" || $2 == *4* ]]; then
-      pipeline_stage_bip "STAGE 4: " stop 4 300 "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 4: " stop 4 "$STAGE4_TIMEOUT_SECS" "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *5* ]]; then
-      pipeline_stage_bip "STAGE 5: " stop 5 300 "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 5: " stop 5 "$STAGE5_TIMEOUT_SECS" "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *6* ]]; then
-      pipeline_stage_bip "STAGE 6: " stop 6 300 "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 6: " stop 6 "$STAGE6_TIMEOUT_SECS" "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *7* ]]; then
-      pipeline_stage_bip "STAGE 7: " stop 7 300 "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 7: " stop 7 "$STAGE7_TIMEOUT_SECS" "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *8* ]]; then
       if [[ -n $APP_EC2_INFO ]]; then
-        pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$APP_EC2_INFO"
+        pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$STAGE8_TIMEOUT_SECS"  "$APP_EC2_INFO"
       fi
-      pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$CMS_EC2_INFO"
+      pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"
       set_env_ec2_info
     fi
   else
