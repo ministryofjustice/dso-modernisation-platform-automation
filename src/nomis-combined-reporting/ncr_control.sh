@@ -475,11 +475,6 @@ do_lb() {
       echo -n "$LB: "
     fi
 
-    if [[ $FORMAT != "default" ]]; then
-      error "$FORMAT format unsupported with lb commands"
-      return 1
-    fi
-
     if [[ $1 == "maintenance-mode" ]]; then
       if [[ $2 == "enable" ]]; then
         lb_enable_maintenance_mode ""
