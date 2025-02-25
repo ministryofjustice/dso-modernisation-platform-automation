@@ -90,11 +90,11 @@ jobs:
         working-directory: configuration-management/ansible
       - name: Run Ansible Ping
         run: |
-          ansible -m ping ${{ inputs.prod_csr_hostname }}
+          ansible -m ping ${{ inputs.prod_csr_hostname }} --check
         working-directory: configuration-management/ansible
       - name: Run Ansible Playbook against Production CSR to take export of schemas
         run: |
-          ansible-playbook site.yml -e force_role=csr-preprod-refresh --tags csr_adhoc_schema_export_prod --limit ${{ inputs.prod_csr_hostname }} --extra-vars "EXPDP_TAG=${{ inputs.dump_file_string }}"
+          ansible-playbook site.yml -e force_role=csr-preprod-refresh --tags csr_adhoc_schema_export_prod --limit ${{ inputs.prod_csr_hostname }} --extra-vars "EXPDP_TAG=${{ inputs.dump_file_string }}" --check
         working-directory: configuration-management/ansible
 
   run_preprod_import_ansible:
@@ -132,9 +132,9 @@ jobs:
         working-directory: configuration-management/ansible
       - name: Run Ansible Ping
         run: |
-          ansible -m ping ${{ inputs.preprod_csr_hostname }}
+          ansible -m ping ${{ inputs.preprod_csr_hostname }} --check
         working-directory: configuration-management/ansible
       - name: Run Ansible Playbook against preproduction CSR to do import of schemas using production dumpfiles 
         run: |
-          ansible-playbook site.yml -e force_role=csr-preprod-refresh --tags csr_adhoc_schema_import_from_prod --limit ${{ inputs.preprod_csr_hostname }} --extra-vars "EXPDP_TAG=${{ inputs.dump_file_string }}"
+          ansible-playbook site.yml -e force_role=csr-preprod-refresh --tags csr_adhoc_schema_import_from_prod --limit ${{ inputs.preprod_csr_hostname }} --extra-vars "EXPDP_TAG=${{ inputs.dump_file_string }}" --check
         working-directory: configuration-management/ansible
