@@ -113,7 +113,7 @@ jobs:
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           token: ${{ secrets.DSO_GITHUB_PAT }}
-          ref: main
+          ref: tm-884
           path: configuration-management
           fetch-depth: 1
       - name: Setup Ansible
