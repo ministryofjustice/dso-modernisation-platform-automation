@@ -11,6 +11,7 @@ on:
         options:
           - t1
           - pp
+          - pd
       pipeline_stages:
         type: string
         description: limit which stages of the start process to run, 0-8 or all
