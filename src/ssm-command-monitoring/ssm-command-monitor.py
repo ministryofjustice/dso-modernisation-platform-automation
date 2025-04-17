@@ -54,9 +54,6 @@ IGNORE_FAILURES_BY_TAGS = {
         { "server-type": "onr-boe" },  # doesn't support RHEL6
         { "server-type": "onr-web" },  # doesn't support RHEL6
     ],
-    "AWS-RunRemoteScript": [
-        { "application": "oasys" },  # remove after TM-935 fix
-    ],
 }
 
 IGNORE_FAILURES_BY_COMMENT = {
@@ -79,7 +76,7 @@ def run_aws_cli(cmd):
                             check=False,
                             timeout=AWSCLI_TIMEOUT_SECS)
     if result.returncode != 0:
-        # Can fail due to rate limiting. Sleep and try again
+        # Can fail due to rate limiting. Sleep and try again
         time.sleep(2)
         result = subprocess.run(cmd,
                                 capture_output=True,
