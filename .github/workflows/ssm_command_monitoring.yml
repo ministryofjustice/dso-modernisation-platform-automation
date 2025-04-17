@@ -139,6 +139,12 @@ jobs:
           exitcode=0
           echo src/ssm-command-monitoring/ssm-command-monitor.sh $options
           src/ssm-command-monitoring/ssm-command-monitor.sh $options 2>output.txt || exitcode=$?
+          if [[ $exitcode -ne 0 ]]; then
+            echo "failed on first attempt with exitcode=${exitcode}; retrying"
+            # we get the odd CLI timeout, retry after a random delay
+            sleep $(( 10 + RANDOM % 50 ))
+            src/ssm-command-monitoring/ssm-command-monitor.sh $options 2>output.txt || exitcode=$?
+          fi
           failedcount=$(cat output.txt | grep "^Verbose1: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
           ignoredcount=$(cat output.txt | grep "^Verbose2: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
           echo "exitcode=${exitcode} failedcount=${failedcount} ignoredcount=${ignoredcount}"
