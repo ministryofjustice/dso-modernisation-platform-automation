@@ -58,10 +58,9 @@ jobs:
     name: Setup
     runs-on: ubuntu-latest
     outputs:
-      matrix_with_review: "${{ steps.parseinput.outputs.matrix_with_review }}"
-      matrix_without_review: "${{ steps.parseinput.outputs.matrix_without_review }}"
-      ncr_environments_with_review: "${{ steps.parseinput.outputs.ncr_environments_with_review }}"
-      ncr_environments_without_review: "${{ steps.parseinput.outputs.ncr_environments_without_review }}"
+      gha_environment: "${{ steps.parseinput.outputs.gha_environment }}"
+      matrix: "${{ steps.parseinput.outputs.matrix }}"
+      ncr_environments: "${{ steps.parseinput.outputs.ncr_environments }}"
       script_flags: "${{ steps.parseinput.outputs.script_flags }}"
       pipeline_stages: "${{ steps.parseinput.outputs.pipeline_stages }}"
       stop_or_shutdown: "${{ steps.parseinput.outputs.stop_or_shutdown }}"
@@ -83,20 +82,19 @@ jobs:
             ) | sed '$s/,$//'
             echo ']}'
           }
-          ncr_environments_with_review=
-          ncr_environments_without_review=
+          gha_environment="nomis-combined-reporting"
+          ncr_environments=
           script_flags=
           pipeline_stages=all
           stop_or_shutdown=shutdown
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
+            ncr_environments="${{ github.event.inputs.ncr_environment }}"
             stop_or_shutdown="${{ github.event.inputs.stop_or_shutdown }}"
             script_flags="$script_flags -3 ${{ github.event.inputs.pipeline_stage3_wait_secs }}"
             if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
               script_flags="$script_flags -d"
-              ncr_environments_without_review="${{ github.event.inputs.ncr_environment }}"
-            else
-              ncr_environments_with_review="${{ github.event.inputs.ncr_environment }}"
+              gha_environment="nomis-combined-reporting-dryrun"
             fi
             if [[ "${{ github.event.inputs.verbose }}" == "true" ]]; then
               script_flags="$script_flags -v"
@@ -104,16 +102,17 @@ jobs:
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             cron_time="${{ github.event.schedule }}"
             is_bst=1
+            gha_environment="nomis-combined-reporting-schedule"
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
             fi
             if [[ "${cron_time}" == '05 18 * * 1-5' ]]; then
               if ((is_bst == 1)); then
-                ncr_environments_without_review="t1 pp" # space separated list
+                ncr_environments="t1 pp" # space separated list
               fi
             elif [[ "${cron_time}" == '05 19 * * 1-5' ]]; then
               if ((is_bst == 0)); then
-                ncr_environments_without_review="t1 pp" # space separated list
+                ncr_environments="t1 pp" # space separated list
               fi
             else
               echo "Unsupported schedule cron ${cron_time}"
@@ -123,70 +122,23 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo "ncr_environments_with_review=${ncr_environments_with_review} ncr_environments_without_review=${ncr_environments_without_review} script_flags=${script_flags} pipeline_stages=${pipeline_stages} stop_or_shutdown=${stop_or_shutdown}"
-          echo "matrix_with_review=$(get_strategy_matrix $ncr_environments_with_review | jq -c)" >> $GITHUB_OUTPUT
-          echo "matrix_without_review=$(get_strategy_matrix $ncr_environments_without_review | jq -c)" >> $GITHUB_OUTPUT
-          echo "ncr_environments_with_review=${ncr_environments_with_review}" >> $GITHUB_OUTPUT
-          echo "ncr_environments_without_review=${ncr_environments_without_review}" >> $GITHUB_OUTPUT
+          echo "ncr_environments=${ncr_environments} gha_environment=${gha_environment} script_flags=${script_flags} pipeline_stages=${pipeline_stages} stop_or_shutdown=${stop_or_shutdown}"
+          echo "gha_environment=${gha_environment}" >> $GITHUB_OUTPUT
+          echo "matrix=$(get_strategy_matrix $ncr_environments | jq -c)" >> $GITHUB_OUTPUT
+          echo "ncr_environments=${ncr_environments}" >> $GITHUB_OUTPUT
           echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT
           echo "pipeline_stages=${pipeline_stages}" >> $GITHUB_OUTPUT
           echo "stop_or_shutdown=${stop_or_shutdown}" >> $GITHUB_OUTPUT
 
-  stop_with_review:
-    environment: "nomis-combined-reporting-${{ matrix.ncr_environment }}"
-    name: Stop (requires reviewer)
-    needs: setup
-    if: ${{ needs.setup.outputs.ncr_environments_with_review != '' }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.setup.outputs.matrix_with_review) }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
-        with:
-          ref: ${{ github.ref }}
-
-      - name: Get Account Name
-        env:
-          ncr_environment: "${{ matrix.ncr_environment }}"
-        id: account_name
-        run: |
-          account_name=$(src/nomis-combined-reporting/ncr_control.sh -e "$ncr_environment" env aws-account)
-          echo "account_name=${account_name}"
-          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
-
-      - name: Get Account Id
-        id: account_id
-        run: |
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.account_name.outputs.account_name] }}"
-          echo "account_id=${account_id}"
-          echo "account_id=${account_id}" >> $GITHUB_OUTPUT
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
-        with:
-          role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ncr_environment }}-1"
-          aws-region: eu-west-2
-
-      - name: Stop
-        env:
-          ncr_environment: "${{ matrix.ncr_environment }}"
-          script_flags: "${{ needs.setup.outputs.script_flags }}"
-          stop_or_shutdown: "${{ needs.setup.outputs.stop_or_shutdown }}"
-          pipeline_stages: "${{ needs.setup.outputs.pipeline_stages }}"
-        run: |
-          src/nomis-combined-reporting/ncr_control.sh -e "$ncr_environment" $script_flags pipeline "$stop_or_shutdown" "$pipeline_stages"
-
-  stop_without_review:
+  stop:
+    environment: "${{ needs.setup.outputs.gha_environment }}-${{ matrix.ncr_environment }}"
     name: Stop
     needs: setup
-    if: ${{ needs.setup.outputs.ncr_environments_without_review != '' }}
+    if: ${{ needs.setup.outputs.ncr_environments != '' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.setup.outputs.matrix_without_review) }}
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
