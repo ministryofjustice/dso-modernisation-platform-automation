@@ -58,9 +58,9 @@ jobs:
     name: Setup
     runs-on: ubuntu-latest
     outputs:
+      gha_environment: "${{ steps.parseinput.outputs.gha_environment }}"
       matrix: "${{ steps.parseinput.outputs.matrix }}"
       ncr_environments: "${{ steps.parseinput.outputs.ncr_environments }}"
-      review_needed: "{{ steps.parseinput.outputs.review_needed }}"
       script_flags: "${{ steps.parseinput.outputs.script_flags }}"
       pipeline_stages: "${{ steps.parseinput.outputs.pipeline_stages }}"
       stop_or_shutdown: "${{ steps.parseinput.outputs.stop_or_shutdown }}"
@@ -82,8 +82,8 @@ jobs:
             ) | sed '$s/,$//'
             echo ']}'
           }
+          gha_environment="nomis-combined-reporting"
           ncr_environments=
-          review_needed="true"
           script_flags=
           pipeline_stages=all
           stop_or_shutdown=shutdown
@@ -94,7 +94,7 @@ jobs:
             script_flags="$script_flags -3 ${{ github.event.inputs.pipeline_stage3_wait_secs }}"
             if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
               script_flags="$script_flags -d"
-              review_needed="false"
+              gha_environment="nomis-combined-reporting-dryrun"
             fi
             if [[ "${{ github.event.inputs.verbose }}" == "true" ]]; then
               script_flags="$script_flags -v"
@@ -102,7 +102,7 @@ jobs:
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             cron_time="${{ github.event.schedule }}"
             is_bst=1
-            review_needed="false"
+            gha_environment="nomis-combined-reporting-schedule"
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
             fi
@@ -122,16 +122,16 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo "ncr_environments=${ncr_environments} review_needed=${review_needed} script_flags=${script_flags} pipeline_stages=${pipeline_stages} stop_or_shutdown=${stop_or_shutdown}"
+          echo "ncr_environments=${ncr_environments} gha_environment=${gha_environment} script_flags=${script_flags} pipeline_stages=${pipeline_stages} stop_or_shutdown=${stop_or_shutdown}"
+          echo "gha_environment=${gha_environment}" >> $GITHUB_OUTPUT
           echo "matrix=$(get_strategy_matrix $ncr_environments | jq -c)" >> $GITHUB_OUTPUT
           echo "ncr_environments=${ncr_environments}" >> $GITHUB_OUTPUT
-          echo "review_needed=${review_needed}" >> $GITHUB_OUTPUT
           echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT
           echo "pipeline_stages=${pipeline_stages}" >> $GITHUB_OUTPUT
           echo "stop_or_shutdown=${stop_or_shutdown}" >> $GITHUB_OUTPUT
 
   stop:
-    environment: "nomis-combined-reporting-${{ matrix.ncr_environment }}${{ !needs.setup.outputs.review_needed && '-no-review' }}"
+    environment: "${{ needs.setup.outputs.gha_environment }}-${{ matrix.ncr_environment }}"
     name: Stop
     needs: setup
     if: ${{ needs.setup.outputs.ncr_environments != '' }}
