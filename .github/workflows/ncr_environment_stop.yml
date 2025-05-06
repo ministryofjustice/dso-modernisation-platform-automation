@@ -131,7 +131,7 @@ jobs:
           echo "stop_or_shutdown=${stop_or_shutdown}" >> $GITHUB_OUTPUT
 
   stop:
-    environment: "nomis-combined-reporting-${{ needs.setup.outputs.review_needed == 'true' && matrix.ncr_environment || 'no-review' }}"
+    environment: "nomis-combined-reporting-${{ matrix.ncr_environment }}${{ !needs.setup.outputs.review_needed && '-no-review' }}"
     name: Stop
     needs: setup
     if: ${{ needs.setup.outputs.ncr_environments != '' }}
