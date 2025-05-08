@@ -82,6 +82,7 @@
         runs-on: ubuntu-latest
         needs: check-strategy
         strategy:
+          fail-fast: false
           matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
           max-parallel: 1
         steps:
