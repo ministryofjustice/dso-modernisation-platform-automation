@@ -1,0 +1,369 @@
+---
+    name: AD Computer Account Cleanup
+    
+    on:
+      workflow_dispatch:
+        inputs:
+          applications:
+            description: 'e.g. nomis or leave blank for all'
+            type: string
+          environments:
+            description: 'e.g. development or leave blank for all'
+            type: string
+          dryrun:
+            type: choice
+            description: Dryrun mode (leave as false unless testing)
+            default: true
+            options:
+              - true
+              - false
+    
+    permissions:
+      id-token: write
+      contents: read
+    
+    jobs:
+      check-strategy:
+        name: Check Strategy
+        runs-on: ubuntu-latest
+        outputs:
+          matrix: "${{ steps.strategy.outputs.matrix }}"
+          ad_comp_cleanup_sh_args: "${{ steps.options.outputs.ad_comp_cleanup_sh_args }}"
+          dryrun: "${{ steps.options.outputs.dryrun }}"
+        steps:
+          - name: Checkout Repository
+            uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+            with:
+              ref: ${{ github.ref }}
+    
+          - name: Strategy
+            id: strategy
+            run: |
+              echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
+              if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+                matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+              else
+                echo "Unsupported event ${GITHUB_EVENT_NAME}"
+                exit 1
+              fi
+              echo '' > aws_cli_commands.sh
+              echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+              echo "${matrix}" >> $GITHUB_OUTPUT
+              echo 'EOF' >> $GITHUB_OUTPUT
+              echo "{$matrix}"
+    
+          - name: Options
+            id: options
+            run: |
+              dryrun=0
+              echo "Setting options event=${GITHUB_EVENT_NAME}"
+              if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+                ad_comp_cleanup_sh_args=""
+                if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+                  dryrun=1
+                fi
+              else
+                echo "Unsupported event ${GITHUB_EVENT_NAME}"
+                exit 1
+              fi
+              echo "ad_comp_cleanup_sh_args=${ad_comp_cleanup_sh_args} dryrun=${dryrun}"
+              echo "ad_comp_cleanup_sh_args=${ad_comp_cleanup_sh_args}" >> $GITHUB_OUTPUT
+              echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
+    
+          - name: Upload aws cli commands artifact
+            uses: actions/upload-artifact@v4
+            with:
+              name: "aws_cli_commands.sh"
+              path: aws_cli_commands.sh
+              overwrite: true
+    
+      check-instances:
+        name: check instances
+        runs-on: ubuntu-latest
+        needs: check-strategy
+        strategy:
+          matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
+          max-parallel: 1
+        steps:
+          - name: Get Account Details
+            id: account
+            run: |
+              echo "account name: ${{ matrix.account_name }}"
+              account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+              role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+              echo "role arn:     ${role_arn}"
+              echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+    
+          - name: Configure AWS Credentials
+            uses: aws-actions/configure-aws-credentials@f24d7193d98baebaeacc7e2227925dd47cc267f5  # v4.2.0
+            with:
+              role-to-assume: "${{ steps.account.outputs.role_arn }}"
+              role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+              aws-region: eu-west-2
+    
+          - name: Checkout Repository
+            uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+            with:
+              ref: ${{ github.ref }}
+              path: dso-modernisation-platform-automation
+
+          - name: Collect EC2 instances from ${{ matrix.account_name }}
+            id: collect-instances
+            run: |
+                # Get all running instances in eu-west-2 region
+                INSTANCES_JSON=$(aws ec2 describe-instances \
+                --filters "Name=instance-state-name,Values=running" \
+                --query "Reservations[].Instances[].[InstanceId, PrivateIpAddress, Tags[?Key=='Name'].Value | [0]]" \
+                --output json)
+                
+                echo "$INSTANCES_JSON" > instances-${{ matrix.account_name }}.json
+                echo "Found $(echo $INSTANCES_JSON | jq length) instances in ${{ matrix.account_name }} account"
+            
+          - name: Run hostname command on instances in ${{ matrix.account_name }}
+            id: collect-hostnames
+            run: |
+                echo "Collecting hostnames via SSM for ${{ matrix.account_name }}"
+                RESULT_JSON="{}"
+                
+                # Process each instance
+                cat instances-${{ matrix.account_name }}.json | jq -c '.[]' | while read -r instance; do
+                  INSTANCE_ID=$(echo $instance | jq -r '.[0]')
+                  PRIVATE_IP=$(echo $instance | jq -r '.[1]')
+                  NAME_TAG=$(echo $instance | jq -r '.[2]')
+                  
+                  echo "Processing $INSTANCE_ID ($NAME_TAG)"
+                  
+                  # Run hostname command via SSM
+                  COMMAND_OUTPUT=$(aws ssm send-command \
+                    --instance-ids "$INSTANCE_ID" \
+                    --document-name "AWS-RunShellScript" \
+                    --parameters '{"commands":["hostname"]}' \
+                    --output text --query "Command.CommandId" 2>/dev/null)
+                  
+                  if [ -n "$COMMAND_OUTPUT" ]; then
+                    # Wait for command to complete
+                    sleep 2
+                    
+                    # Get the hostname
+                    HOSTNAME=$(aws ssm list-command-invocations \
+                      --command-id "$COMMAND_OUTPUT" \
+                      --details \
+                      --query "CommandInvocations[0].CommandPlugins[0].Output" \
+                      --output text | tr -d '\n\r')
+                    
+                    if [ -n "$HOSTNAME" ]; then
+                      echo "Instance $INSTANCE_ID hostname: $HOSTNAME"
+                      
+                      # Add to results JSON, including account information
+                      RESULT_JSON=$(echo $RESULT_JSON | jq --arg id "$INSTANCE_ID" \
+                                                        --arg hostname "$HOSTNAME" \
+                                                        --arg name "$NAME_TAG" \
+                                                        --arg ip "$PRIVATE_IP" \
+                                                        --arg account "${{ matrix.account_name }}" \
+                                                        '. + {($id): {"hostname": $hostname, "name": $name, "ip": $ip, "account": $account}}')
+                    else
+                      echo "No hostname retrieved for $INSTANCE_ID"
+                    fi
+                  else
+                    echo "Instance $INSTANCE_ID is not accessible via SSM"
+                  fi
+                done
+                
+                # Save the results for this account
+                echo "$RESULT_JSON" > hostnames-${{ matrix.account_name }}.json
+                
+                # Create a simple hostname list for this account only
+                echo "$RESULT_JSON" | jq -r '.[] | .hostname' > hostname-list-${{ matrix.account_name }}.txt
+                
+                echo "Hostname collection complete for ${{ matrix.account_name }}"
+            
+          - name: Upload results for ${{ matrix.account_name }}
+            uses: actions/upload-artifact@v3
+            with:
+                name: ec2-hostnames-${{ matrix.account_name }}
+                path: |
+                    hostnames-${{ matrix.account_name }}.json
+                    hostname-list-${{ matrix.account_name }}.txt
+                retention-days: 7
+      
+      consolidate-hostnames:
+        needs: check-instances
+        runs-on: ubuntu-latest
+        steps:
+           - name: Download all artifacts
+             uses: actions/download-artifact@v3
+            
+           - name: Consolidate hostname data
+             run: |
+                echo "Consolidating hostname data from all accounts"
+                
+                # Initialize our consolidated files
+                MASTER_JSON="{}"
+                > all-hostnames.txt
+                > all-instances.csv
+                echo "hostname,instance_id,name_tag,private_ip,account" > instances-with-hostnames.csv
+                
+                # Process each account's data
+                for account_dir in ec2-hostnames-*; do
+                    ACCOUNT_NAME=$(echo $account_dir | sed 's/ec2-hostnames-//')
+                    echo "Processing data from $ACCOUNT_NAME account"
+                    
+                    # Add hostnames to the master text file
+                    if [ -f "$account_dir/hostname-list-$ACCOUNT_NAME.txt" ]; then
+                    cat "$account_dir/hostname-list-$ACCOUNT_NAME.txt" >> all-hostnames.txt
+                    fi
+                    
+                    # Add account JSON to master JSON
+                    if [ -f "$account_dir/hostnames-$ACCOUNT_NAME.json" ]; then
+                    ACCOUNT_JSON=$(cat "$account_dir/hostnames-$ACCOUNT_NAME.json")
+                    MASTER_JSON=$(echo "$MASTER_JSON" | jq --argjson data "$ACCOUNT_JSON" '. + $data')
+                    
+                    # Add to CSV file
+                    cat "$account_dir/hostnames-$ACCOUNT_NAME.json" | jq -r 'to_entries[] | [.value.hostname, .key, .value.name, .value.ip, .value.account] | @csv' >> instances-with-hostnames.csv
+                    fi
+                done
+                
+                # Create final consolidated JSON
+                echo "$MASTER_JSON" > all-instances.json
+                
+                # Report statistics
+                echo "Consolidation complete"
+                echo "Total instance hostnames: $(jq 'length' all-instances.json)"
+                
+           - name: Upload consolidated results
+             uses: actions/upload-artifact@v3
+             with:
+                name: consolidated-ec2-hostnames
+                path: |
+                    all-instances.json
+                    instances-with-hostnames.csv
+                retention-days: 30
+              
+    #         - name: check instances
+    #           id: check
+    #           working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
+    #           run: |
+    #             [[ -s "commands.sh" ]] && rm -f "commands.sh"
+    #             touch "commands.sh"
+    #             echo src/ad_comp_cleanup.sh -s "commands.sh" -d ${{ needs.check-strategy.outputs.ad_comp_cleanup_sh_args }} delete
+    #             src/ad_comp_cleanup.sh -s "commands.sh" -d ${{ needs.check-strategy.outputs.ad_comp_cleanup_sh_args }} delete
+    #             if [[ -s "commands.sh" ]]; then
+    #                 echo "cleanup=1" >> $GITHUB_OUTPUT
+    #             else
+    #                 echo "cleanup=0" >> $GITHUB_OUTPUT
+    #             fi
+    
+    #         - name: Download aws_cli_commands.sh Artifact
+    #           if: ${{ steps.check.outputs.cleanup == 1 }}
+    #           uses: actions/download-artifact@v4
+    #           with:
+    #             name: "aws_cli_commands.sh"
+    #             path: dso-modernisation-platform-automation
+        
+    #         - name: Append aws cli commands
+    #           if: ${{ steps.check.outputs.cleanup == 1 }}
+    #           working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
+    #           run: |
+    #             output() {
+    #                 echo "export AWS_DEFAULT_PROFILE=${{ matrix.account_name }}"
+    #                 cat ./commands.sh
+    #                 echo "unset AWS_DEFAULT_PROFILE"
+    #                 echo ""
+    #             }
+    #             output
+    #             output >> aws_cli_commands.sh
+        
+    #         - name: Upload aws_cli_commands.sh Artifact
+    #           if: ${{ steps.check.outputs.cleanup == 1 }}
+    #           uses: actions/upload-artifact@v4
+    #           with:
+    #             name: "aws_cli_commands.sh"
+    #             path: dso-modernisation-platform-automation/aws_cli_commands.sh
+    #             overwrite: true
+    
+    #   cleanup-strategy:
+    #     name: Cleanup Strategy
+    #     needs: check-instances
+    #     runs-on: ubuntu-latest
+    #     outputs:
+    #       do_update: "${{ steps.strategy.outputs.do_update }}"
+    #       matrix: "${{ steps.strategy.outputs.matrix }}"
+    #     steps:
+    #       - name: Download Expiry Artifact
+    #         uses: actions/download-artifact@v4
+    #         with:
+    #           name: "aws_cli_commands.sh"
+    
+    #       - name: Strategy
+    #         id: strategy
+    #         run: |
+    #           get_matrix() {
+    #             echo '{"include":['
+    #             (
+    #               for account in $@; do
+    #                 echo '{"account_name": "'"$account"'"},'
+    #               done
+    #             ) | sed '$s/,$//'
+    #             echo ']}'
+    #           }
+    #           do_update=1
+    #           echo "Setting strategy matrix for AD Computers Cleanup"
+    #           accounts=$(grep '^export AWS_DEFAULT_PROFILE=' aws_cli_commands.sh | cut -d= -f2)
+    #           matrix=$(get_matrix $accounts)
+    #           [[ -z $accounts ]] && do_update=0
+    #           echo "do_update=${do_update}"
+    #           echo "${matrix}"
+    #           echo "do_update=${do_update}" >> $GITHUB_OUTPUT
+    #           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+    #           echo "${matrix}" >> $GITHUB_OUTPUT
+    #           echo 'EOF' >> $GITHUB_OUTPUT
+    
+    #       - name: Print Commands
+    #         if: ${{ steps.strategy.outputs.do_update == 1 }}
+    #         run: |
+    #           cat aws_cli_commands.sh
+    
+    #   cleanup-computers:
+    #     name: Cleanup computers
+    #     needs:
+    #       - check-strategy
+    #       - cleanup-strategy
+    #     runs-on: ubuntu-latest
+    #     if: ${{ needs.cleanup-strategy.outputs.do_update == 1 && needs.check-strategy.outputs.dryrun == 0 }}
+    #     strategy:
+    #       matrix: ${{ fromJson(needs.cleanup-strategy.outputs.matrix) }}
+    #       max-parallel: 1
+    #     steps:
+    #       - name: Get Account Details
+    #         id: account
+    #         run: |
+    #           echo "account name: ${{ matrix.account_name }}"
+    #           account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+    #           role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+    #           echo "role arn:     ${role_arn}"
+    #           echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+    
+    #       - name: Configure AWS Credentials
+    #         uses: aws-actions/configure-aws-credentials@f24d7193d98baebaeacc7e2227925dd47cc267f5  # v4.2.0
+    #         with:
+    #           role-to-assume: "${{ steps.account.outputs.role_arn }}"
+    #           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+    #           aws-region: eu-west-2
+    
+    #       - name: Download Expiry Artifact
+    #         uses: actions/download-artifact@v4
+    #         with:
+    #           name: "aws_cli_commands.sh"
+    
+    #       - name: Run Commands
+    #         run: |
+    #           IFS=$'\n'
+    #           cmds=($(sed -n '/export AWS_DEFAULT_PROFILE=${{ matrix.account_name }}/,/unset AWS_DEFAULT_PROFILE/p' aws_cli_commands.sh | grep -v AWS_DEFAULT_PROFILE))
+    #           unset IFS
+    #           n=${#cmds[@]}
+    #           for ((i=0;i<n;i++)); do
+    #             echo "[$((i+1))/$n]: ${cmds[$i]}"
+    #             echo "${cmds[$i]}" > command.sh
+    #             . ./command.sh
+    #           done
+    
