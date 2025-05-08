@@ -118,7 +118,7 @@
                 --output json)
                 
                 echo "$INSTANCES_JSON" > instances-${{ matrix.account_name }}.json
-                echo "Found $(echo $INSTANCES_JSON | jq length) instances in ${{ matrix.account_name }} account"
+                echo "Found $(echo $INSTANCES_JSON | jq length) instance(s) in ${{ matrix.account_name }} account"
             
           - name: Run hostname command on instances in ${{ matrix.account_name }}
             id: collect-hostnames
@@ -137,7 +137,7 @@
                   # Run hostname command via SSM
                   COMMAND_OUTPUT=$(aws ssm send-command \
                     --instance-ids "$INSTANCE_ID" \
-                    --document-name "AWS-RunShellScript" \
+                    --document-name "AWS-RunPowerShellScript" \
                     --parameters '{"commands":["hostname"]}' \
                     --output text --query "Command.CommandId" 2>/dev/null)
                   
