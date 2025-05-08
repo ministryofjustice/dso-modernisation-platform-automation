@@ -14,10 +14,6 @@ on:
         type: choice
         description: Dryrun mode (leave as false unless testing)
         default: false
-        options:
-          - true
-          - false
-
 permissions:
   id-token: write
   contents: read
@@ -26,10 +22,6 @@ jobs:
   check-strategy:
     name: Check Strategy
     runs-on: ubuntu-latest
-    outputs:
-      matrix: "${{ steps.strategy.outputs.matrix }}"
-      snapshot_cleanup_sh_args: "${{ steps.options.outputs.snapshot_cleanup_sh_args }}"
-      dryrun: "${{ steps.options.outputs.dryrun }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
@@ -50,27 +42,8 @@ jobs:
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
           echo "${matrix}" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
-          echo "{$matrix}"
-
-      - name: Options
-        id: options
-        run: |
-          dryrun=0
-          echo "Seitting options event=${GITHUB_EVENT_NAME}"
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            snapshot_cleanup_sh_args=""
-            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
-              dryrun=1
-            fi
-          else
-            echo "Unsupported event ${GITHUB_EVENT_NAME}"
-            exit 1
-          fi
-          echo "snapshot_cleanup_sh_args=${snapshot_cleanup_sh_args} dryrun=${dryrun}"
-          echo "snapshot_cleanup_sh_args=${snapshot_cleanup_sh_args}" >> $GITHUB_OUTPUT
-          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
-
-      - name: Upload aws cli commands artifact
+          echo "{$matrix}
+        - name: Upload aws cli commands artifact
         uses: actions/upload-artifact@v4
         with:
           name: "aws_cli_commands.sh"
@@ -81,9 +54,6 @@ jobs:
     name: Check Snapshots
     runs-on: ubuntu-latest
     needs: check-strategy
-    strategy:
-      matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
-      max-parallel: 1
     steps:
       - name: Get Account Details
         id: account
@@ -97,8 +67,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
         with:
-          role-to-assume: "${{ steps.account.outputs.role_arn }}"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+         role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
 
       - name: Checkout Repository
@@ -119,8 +88,6 @@ jobs:
         run: |
           [[ -s "commands.sh" ]] && rm -f "commands.sh"
           touch "commands.sh"
-          echo src/snapshot_cleanup.sh -s "commands.sh" -d ${{ needs.check-strategy.outputs.snapshot_cleanup_sh_args }} delete
-          src/snapshot_cleanup.sh -s "commands.sh" -d ${{ needs.check-strategy.outputs.snapshot_cleanup_sh_args }} delete
           if [[ -s "commands.sh" ]]; then
             echo "cleanup=1" >> $GITHUB_OUTPUT
           else
@@ -128,14 +95,12 @@ jobs:
           fi
 
       - name: Download aws_cli_commands.sh Artifact
-        if: ${{ steps.check.outputs.cleanup == 1 }}
         uses: actions/download-artifact@v4
         with:
           name: "aws_cli_commands.sh"
           path: dso-modernisation-platform-automation
 
       - name: Append aws cli commands
-        if: ${{ steps.check.outputs.cleanup == 1 }}
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
           output() {
@@ -148,7 +113,6 @@ jobs:
           output >> aws_cli_commands.sh
 
       - name: Upload aws_cli_commands.sh Artifact
-        if: ${{ steps.check.outputs.cleanup == 1 }}
         uses: actions/upload-artifact@v4
         with:
           name: "aws_cli_commands.sh"
@@ -159,9 +123,6 @@ jobs:
     name: Cleanup Strategy
     needs: check-snapshots
     runs-on: ubuntu-latest
-    outputs:
-      do_update: "${{ steps.strategy.outputs.do_update }}"
-      matrix: "${{ steps.strategy.outputs.matrix }}"
     steps:
       - name: Download Expiry Artifact
         uses: actions/download-artifact@v4
@@ -193,7 +154,6 @@ jobs:
           echo 'EOF' >> $GITHUB_OUTPUT
 
       - name: Print Commands
-        if: ${{ steps.strategy.outputs.do_update == 1 }}
         run: |
           cat aws_cli_commands.sh
 
@@ -203,9 +163,7 @@ jobs:
       - check-strategy
       - cleanup-strategy
     runs-on: ubuntu-latest
-    if: ${{ needs.cleanup-strategy.outputs.do_update == 1 && needs.check-strategy.outputs.dryrun == 0 }}
     strategy:
-      matrix: ${{ fromJson(needs.cleanup-strategy.outputs.matrix) }}
       max-parallel: 1
     steps:
       - name: Get Account Details
@@ -220,8 +178,6 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
         with:
-          role-to-assume: "${{ steps.account.outputs.role_arn }}"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
 
       - name: Download Expiry Artifact
