@@ -125,9 +125,6 @@
             id: collect-hostnames
             run: |
                 echo "Collecting hostnames via SSM for ${{ matrix.account_name }}"
-                RESULT_JSON="{}"
-                pwd
-                ls -a
                 # Process each instance
                 cat instances-${{ matrix.account_name }}.json | jq -c '.[]' | while read -r instance; do
                   INSTANCE_ID=$(echo $instance | jq -r '.[0]')
@@ -139,9 +136,11 @@
                   OSHOSTNAME=$(src/run_script_on_ec2.sh first "$NAME_TAG" "get-the-os-level-hostname" "hostname")
                   echo "OS hostname is: $OSHOSTNAME via src/run_script_on_ec2.sh"
                   echo "$OSHOSTNAME" >> $GITHUB_OUTPUT
+                done  
                   
                 # Save the results for this account
-                # echo "$GITHUB_OUTPUT" > hostnames-${{ matrix.account_name }}.txt
+                pwd && ls -l
+                echo "$GITHUB_OUTPUT" > hostnames-${{ matrix.account_name }}.txt
                 echo "Hostname collection complete for ${{ matrix.account_name }}"
 
           - name: Upload results for ${{ matrix.account_name }}
