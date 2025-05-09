@@ -135,13 +135,14 @@
 
                   OSHOSTNAME=$(src/run_script_on_ec2.sh first "$NAME_TAG" "get-the-os-level-hostname" "hostname")
                   echo "OS hostname is: $OSHOSTNAME via src/run_script_on_ec2.sh"
-                  echo "$OSHOSTNAME" >> $GITHUB_OUTPUT
+                  echo "$OSHOSTNAME" >> $RESULT_TXT
                 done  
                   
                 # Save the results for this account
                 pwd && ls -lh
                 echo mkr 1
-                echo "$GITHUB_OUTPUT" > hostnames-${{ matrix.account_name }}.txt
+                echo "$RESULT_TXT" > hostnames-${{ matrix.account_name }}.txt
+                echo "RESULT_TXT var is set to: $RESULT_TXT"
                 echo mkr 2
                 echo "Hostname collection complete for ${{ matrix.account_name }}"
                 cat "hostnames-${{ matrix.account_name }}.txt"
