@@ -126,6 +126,7 @@
             run: |
                 echo "Collecting hostnames via SSM for ${{ matrix.account_name }}"
                 # Process each instance
+                > hostnames-${{ matrix.account_name }}.txt
                 cat instances-${{ matrix.account_name }}.json | jq -c '.[]' | while read -r instance; do
                   INSTANCE_ID=$(echo $instance | jq -r '.[0]')
                   PRIVATE_IP=$(echo $instance | jq -r '.[1]')
@@ -135,14 +136,11 @@
 
                   OSHOSTNAME=$(src/run_script_on_ec2.sh first "$NAME_TAG" "get-the-os-level-hostname" "hostname")
                   echo "OS hostname is: $OSHOSTNAME via src/run_script_on_ec2.sh"
-                  echo "$OSHOSTNAME" >> $RESULT_TXT
+                  echo "$OSHOSTNAME" >> hostnames-${{ matrix.account_name }}.txt
                 done  
                   
                 # Save the results for this account
                 pwd && ls -lh
-                echo mkr 1
-                echo "$RESULT_TXT" > hostnames-${{ matrix.account_name }}.txt
-                echo "RESULT_TXT var is set to: $RESULT_TXT"
                 echo mkr 2
                 echo "Hostname collection complete for ${{ matrix.account_name }}"
                 cat "hostnames-${{ matrix.account_name }}.txt"
