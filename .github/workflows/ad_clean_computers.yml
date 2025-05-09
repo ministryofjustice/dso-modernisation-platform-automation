@@ -139,9 +139,13 @@
                 done  
                   
                 # Save the results for this account
-                pwd && ls -l
+                pwd && ls -lh
+                echo mkr 1
                 echo "$GITHUB_OUTPUT" > hostnames-${{ matrix.account_name }}.txt
+                echo mkr 2
                 echo "Hostname collection complete for ${{ matrix.account_name }}"
+                cat "hostnames-${{ matrix.account_name }}.txt"
+                echo mkr 3
 
           - name: Upload results for ${{ matrix.account_name }}
             uses: actions/upload-artifact@v4
