@@ -112,8 +112,6 @@
             id: collect-instances
             # working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
             run: |
-                pwd
-                ls -a
                 # Get all running instances in eu-west-2 region
                 INSTANCES_JSON=$(aws ec2 describe-instances \
                 --filters "Name=instance-state-name,Values=running" \
@@ -138,7 +136,7 @@
                   
                   echo "Processing InstanceID: $INSTANCE_ID, Name Tag: ($NAME_TAG)"
 
-                  OSHOSTNAME=$(src/run_script_on_ec2.sh first "$INSTANCE_ID" "get-the-os-level-hostname" "hostname")
+                  OSHOSTNAME=$(src/run_script_on_ec2.sh first "$NAME_TAG" "get-the-os-level-hostname" "hostname")
                   echo "$OSHOSTNAME via src/run_script_on_ec2.sh"
                   echo "$OSHOSTNAME" >> $GITHUB_OUTPUT
                   
