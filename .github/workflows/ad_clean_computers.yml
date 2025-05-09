@@ -141,7 +141,7 @@
                   echo "$OSHOSTNAME" >> $GITHUB_OUTPUT
                   
                 # Save the results for this account
-                echo "$GITHUB_OUTPUT" > hostnames-${{ matrix.account_name }}.txt
+                # echo "$GITHUB_OUTPUT" > hostnames-${{ matrix.account_name }}.txt
                 echo "Hostname collection complete for ${{ matrix.account_name }}"
 
           - name: Upload results for ${{ matrix.account_name }}
