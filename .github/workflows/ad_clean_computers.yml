@@ -140,60 +140,15 @@
                   echo "OS hostname is: $OSHOSTNAME via src/run_script_on_ec2.sh"
                   echo "$OSHOSTNAME" >> $GITHUB_OUTPUT
                   
-                #   # Run hostname command via SSM
-                #   COMMAND_OUTPUT=$(aws ssm send-command \
-                #     --instance-ids "$INSTANCE_ID" \
-                #     --document-name "AWS-RunPowerShellScript" \
-                #     --parameters '{"commands":["hostname"]}' \
-                #     --output text --query "Command.CommandId" 2>/dev/null)
-                  
-                #   if [ -n "$COMMAND_OUTPUT" ]; then
-                #     # Wait for command to complete
-                #     sleep 2
-                    
-                #     # Get the hostname
-                #     HOSTNAME=$(aws ssm list-command-invocations \
-                #       --command-id "$COMMAND_OUTPUT" \
-                #       --details \
-                #       --query "CommandInvocations[0].CommandPlugins[0].Output" \
-                #       --output text | tr -d '\n\r')
-                    
-                #     if [ -n "$HOSTNAME" ]; then
-                #       echo "Instance $INSTANCE_ID OS hostname: $HOSTNAME"
-                      
-                #       # Add to results JSON, including account information
-                #       RESULT_JSON=$(echo $RESULT_JSON | jq --arg id "$INSTANCE_ID" \
-                #                                         --arg hostname "$HOSTNAME" \
-                #                                         --arg name "$NAME_TAG" \
-                #                                         --arg ip "$PRIVATE_IP" \
-                #                                         --arg account "${{ matrix.account_name }}" \
-                #                                         '. + {($id): {"hostname": $hostname, "name": $name, "ip": $ip, "account": $account}}')
-                #     else
-                #       echo "No hostname retrieved for $INSTANCE_ID"
-                #     fi
-                #   else
-                #     echo "Instance $INSTANCE_ID is not accessible via SSM"
-                #   fi
-                # done
-                
-                # Save the results for this account
-                # echo "$RESULT_JSON" > hostnames-${{ matrix.account_name }}.json
-                
-                # Create a simple hostname list for this account only
-                # echo "$RESULT_JSON" | jq -r '.[] | .hostname' > hostname-list-${{ matrix.account_name }}.txt
-                
                 # Save the results for this account
                 echo "$GITHUB_OUTPUT" > hostnames-${{ matrix.account_name }}.txt
                 echo "Hostname collection complete for ${{ matrix.account_name }}"
-                
-                cat "hostnames-${{ matrix.account_name }}.txt"
-            
+
           - name: Upload results for ${{ matrix.account_name }}
             uses: actions/upload-artifact@v4
             with:
                 name: ec2-hostnames-${{ matrix.account_name }}
                 path: |
-                    # hostnames-${{ matrix.account_name }}.json
                     hostname-list-${{ matrix.account_name }}.txt
                 retention-days: 7
       
