@@ -110,7 +110,10 @@
 
           - name: Collect EC2 instances from ${{ matrix.account_name }}
             id: collect-instances
+            working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
             run: |
+                pwd
+                ls -a
                 # Get all running instances in eu-west-2 region
                 INSTANCES_JSON=$(aws ec2 describe-instances \
                 --filters "Name=instance-state-name,Values=running" \
