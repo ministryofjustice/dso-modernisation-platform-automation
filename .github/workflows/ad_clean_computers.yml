@@ -132,7 +132,11 @@
                   PRIVATE_IP=$(echo $instance | jq -r '.[1]')
                   NAME_TAG=$(echo $instance | jq -r '.[2]')
                   
-                  echo "Processing $INSTANCE_ID ($NAME_TAG)"
+                  echo "Processing InstanceID: $INSTANCE_ID, Name Tag: ($NAME_TAG)"
+
+                  OSHOSTNAME=$(src/run_script_on_ec2.sh first "$INSTANCE_ID" "get-the-os-level-hostname" "hostname")
+                  echo "$OSHOSTNAME via src/run_script_on_ec2.sh"
+                  echo "$OSHOSTNAME" >> $GITHUB_OUTPUT
                   
                   # Run hostname command via SSM
                   COMMAND_OUTPUT=$(aws ssm send-command \
@@ -153,7 +157,7 @@
                       --output text | tr -d '\n\r')
                     
                     if [ -n "$HOSTNAME" ]; then
-                      echo "Instance $INSTANCE_ID hostname: $HOSTNAME"
+                      echo "Instance $INSTANCE_ID OS hostname: $HOSTNAME"
                       
                       # Add to results JSON, including account information
                       RESULT_JSON=$(echo $RESULT_JSON | jq --arg id "$INSTANCE_ID" \
