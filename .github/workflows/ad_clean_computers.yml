@@ -137,59 +137,62 @@
                   echo "Processing InstanceID: $INSTANCE_ID, Name Tag: ($NAME_TAG)"
 
                   OSHOSTNAME=$(src/run_script_on_ec2.sh first "$NAME_TAG" "get-the-os-level-hostname" "hostname")
-                  echo "$OSHOSTNAME via src/run_script_on_ec2.sh"
+                  echo "OS hostname is: $OSHOSTNAME via src/run_script_on_ec2.sh"
                   echo "$OSHOSTNAME" >> $GITHUB_OUTPUT
                   
-                  # Run hostname command via SSM
-                  COMMAND_OUTPUT=$(aws ssm send-command \
-                    --instance-ids "$INSTANCE_ID" \
-                    --document-name "AWS-RunPowerShellScript" \
-                    --parameters '{"commands":["hostname"]}' \
-                    --output text --query "Command.CommandId" 2>/dev/null)
+                #   # Run hostname command via SSM
+                #   COMMAND_OUTPUT=$(aws ssm send-command \
+                #     --instance-ids "$INSTANCE_ID" \
+                #     --document-name "AWS-RunPowerShellScript" \
+                #     --parameters '{"commands":["hostname"]}' \
+                #     --output text --query "Command.CommandId" 2>/dev/null)
                   
-                  if [ -n "$COMMAND_OUTPUT" ]; then
-                    # Wait for command to complete
-                    sleep 2
+                #   if [ -n "$COMMAND_OUTPUT" ]; then
+                #     # Wait for command to complete
+                #     sleep 2
                     
-                    # Get the hostname
-                    HOSTNAME=$(aws ssm list-command-invocations \
-                      --command-id "$COMMAND_OUTPUT" \
-                      --details \
-                      --query "CommandInvocations[0].CommandPlugins[0].Output" \
-                      --output text | tr -d '\n\r')
+                #     # Get the hostname
+                #     HOSTNAME=$(aws ssm list-command-invocations \
+                #       --command-id "$COMMAND_OUTPUT" \
+                #       --details \
+                #       --query "CommandInvocations[0].CommandPlugins[0].Output" \
+                #       --output text | tr -d '\n\r')
                     
-                    if [ -n "$HOSTNAME" ]; then
-                      echo "Instance $INSTANCE_ID OS hostname: $HOSTNAME"
+                #     if [ -n "$HOSTNAME" ]; then
+                #       echo "Instance $INSTANCE_ID OS hostname: $HOSTNAME"
                       
-                      # Add to results JSON, including account information
-                      RESULT_JSON=$(echo $RESULT_JSON | jq --arg id "$INSTANCE_ID" \
-                                                        --arg hostname "$HOSTNAME" \
-                                                        --arg name "$NAME_TAG" \
-                                                        --arg ip "$PRIVATE_IP" \
-                                                        --arg account "${{ matrix.account_name }}" \
-                                                        '. + {($id): {"hostname": $hostname, "name": $name, "ip": $ip, "account": $account}}')
-                    else
-                      echo "No hostname retrieved for $INSTANCE_ID"
-                    fi
-                  else
-                    echo "Instance $INSTANCE_ID is not accessible via SSM"
-                  fi
-                done
+                #       # Add to results JSON, including account information
+                #       RESULT_JSON=$(echo $RESULT_JSON | jq --arg id "$INSTANCE_ID" \
+                #                                         --arg hostname "$HOSTNAME" \
+                #                                         --arg name "$NAME_TAG" \
+                #                                         --arg ip "$PRIVATE_IP" \
+                #                                         --arg account "${{ matrix.account_name }}" \
+                #                                         '. + {($id): {"hostname": $hostname, "name": $name, "ip": $ip, "account": $account}}')
+                #     else
+                #       echo "No hostname retrieved for $INSTANCE_ID"
+                #     fi
+                #   else
+                #     echo "Instance $INSTANCE_ID is not accessible via SSM"
+                #   fi
+                # done
                 
                 # Save the results for this account
-                echo "$RESULT_JSON" > hostnames-${{ matrix.account_name }}.json
+                # echo "$RESULT_JSON" > hostnames-${{ matrix.account_name }}.json
                 
                 # Create a simple hostname list for this account only
-                echo "$RESULT_JSON" | jq -r '.[] | .hostname' > hostname-list-${{ matrix.account_name }}.txt
+                # echo "$RESULT_JSON" | jq -r '.[] | .hostname' > hostname-list-${{ matrix.account_name }}.txt
                 
+                # Save the results for this account
+                echo "$GITHUB_OUTPUT" > hostnames-${{ matrix.account_name }}.txt
                 echo "Hostname collection complete for ${{ matrix.account_name }}"
+                cat hostnames-${{ matrix.account_name }}.txt
             
           - name: Upload results for ${{ matrix.account_name }}
             uses: actions/upload-artifact@v4
             with:
                 name: ec2-hostnames-${{ matrix.account_name }}
                 path: |
-                    hostnames-${{ matrix.account_name }}.json
+                    # hostnames-${{ matrix.account_name }}.json
                     hostname-list-${{ matrix.account_name }}.txt
                 retention-days: 7
       
@@ -204,11 +207,8 @@
              run: |
                 echo "Consolidating hostname data from all accounts"
                 
-                # Initialize our consolidated files
-                MASTER_JSON="{}"
+                # Initialize our consolidated list of instances across accounts
                 > all-hostnames.txt
-                > all-instances.csv
-                echo "hostname,instance_id,name_tag,private_ip,account" > instances-with-hostnames.csv
                 
                 # Process each account's data
                 for account_dir in ec2-hostnames-*; do
@@ -219,31 +219,18 @@
                     if [ -f "$account_dir/hostname-list-$ACCOUNT_NAME.txt" ]; then
                     cat "$account_dir/hostname-list-$ACCOUNT_NAME.txt" >> all-hostnames.txt
                     fi
-                    
-                    # Add account JSON to master JSON
-                    if [ -f "$account_dir/hostnames-$ACCOUNT_NAME.json" ]; then
-                    ACCOUNT_JSON=$(cat "$account_dir/hostnames-$ACCOUNT_NAME.json")
-                    MASTER_JSON=$(echo "$MASTER_JSON" | jq --argjson data "$ACCOUNT_JSON" '. + $data')
-                    
-                    # Add to CSV file
-                    cat "$account_dir/hostnames-$ACCOUNT_NAME.json" | jq -r 'to_entries[] | [.value.hostname, .key, .value.name, .value.ip, .value.account] | @csv' >> instances-with-hostnames.csv
-                    fi
                 done
-                
-                # Create final consolidated JSON
-                echo "$MASTER_JSON" > all-instances.json
                 
                 # Report statistics
                 echo "Consolidation complete"
-                echo "Total instance hostnames: $(jq 'length' all-instances.json)"
+                echo "Total instance hostnames: $(jq 'length' all-hostnames.txt)"
                 
            - name: Upload consolidated results
              uses: actions/upload-artifact@v4
              with:
                 name: consolidated-ec2-hostnames
                 path: |
-                    all-instances.json
-                    instances-with-hostnames.csv
+                    all-hostnames.txt
                 retention-days: 30
 
         #         - name: check instances
