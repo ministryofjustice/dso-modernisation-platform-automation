@@ -141,17 +141,16 @@
                   
                 # Save the results for this account
                 pwd && ls -lh
-                echo mkr 2
                 echo "Hostname collection complete for ${{ matrix.account_name }}"
                 cat "hostnames-${{ matrix.account_name }}.txt"
-                echo mkr 3
+                cat "hostnames-${{ matrix.account_name }}.json"                
 
           - name: Upload results for ${{ matrix.account_name }}
             uses: actions/upload-artifact@v4
             with:
                 name: ec2-hostnames-${{ matrix.account_name }}
                 path: |
-                    hostname-list-${{ matrix.account_name }}.txt
+                    hostnames-${{ matrix.account_name }}.txt
                 retention-days: 7
       
       consolidate-hostnames:
@@ -174,8 +173,8 @@
                     echo "Processing data from $ACCOUNT_NAME account"
                     
                     # Add hostnames to the master text file
-                    if [ -f "$account_dir/hostname-list-$ACCOUNT_NAME.txt" ]; then
-                    cat "$account_dir/hostname-list-$ACCOUNT_NAME.txt" >> all-hostnames.txt
+                    if [ -f "$account_dir/hostnames-$ACCOUNT_NAME.txt" ]; then
+                    cat "$account_dir/hostnames-$ACCOUNT_NAME.txt" >> all-hostnames.txt
                     fi
                 done
                 
