@@ -1,7 +1,6 @@
 ---
 name: Snapshot Cleanup
 
-
 on:
   workflow_dispatch:
     inputs:
