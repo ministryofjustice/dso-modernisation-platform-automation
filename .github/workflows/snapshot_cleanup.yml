@@ -10,13 +10,11 @@ on:
       environments:
         description: 'e.g. development or leave blank for all'
         type: string
-      dryrun:
-        type: choice
-        description: Dryrun mode (leave as false unless testing)
-        default: false
+      
 permissions:
   id-token: write
   contents: read
+
 jobs:
   check-strategy:
     name: Check Strategy
@@ -41,18 +39,35 @@ jobs:
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
           echo "${matrix}" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
-          echo "{$matrix}
-        - name: Upload aws cli commands artifact
+          echo "{$matrix}"
+
+      - name: Options
+        id: options
+        run: |
+          dryrun=0
+          echo "Seitting options event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            snapshot_cleanup_sh_args=""
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo "snapshot_cleanup_sh_args=${snapshot_cleanup_sh_args} dryrun=${dryrun}"
+          echo "snapshot_cleanup_sh_args=${snapshot_cleanup_sh_args}" >> $GITHUB_OUTPUT
+          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
+
+      - name: Upload aws cli commands artifact
         uses: actions/upload-artifact@v4
         with:
           name: "aws_cli_commands.sh"
           path: aws_cli_commands.sh
-          overwrite: true
 
   check-snapshots:
     name: Check Snapshots
     runs-on: ubuntu-latest
     needs: check-strategy
+    strategy:
+      max-parallel: 1
     steps:
       - name: Get Account Details
         id: account
@@ -66,7 +81,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
         with:
-         role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
 
       - name: Checkout Repository
@@ -116,7 +131,6 @@ jobs:
         with:
           name: "aws_cli_commands.sh"
           path: dso-modernisation-platform-automation/aws_cli_commands.sh
-          overwrite: true
 
   cleanup-strategy:
     name: Cleanup Strategy
@@ -177,6 +191,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
         with:
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
 
       - name: Download Expiry Artifact
