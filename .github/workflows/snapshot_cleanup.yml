@@ -121,12 +121,14 @@ jobs:
           fi
 
       - name: Download aws_cli_commands.sh Artifact
+        if: ${{ steps.check.outputs.cleanup == 1 }}
         uses: actions/download-artifact@v4
         with:
           name: "aws_cli_commands.sh"
           path: dso-modernisation-platform-automation
 
       - name: Append aws cli commands
+        if: ${{ steps.check.outputs.cleanup == 1 }}
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
           output() {
