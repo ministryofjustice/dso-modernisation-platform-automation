@@ -194,7 +194,7 @@ jobs:
       - check-strategy
       - cleanup-strategy
     runs-on: ubuntu-latest
-    if: ${{ needs.cleanup-strategy.outputs.do_update == 1 && needs.check-strategy.outputs.dryrun == 1 }}
+    if: ${{ needs.cleanup-strategy.outputs.do_update == 1 && needs.check-strategy.outputs.dryrun == 0 }}
     strategy:
       matrix: ${{ fromJson(needs.cleanup-strategy.outputs.matrix) }}
       max-parallel: 1
