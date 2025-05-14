@@ -48,7 +48,7 @@ jobs:
       - name: Options
         id: options
         run: |
-          dryrun=0
+          dryrun=1
           echo "Seitting options event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             snapshot_cleanup_sh_args=""
@@ -194,7 +194,7 @@ jobs:
       - check-strategy
       - cleanup-strategy
     runs-on: ubuntu-latest
-    if: ${{ needs.cleanup-strategy.outputs.do_update == 1 && needs.check-strategy.outputs.dryrun == 0 }}
+    if: ${{ needs.cleanup-strategy.outputs.do_update == 1 && needs.check-strategy.outputs.dryrun == 1 }}
     strategy:
       matrix: ${{ fromJson(needs.cleanup-strategy.outputs.matrix) }}
       max-parallel: 1
