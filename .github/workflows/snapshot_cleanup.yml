@@ -10,14 +10,7 @@ on:
       environments:
         description: 'e.g. development or leave blank for all'
         type: string
-      dryrun:
-        type: choice
-        description: Dryrun mode (leave as false unless testing)
-        default: false
-        options:
-          - true
-          - false
-
+      
 permissions:
   id-token: write
   contents: read
@@ -32,7 +25,7 @@ jobs:
       dryrun: "${{ steps.options.outputs.dryrun }}"
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
         with:
           ref: ${{ github.ref }}
 
@@ -55,7 +48,7 @@ jobs:
       - name: Options
         id: options
         run: |
-          dryrun=0
+          dryrun=1
           echo "Seitting options event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             snapshot_cleanup_sh_args=""
@@ -95,20 +88,20 @@ jobs:
           echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        uses: aws-actions/configure-aws-credentials@f24d7193d98baebaeacc7e2227925dd47cc267f5 # v4.2.0
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
 
       - name: Checkout Repository
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
         with:
           ref: ${{ github.ref }}
           path: dso-modernisation-platform-automation
 
       - name: Checkout Repository
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
         with:
           repository: ministryofjustice/modernisation-platform-environments
           path: modernisation-platform-environments
@@ -218,7 +211,7 @@ jobs:
           echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        uses: aws-actions/configure-aws-credentials@f24d7193d98baebaeacc7e2227925dd47cc267f5 # v4.2.0
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
