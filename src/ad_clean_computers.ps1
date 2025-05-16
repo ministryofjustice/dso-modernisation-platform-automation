@@ -1,0 +1,173 @@
+#Import-Module ActiveDirectory
+
+$daysInactive = 90
+$inactiveDate = (Get-Date).Adddays( - ($daysInactive))
+Write-Output "Inactive date will be $($daysInactive) days pre: $($inactiveDate)"
+
+#-------------------------------
+# FIND INACTIVE COMPUTERS
+#-------------------------------
+
+# Get AD Computers that haven't logged on in $daysInactive days
+$inactiveComputers = Get-ADComputer -Filter { LastLogonDate -lt $inactiveDate } -Properties LastLogonDate, whenCreated, IPv4Address | Select-Object Name, LastLogonDate, IPv4Address, DistinguishedName
+
+# Get AD Computers that have never logged on and were created > the $daysInactive variable
+$UnusedComputers = Get-ADComputer -Filter { LastLogonDate -notlike "*" -and whenCreated -lt $inactiveDate } -Properties LastLogonDate, whenCreated  | Select-Object Name, LastLogonDate, whenCreated, DistinguishedName
+Write-Output "Unused, aged computer accounts are: $($UnusedComputers.Name)"
+Write-Output "Unused, aged computer account count is: $($UnusedComputers.count)"
+
+# Alternative method (includes never logged on computers)
+# $inactiveComputers = Search-ADAccount -AccountInactive -DateTime $inactiveDate -ComputersOnly | Select-Object Name, LastLogonDate, Enabled, DistinguishedName
+
+#-------------------------------
+# SPLIT BY CLOUD USING IP RANGE
+#-------------------------------
+
+$azNomsProdIpRange = "10.40."
+$azNomsDevTestIpRange = "10.101."
+$azNomsDevTestMgmtIpRange = "10.102."
+$AwsMpCore = "10.20."
+$AwsMpNonLive = "10.26."
+$AwsMpLive = "10.27."
+
+$azNomsInactiveCompAccts = @()
+$awsInactiveCompAccts = @()
+
+foreach ($Computer in $inactiveComputers) {
+    $IPAddress = $Computer.IPv4Address
+    if ($IPAddress -like "$azNomsProdIpRange*" -or $IPAddress -like "$azNomsDevTestIpRange*" -or $IPAddress -like "$azNomsDevTestMgmtIpRange*") {
+        $azNomsInactiveCompAccts += [PSCustomObject]@{
+            Name              = $Computer.Name
+            IPAddress         = $IPAddress
+            LastLogonDate     = $Computer.LastLogonDate
+            whenCreated       = $Computer.whenCreated
+            DistinguishedName = $Computer.DistinguishedName
+        }
+    }
+    elseif ($IPAddress -like "$AwsMpCore*" -or $IPAddress -like "$AwsMpNonLive*" -or $IPAddress -like "$AwsMpLive*") {
+        $awsInactiveCompAccts += [PSCustomObject]@{
+            Name              = $Computer.Name
+            IPAddress         = $IPAddress
+            LastLogonDate     = $Computer.LastLogonDate
+            whenCreated       = $Computer.whenCreated
+            DistinguishedName = $Computer.DistinguishedName
+        }
+    }
+}
+
+Write-Output "azNomsInactiveCompAccts count: $($azNomsInactiveCompAccts.count), AwsInactiveCompsAccts (ModPlatform) count: $($awsInactiveCompAccts.count) out of a total inactive of: $($inactiveComputers.count)"
+
+# #----------------------------------
+# # CROSS REFERENCE AZURE TO BE SAFE
+# #----------------------------------
+
+# # Import-Module Az
+
+# #  Connect-AzAccount -TenantId "747381f4-e81f-4a43-bf68-ced6a1e14edf" -Subscription "1d95dcda-65b2-4273-81df-eb979c6b547b"
+
+# # NOMS Production 1, NOMS Dev & Test Environments
+# $subscriptionIds = @("1d95dcda-65b2-4273-81df-eb979c6b547b", "b1f3cebb-4988-4ff9-9259-f02ad7744fcb")
+
+# $doNotDeleteAzCompAccts = @()
+
+# Write-Output "Before verification azNomsInactiveCompAccts count is: $($azNomsInactiveCompAccts.Count)"
+
+# foreach ($subscriptionId in $subscriptionIds) {
+#     Select-AzSubscription -SubscriptionId $subscriptionId
+#     # Get all Azure VMs in the current subscription
+#     $AzureVMs = Get-AzVM | Select-Object Name
+#     Write-Output "Cross checking $($AzureVMs.count) VM's in current subsription"
+#     # Compare inactive AD computer accounts with Azure VMs
+#     $doNotDeleteAzCompAccts = $azNomsInactiveCompAccts | Where-Object { $_.Name -in $AzureVMs.Name } # T1PWL0003 (RHEL 7.4 DevTest)
+#     $azNomsInactiveCompAccts = $azNomsInactiveCompAccts | Where-Object { $_.Name -notin $AzureVMs.Name }
+#     Write-Output "$($doNotDeleteAzCompAccts.Name) removed from the deletion list for current subsription, $($doNotDeleteAzCompAccts.Count) VM's"
+#     Write-Output "After this verification pass azNomsInactiveCompAccts count is: $($azNomsInactiveCompAccts.Count)"
+# }
+
+# # Output deleted VMs
+# if ($azNomsInactiveCompAccts) {
+#     Write-Output "After verification azNomsInactiveCompAccts count is: $($azNomsInactiveCompAccts.Count), difference is: $($doNotDeleteAzCompAccts.Count)"
+#     # Write-Output "Deleted VMs:"
+#     # $azNomsInactiveCompAccts | ForEach-Object { Write-Output $_.Name }
+# } else {
+#     Write-Output "No deleted VMs found."
+# }
+
+#----------------------------------
+# CROSS REFERENCE AWS TO BE SAFE
+#----------------------------------
+
+$awsNamedInstances = Get-Content -Path "C:\ScriptLogs\all-ec2-hostnames.txt"
+
+$doNotDeleteAwsCompAccts = @()
+$verifiedAwsInactiveComps = @()
+
+# to confirm the verication is working we can pick a name from $awsInactiveCompAccts and add it to $awsNamedInstances
+# $awsNamedInstances += "EC2AMAZ-1234567"
+
+foreach ($name in $awsInactiveCompAccts.Name) {
+    write-output "Testing for $($name)"
+    # Compare inactive AD computer accounts with current Mod-Platform instances
+    if ($name -in $awsNamedInstances) {
+        $doNotDeleteAwsCompAccts += $name
+    }
+    elseif ($name -notin $awsNamedInstances) {
+        $verifiedAwsInactiveComps += $name
+    }
+}
+
+# Output results after AWS verification
+if ($awsInactiveCompAccts) {
+    Write-Output "Checked $($awsInactiveCompAccts.count) inactive AWS comp accts, against $($awsNamedInstances.count) active instances, verified result count is: $($verifiedAwsInactiveComps.Count), difference is: $($doNotDeleteAwsCompAccts.Count), which is:"
+    write-output $doNotDeleteAwsCompAccts
+    # Write-Output "Deleted VMs:"
+    # $awsInactiveCompAccts | ForEach-Object { Write-Output $_.Name }
+}
+else {
+    Write-Output "No deleted VMs found."
+}
+
+#-----------------------------------
+# REPORTING - Export results to CSV
+#-----------------------------------
+$LogDir = "C:\ScriptLogs"
+if (!(Test-Path -Path $LogDir)) {
+    New-Item -ItemType Directory -Path $LogDir -Force
+}
+
+$inactiveComputers | Export-Csv $LogDir\ad_clean_computers_allInactiveComputers.csv -NoTypeInformation
+# $azNomsInactiveCompAccts | Export-Csv $LogDir\ad_clean_computers_verifiedInactiveazNomsComputers.csv -NoTypeInformation
+$verifiedAwsInactiveComps | Out-File -FilePath $LogDir\ad_clean_computers_verifiedAwsInactiveComps.csv
+$UnusedComputers | Export-Csv $LogDir\ad_clean_computers_completelyUnusedComputers.csv -NoTypeInformation
+
+#$dateTime = Get-Date -F 'ddMMyy-HHmm'
+$ZipPath = Join-Path $LogDir "all_logs.zip"
+Compress-Archive -Path "$LogDir\*.csv" -DestinationPath $ZipPath -Force
+         
+# Output location of zip file for retrieval
+Write-Host "##output_path##$ZipPath"
+
+#-------------------------------
+# INACTIVE COMPUTER MANAGEMENT
+#-------------------------------
+
+# # Example to Disable Inactive Computers
+# ForEach ($computer in $inactiveComputers) {
+#     $DistName = $computer.DistinguishedName
+#     #Set-ADComputer -Identity $DistName -Enabled $false
+#     Get-ADComputer -Filter { DistinguishedName -eq $DistName } | Select-Object Name, Enabled
+# }
+
+# Delete Inactive Az Computers
+# ForEach ($computer in $azNomsInactiveCompAccts.Name) {
+#     Remove-ADComputer -Identity $computer -Confirm:$false
+#     #Write-Output "$($computer) - Deleted"
+# }
+
+# Delete Inactive AWS Computers
+# ForEach ($computer in $verifiedAwsInactiveComps) {
+#     Remove-ADComputer -Identity $computer -Confirm:$false
+#     #Write-Output "$($computer) - Deleted"
+# }
+
+# May need Get-ADComputer $computer.DistinguishedName | Remove-ADObject -Recursive -Confirm:$false
