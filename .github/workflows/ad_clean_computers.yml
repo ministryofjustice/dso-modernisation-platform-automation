@@ -178,7 +178,7 @@
                 echo "Hostname collection complete for ${{ matrix.account_name }}"
             
           - name: Upload results for ${{ matrix.account_name }}
-            uses: actions/upload-artifact@v3
+            uses: actions/upload-artifact@v4
             with:
                 name: ec2-hostnames-${{ matrix.account_name }}
                 path: |
@@ -231,7 +231,7 @@
                 echo "Total instance hostnames: $(jq 'length' all-instances.json)"
                 
            - name: Upload consolidated results
-             uses: actions/upload-artifact@v3
+             uses: actions/upload-artifact@v4
              with:
                 name: consolidated-ec2-hostnames
                 path: |
