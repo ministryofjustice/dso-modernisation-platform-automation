@@ -218,8 +218,8 @@
           run: |
             # populate/refresh the aws secret from the github secret
             aws secretsmanager put-secret-value --secret-id "${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}" --secret-string "${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}"
-            #  - retrieve that from your script
-            #     aws secretsmanager get-secret-value --secret-id $arn --query SecretString --output text
+           
+            # aws secretsmanager get-secret-value --secret-id $arn --query SecretString --output text  #  - retrieve that from a script
 
         - name: Download consolidated hostname data
           uses: actions/download-artifact@v4
@@ -249,7 +249,7 @@
                 --document-name "AWS-RunPowerShellScript" \
                 --instance-ids ${{ env.DEVTEST_ADMIN_INSTANCE_ID }} \
                 --parameters "commands=['[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(\"$ENCODED_SCRIPT\")) | Invoke-Expression']" \
-                --output text
+                --output text \
                 --comment "retrieve all-ec2-hostnames.txt"
 
         - name: Run the PowerShell script for AD comparison
@@ -266,11 +266,11 @@
                 "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1 ad_clean_computers.ps1",
                 "powershell.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1"
                 ]' \
-                --output text
+                --output text \
                 --comment "run-ad-clean-computers-pwsh"
 
 
-            #CLEANCOMPUTERS=$(src/run_script_on_ec2.sh first "t2-jump2022-2" "run-ad-clean-computers-pwsh" "src/ad_clean_computers.ps1") # "${{ env.DEVTEST_ADMIN_INSTANCE_ID }}" "$NAME_TAG"
+            #CLEANCOMPUTERS=$(src/run_script_on_ec2.sh first "name" "run-ad-clean-computers-pwsh" "src/ad_clean_computers.ps1") # "${{ env.DEVTEST_ADMIN_INSTANCE_ID }}" "$NAME_TAG"
 
         # - name: retrieve the logs
         #   id: retrieve-logs
