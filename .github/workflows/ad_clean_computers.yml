@@ -198,8 +198,7 @@
           #DEVTEST_ADMIN_ACCOUNT_ID: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}
           DEVTEST_ADMIN_INSTANCE_ID: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}
           ADMIN_ACCOUNT_ROLE: "arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd"
-          DEVTEST_APPID: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_APPID }}
-          DEVTEST_SECRET: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_SECRET }}
+          DEVTEST_SECRET_ARN: ${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}
           DEVTEST_S3_BUCKET: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}
 
         steps:
@@ -213,6 +212,14 @@
           with:
             role-to-assume: ${{ env.ADMIN_ACCOUNT_ROLE }}
             aws-region: "eu-west-2"
+
+        - name: Refresh the aws secret
+          id: refresh-secret
+          run: |
+            # populate/refresh the aws secret from the github secret
+            aws secretsmanager put-secret-value --secret-id ${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }} --secret-string ${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}
+            #  - retrieve that from your script
+            #     aws secretsmanager get-secret-value --secret-id $arn --query SecretString --output text
         
         - name: Download consolidated hostname data
           uses: actions/download-artifact@v4
@@ -237,19 +244,27 @@
             # Encode the script
             ENCODED_SCRIPT=$(echo "$SCRIPT_CONTENT" | base64 -w 0)
             
-            # Now send the encoded all-ec2-hostnames.txt via SSM
+            # Send the encoded script to be executed
+            aws ssm send-command \
+                --document-name "AWS-RunPowerShellScript" \
+                --instance-ids ${{ env.DEVTEST_ADMIN_INSTANCE_ID }} \
+                --parameters "commands=['[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(\"$ENCODED_SCRIPT\")) | Invoke-Expression']" \
+                --output text
+                --comment "retrieve all-ec2-hostnames.txt"
+
+        - name: Run the PowerShell script for AD comparison
+          id: run-compare-pwsh
+          run: |
             # pwd && ls -lh
             # cat 'all-ec2-hostnames.txt'
-
             aws s3 cp src/ad_clean_computers.ps1 s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1
 
             aws ssm send-command \
                 --document-name "AWS-RunPowerShellScript" \
                 --instance-ids ${{ env.DEVTEST_ADMIN_INSTANCE_ID }} \
                 --parameters 'commands=[
-                '[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(\"$ENCODED_SCRIPT\")) | Invoke-Expression',
                 "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1 ad_clean_computers.ps1",
-                "powershell.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1 -Username ${{ env.DEVTEST_APPID }}"
+                "powershell.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1"
                 ]' \
                 --output text
                 --comment "run-ad-clean-computers-pwsh"
