@@ -61,6 +61,22 @@ Write-Output "azNomsInactiveCompAccts count: $($azNomsInactiveCompAccts.count), 
 # # CROSS REFERENCE AZURE TO BE SAFE
 # #----------------------------------
 
+Import-Module AWSPowerShell.NetCore
+
+# Get the secret value
+$secretValue = Get-SECSecretValue -SecretId "/t1-jump2022-1/dso-modernisation-platform-automation" -Region "eu-west-2"
+
+# Parse the JSON string
+$secretJson = $secretValue.SecretString | ConvertFrom-Json
+
+# Access individual values
+$clientId = $secretJson.clientId
+$clientSecret = $secretJson.clientSecret
+$tenantId = $secretJson.tenantId
+
+Write-Output "Client ID: $clientId"
+Write-Output "Tenant ID: $tenantId"
+
 # # Import-Module Az
 
 # #  Connect-AzAccount -TenantId "747381f4-e81f-4a43-bf68-ced6a1e14edf" -Subscription "1d95dcda-65b2-4273-81df-eb979c6b547b"
@@ -106,7 +122,7 @@ $verifiedAwsInactiveComps = @()
 # $awsNamedInstances += "EC2AMAZ-1234567"
 
 foreach ($name in $awsInactiveCompAccts.Name) {
-    write-output "Testing for $($name)"
+    # write-output "Testing for $($name)"
     # Compare inactive AD computer accounts with current Mod-Platform instances
     if ($name -in $awsNamedInstances) {
         $doNotDeleteAwsCompAccts += $name
