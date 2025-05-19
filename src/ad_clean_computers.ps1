@@ -57,57 +57,65 @@ foreach ($Computer in $inactiveComputers) {
 
 Write-Output "azNomsInactiveCompAccts count: $($azNomsInactiveCompAccts.count), AwsInactiveCompsAccts (ModPlatform) count: $($awsInactiveCompAccts.count) out of a total inactive of: $($inactiveComputers.count)"
 
-# #----------------------------------
-# # CROSS REFERENCE AZURE TO BE SAFE
-# #----------------------------------
+#----------------------------------
+# CROSS REFERENCE AZURE TO BE SAFE
+#----------------------------------
 
-Import-Module AWSPowerShell.NetCore
+import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
+# Import-Module Az
 
 # Get the secret value
-$secretValue = Get-SECSecretValue -SecretId "/t1-jump2022-1/dso-modernisation-platform-automation" -Region "eu-west-2"
+$hostname = (Get-ComputerInfo).CsName
+$secretValue = Get-SECSecretValue -SecretId "/$hostname/dso-modernisation-platform-automation" -Region "eu-west-2"
+$raw = $secretValue.SecretString.Trim('{}').Trim()
+$parts = $raw -split ',\s*'
 
-# Parse the JSON string
-$secretJson = $secretValue.SecretString | ConvertFrom-Json
+# Parse into hashtable
+$secretJson = @{}
+foreach ($part in $parts) {
+    $kv = $part -split ':\s*', 2
+    $secretJson[$kv[0].Trim()] = $kv[1].Trim()
+}
 
-# Access individual values
-$clientId = $secretJson.clientId
-$clientSecret = $secretJson.clientSecret
-$tenantId = $secretJson.tenantId
+$clientId = $secretJson["clientId"]
+#$clientSecret = $secretJson["clientSecret"]
+$tenantId = $secretJson["tenantId"]
+$subscriptionId = $secretJson["subscriptionId"]
 
-Write-Output "Client ID: $clientId"
-Write-Output "Tenant ID: $tenantId"
 
-# # Import-Module Az
+$SecureStringPwd = $secretJson["clientSecret"] | ConvertTo-SecureString -AsPlainText -Force
+$pscredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $clientId, $SecureStringPwd
+Connect-AzAccount -ServicePrincipal -Credential $pscredential -Tenant $tenantId -Subscription $subscriptionId
 
 # #  Connect-AzAccount -TenantId "747381f4-e81f-4a43-bf68-ced6a1e14edf" -Subscription "1d95dcda-65b2-4273-81df-eb979c6b547b"
 
-# # NOMS Production 1, NOMS Dev & Test Environments
-# $subscriptionIds = @("1d95dcda-65b2-4273-81df-eb979c6b547b", "b1f3cebb-4988-4ff9-9259-f02ad7744fcb")
+# NOMS Production 1, NOMS Dev & Test Environments
+$subscriptionIds = @("1d95dcda-65b2-4273-81df-eb979c6b547b", "b1f3cebb-4988-4ff9-9259-f02ad7744fcb")
 
-# $doNotDeleteAzCompAccts = @()
+$doNotDeleteAzCompAccts = @()
 
-# Write-Output "Before verification azNomsInactiveCompAccts count is: $($azNomsInactiveCompAccts.Count)"
+Write-Output "Before verification azNomsInactiveCompAccts count is: $($azNomsInactiveCompAccts.Count)"
 
-# foreach ($subscriptionId in $subscriptionIds) {
-#     Select-AzSubscription -SubscriptionId $subscriptionId
-#     # Get all Azure VMs in the current subscription
-#     $AzureVMs = Get-AzVM | Select-Object Name
-#     Write-Output "Cross checking $($AzureVMs.count) VM's in current subsription"
-#     # Compare inactive AD computer accounts with Azure VMs
-#     $doNotDeleteAzCompAccts = $azNomsInactiveCompAccts | Where-Object { $_.Name -in $AzureVMs.Name } # T1PWL0003 (RHEL 7.4 DevTest)
-#     $azNomsInactiveCompAccts = $azNomsInactiveCompAccts | Where-Object { $_.Name -notin $AzureVMs.Name }
-#     Write-Output "$($doNotDeleteAzCompAccts.Name) removed from the deletion list for current subsription, $($doNotDeleteAzCompAccts.Count) VM's"
-#     Write-Output "After this verification pass azNomsInactiveCompAccts count is: $($azNomsInactiveCompAccts.Count)"
-# }
+foreach ($subscriptionId in $subscriptionIds) {
+    Select-AzSubscription -SubscriptionId $subscriptionId
+    # Get all Azure VMs in the current subscription
+    $AzureVMs = Get-AzVM | Select-Object Name
+    Write-Output "Cross checking $($AzureVMs.count) VM's in current subsription"
+    # Compare inactive AD computer accounts with Azure VMs
+    $doNotDeleteAzCompAccts = $azNomsInactiveCompAccts | Where-Object { $_.Name -in $AzureVMs.Name } # T1PWL0003 (RHEL 7.4 DevTest)
+    $azNomsInactiveCompAccts = $azNomsInactiveCompAccts | Where-Object { $_.Name -notin $AzureVMs.Name }
+    Write-Output "$($doNotDeleteAzCompAccts.Name) removed from the deletion list for current subsription, $($doNotDeleteAzCompAccts.Count) VM's"
+    Write-Output "After this verification pass azNomsInactiveCompAccts count is: $($azNomsInactiveCompAccts.Count)"
+}
 
-# # Output deleted VMs
-# if ($azNomsInactiveCompAccts) {
-#     Write-Output "After verification azNomsInactiveCompAccts count is: $($azNomsInactiveCompAccts.Count), difference is: $($doNotDeleteAzCompAccts.Count)"
-#     # Write-Output "Deleted VMs:"
-#     # $azNomsInactiveCompAccts | ForEach-Object { Write-Output $_.Name }
-# } else {
-#     Write-Output "No deleted VMs found."
-# }
+# Output deleted VMs
+if ($azNomsInactiveCompAccts) {
+    Write-Output "After verification azNomsInactiveCompAccts count is: $($azNomsInactiveCompAccts.Count), difference is: $($doNotDeleteAzCompAccts.Count)"
+    # Write-Output "Deleted VMs:"
+    # $azNomsInactiveCompAccts | ForEach-Object { Write-Output $_.Name }
+} else {
+    Write-Output "No deleted VMs found."
+}
 
 #----------------------------------
 # CROSS REFERENCE AWS TO BE SAFE
