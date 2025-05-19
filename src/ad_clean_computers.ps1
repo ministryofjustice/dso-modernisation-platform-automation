@@ -62,11 +62,12 @@ Write-Output "azNomsInactiveCompAccts count: $($azNomsInactiveCompAccts.count), 
 #----------------------------------
 
 import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
-# Import-Module Az
+Import-Module Az.Accounts, Az.Compute
+Import-Module Microsoft.PowerShell.Security
 
 # Get the secret value
 $hostname = (Get-ComputerInfo).CsName
-$secretValue = Get-SECSecretValue -SecretId "/t1-jump2022-1/dso-modernisation-platform-automation" -Region "eu-west-2"
+$secretValue = Get-SECSecretValue -SecretId "/$($hostname.ToLower())/dso-modernisation-platform-automation" -Region "eu-west-2"
 $raw = $secretValue.SecretString.Trim('{}').Trim()
 $parts = $raw -split ',\s*'
 
