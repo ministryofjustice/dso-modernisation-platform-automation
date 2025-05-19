@@ -217,10 +217,10 @@
           id: refresh-secret
           run: |
             # populate/refresh the aws secret from the github secret
-            aws secretsmanager put-secret-value --secret-id ${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }} --secret-string ${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}
+            aws secretsmanager put-secret-value --secret-id "${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}" --secret-string "${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}"
             #  - retrieve that from your script
             #     aws secretsmanager get-secret-value --secret-id $arn --query SecretString --output text
-        
+
         - name: Download consolidated hostname data
           uses: actions/download-artifact@v4
           with:
