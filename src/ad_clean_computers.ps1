@@ -2,7 +2,7 @@
 
 $daysInactive = 90
 $inactiveDate = (Get-Date).Adddays( - ($daysInactive))
-Write-Output "Inactive date will be $($daysInactive) days pre: $($inactiveDate)"
+Write-Output "Inactive date will be $($daysInactive) days previous, i.e. $($inactiveDate)"
 
 #-------------------------------
 # FIND INACTIVE COMPUTERS
@@ -63,7 +63,7 @@ Write-Output "azNomsInactiveCompAccts count: $($azNomsInactiveCompAccts.count), 
 
 import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
 Import-Module Az.Accounts, Az.Compute
-Import-Module Microsoft.PowerShell.Security
+# Import-Module Microsoft.PowerShell.Security
 
 # Get the secret value
 $hostname = (Get-ComputerInfo).CsName
