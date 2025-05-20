@@ -62,7 +62,7 @@ Write-Output "azNomsInactiveCompAccts count: $($azNomsInactiveCompAccts.count), 
 
 import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
 Import-Module Az.Accounts, Az.Compute
-# Import-Module Microsoft.PowerShell.Security
+Import-Module Microsoft.PowerShell.Security
 
 # Get the secret value
 $hostname = (Get-ComputerInfo).CsName
