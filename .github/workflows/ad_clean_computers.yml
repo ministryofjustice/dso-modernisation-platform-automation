@@ -149,7 +149,7 @@
                 name: ec2-hostnames-${{ matrix.account_name }}
                 path: |
                     hostnames-${{ matrix.account_name }}.txt
-                retention-days: 7
+                retention-days: 1
       
       consolidate-hostnames:
         needs: check-instances
@@ -185,7 +185,7 @@
                 name: consolidated-ec2-hostnames
                 path: |
                     all-ec2-hostnames.txt
-                retention-days: 30
+                retention-days: 1
 
       compare-with-active-directory:
         needs: consolidate-hostnames
@@ -195,7 +195,6 @@
           contents: read
         
         env:
-          #DEVTEST_ADMIN_ACCOUNT_ID: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}
           DEVTEST_ADMIN_INSTANCE_ID: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}
           ADMIN_ACCOUNT_ROLE: "arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd"
           DEVTEST_SECRET_ARN: ${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}
@@ -268,8 +267,16 @@
                 --output text \
                 --comment "run-ad-clean-computers-pwsh"
 
+            aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip all_logs.zip
 
-            #CLEANCOMPUTERS=$(src/run_script_on_ec2.sh first "name" "run-ad-clean-computers-pwsh" "src/ad_clean_computers.ps1") # "${{ env.DEVTEST_ADMIN_INSTANCE_ID }}" "$NAME_TAG"
+        - name: Upload all results
+          uses: actions/upload-artifact@v4
+          with:
+             name: all_logs.zip
+             path: |
+                 all_logs.zip
+             retention-days: 14
+
 
         # - name: retrieve the logs
         #   id: retrieve-logs
