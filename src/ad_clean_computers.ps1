@@ -59,7 +59,7 @@ Write-Output "azNomsInactiveCompAccts count: $($azNomsInactiveCompAccts.count), 
 #----------------------------------
 # CROSS REFERENCE AZURE TO BE SAFE
 #----------------------------------
-
+Set-Variable -Name "PSModulePath" -Value "C:\Program Files\WindowsPowerShell\Modules"
 import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
 Import-Module Az.Accounts, Az.Compute
 Import-Module Microsoft.PowerShell.Security -Force
