@@ -2,7 +2,7 @@
 
 $daysInactive = 90
 $inactiveDate = (Get-Date).Adddays( - ($daysInactive))
-Write-Output "Inactive date will be $($daysInactive) days previous, i.e. $($inactiveDate)"
+Write-Output "Inactive cleanup date will be $($daysInactive) days previous, i.e. $($inactiveDate)"
 
 #-------------------------------
 # FIND INACTIVE COMPUTERS
@@ -13,8 +13,7 @@ $inactiveComputers = Get-ADComputer -Filter { LastLogonDate -lt $inactiveDate } 
 
 # Get AD Computers that have never logged on and were created > the $daysInactive variable
 $UnusedComputers = Get-ADComputer -Filter { LastLogonDate -notlike "*" -and whenCreated -lt $inactiveDate } -Properties LastLogonDate, whenCreated  | Select-Object Name, LastLogonDate, whenCreated, DistinguishedName
-Write-Output "Unused, aged computer accounts are: $($UnusedComputers.Name)"
-Write-Output "Unused, aged computer account count is: $($UnusedComputers.count)"
+Write-Output "Found $($UnusedComputers.count) unused, aged computer accounts, which are: $($UnusedComputers.Name)"
 
 # Alternative method (includes never logged on computers)
 # $inactiveComputers = Search-ADAccount -AccountInactive -DateTime $inactiveDate -ComputersOnly | Select-Object Name, LastLogonDate, Enabled, DistinguishedName
