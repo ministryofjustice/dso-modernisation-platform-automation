@@ -278,76 +278,74 @@
              retention-days: 14
 
 
-        # - name: retrieve the logs
-        #   id: retrieve-logs
+      delete-verified-inactive-computers:
+        needs: compare-with-active-directory
+        runs-on: ubuntu-latest
+        permissions:
+          id-token: write
+          contents: read
+        
+        env:
+          DEVTEST_ADMIN_INSTANCE_ID: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}
+          ADMIN_ACCOUNT_ROLE: "arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd"
+          DEVTEST_SECRET_ARN: ${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}
+          DEVTEST_S3_BUCKET: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}
+
+        steps:
+        - name: Checkout Repository
+          uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+          with:
+            ref: ${{ github.ref }}
+
+        - name: Configure AWS credentials for Admin account
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            role-to-assume: ${{ env.ADMIN_ACCOUNT_ROLE }}
+            aws-region: "eu-west-2"
+
+        # - name: Refresh the aws secret
+        #   id: refresh-secret
         #   run: |
-          
-        #     # Set the paths
-        #     EC2_FILE_PATH="C:\\ScriptLogs\\all_logs.zip"
-        #     RUNNER_FILE_PATH="./all_logs.zip"
-            
-        #     # Create PowerShell script to read and encode the file
-        #     SCRIPT_CONTENT="
-        #     # Check if file exists
-        #     if (-Not (Test-Path -Path '$EC2_FILE_PATH')) {
-        #         Write-Error 'File does not exist: $EC2_FILE_PATH'
-        #         exit 1
-        #     }
-            
-        #     # Read file as bytes and convert to base64
-        #     \$fileBytes = [System.IO.File]::ReadAllBytes('$EC2_FILE_PATH')
-        #     \$base64Content = [System.Convert]::ToBase64String(\$fileBytes)
-            
-        #     # Output the base64 content
-        #     Write-Output \$base64Content
-        #     "
-            
-        #     # Encode the script
-        #     ENCODED_SCRIPT=$(echo "$SCRIPT_CONTENT" | base64 -w 0)
-            
-        #     # Execute the script on EC2 and capture the output
-        #     echo "Retrieving file from EC2 instance..."
-            
-        #     BASE64_CONTENT=$(aws ssm send-command \
+        #     # populate/refresh the aws secret from the github secret
+        #     aws secretsmanager put-secret-value --secret-id "${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}" --secret-string "${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}"
+           
+        #     # aws secretsmanager get-secret-value --secret-id $arn --query SecretString --output text  #  - retrieve that from a script
+
+        - name: Download all_logs.zip
+          uses: actions/download-artifact@v4
+          with:
+            name: all_logs.zip
+
+        - name: extract log files
+          id: extract-logs
+          run: |
+            mkdir -p logs
+            unzip all_logs.zip -d logs/
+            ls -lh ./logs 
+
+        # - name: Run the PowerShell script for AD comparison
+        #   id: run-compare-pwsh
+        #   run: |
+        #     aws s3 cp src/ad_clean_computers.ps1 s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1
+
+        #     aws ssm send-command \
         #         --document-name "AWS-RunPowerShellScript" \
         #         --instance-ids ${{ env.DEVTEST_ADMIN_INSTANCE_ID }} \
-        #         --parameters "commands=['[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(\"$ENCODED_SCRIPT\")) | Invoke-Expression']" \
+        #         --parameters 'commands=[
+        #         "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1 ad_clean_computers.ps1",
+        #         "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1 -Wait",
+        #         "aws s3 cp C:\ScriptLogs\all_logs.zip s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip"
+        #         ]' \
         #         --output text \
-        #         --query "Command.CommandInvocations[0].CommandPlugins[0].Output" || echo "COMMAND_FAILED")
-            
-        #     # Check if command succeeded
-        #     if [[ "$BASE64_CONTENT" == "COMMAND_FAILED" || "$BASE64_CONTENT" == *"Error"* ]]; then
-        #         echo "Failed to retrieve file from EC2 instance"
-        #         echo "$BASE64_CONTENT"
-        #         exit 1
-        #     fi
-            
-        #     # Remove any SSM output headers/footers and whitespace
-        #     CLEAN_BASE64=$(echo "$BASE64_CONTENT" | grep -v "^[[:space:]]*$" | grep -v "^[[:space:]]*Transcript" | grep -v "^[[:space:]]*--------" | tr -d '\r\n')
-            
-        #     # Decode the base64 content and save to file
-        #     echo "Decoding and saving file..."
-        #     echo "$CLEAN_BASE64" | base64 --decode > "$RUNNER_FILE_PATH"
-            
-        #     # Verify the file was downloaded
-        #     if [ -f "$RUNNER_FILE_PATH" ]; then
-        #         FILE_SIZE=$(stat -c%s "$RUNNER_FILE_PATH")
-        #         echo "File downloaded successfully ($FILE_SIZE bytes)"
-        #     else
-        #         echo "Failed to save file"
-        #         exit 1
-        #     fi
-            
-        # - name: extract the logs
-        #   id: extract-logs
-        #   run: |
-        #     mkdir -p logs
-        #     unzip all_logs.zip -d logs/
-        
-        # - name: Upload logs as artifacts
+        #         --comment "run-ad-clean-computers-pwsh"
+
+        #     aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip all_logs.zip
+
+        # - name: Upload all results
         #   uses: actions/upload-artifact@v4
         #   with:
-        #     name: scriptlogs
-        #     path: logs/
-        #     retention-days: 30
+        #      name: all_logs.zip
+        #      path: |
+        #          all_logs.zip
+        #      retention-days: 14
     
