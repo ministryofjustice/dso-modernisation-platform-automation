@@ -264,7 +264,7 @@
                 --instance-ids ${{ env.DEVTEST_ADMIN_INSTANCE_ID }} \
                 --parameters 'commands=[
                 "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1 ad_clean_computers.ps1",
-                "powershell.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1"
+                "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1"
                 ]' \
                 --output text \
                 --comment "run-ad-clean-computers-pwsh"
