@@ -62,7 +62,7 @@ Write-Output "azNomsInactiveCompAccts count: $($azNomsInactiveCompAccts.count), 
 
 import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
 Import-Module Az.Accounts, Az.Compute
-Import-Module Microsoft.PowerShell.Security
+Import-Module Microsoft.PowerShell.Security -Force
 
 # Get the secret value
 $hostname = (Get-ComputerInfo).CsName
@@ -78,13 +78,12 @@ foreach ($part in $parts) {
 }
 
 $clientId = $secretJson["clientId"]
-#$clientSecret = $secretJson["clientSecret"]
+$clientSecret = $secretJson["clientSecret"]
 $tenantId = $secretJson["tenantId"]
 $subscriptionId = $secretJson["subscriptionId"]
 
-
-$SecureStringPwd = $secretJson["clientSecret"] | ConvertTo-SecureString -AsPlainText -Force
-$pscredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $clientId, $SecureStringPwd
+$clientSecret = ConvertTo-SecureString -String $clientSecret -AsPlainText -Force
+$pscredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $clientId, $clientSecret
 Connect-AzAccount -ServicePrincipal -Credential $pscredential -Tenant $tenantId -Subscription $subscriptionId
 
 # #  Connect-AzAccount -TenantId "747381f4-e81f-4a43-bf68-ced6a1e14edf" -Subscription "1d95dcda-65b2-4273-81df-eb979c6b547b"
