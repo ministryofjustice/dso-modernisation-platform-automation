@@ -59,7 +59,6 @@ Write-Output "azNomsInactiveCompAccts count: $($azNomsInactiveCompAccts.count), 
 #----------------------------------
 # CROSS REFERENCE AZURE TO BE SAFE
 #----------------------------------
-#Set-Variable -Name "PSModulePath" -Value "C:\Program Files\WindowsPowerShell\Modules"
 import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
 Import-Module Az.Accounts, Az.Compute
 Import-Module Microsoft.PowerShell.Security
@@ -86,8 +85,6 @@ $clientSecret = ConvertTo-SecureString -String $clientSecret -AsPlainText -Force
 $pscredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $clientId, $clientSecret
 Connect-AzAccount -ServicePrincipal -Credential $pscredential -Tenant $tenantId -Subscription $subscriptionId
 
-# #  Connect-AzAccount -TenantId "747381f4-e81f-4a43-bf68-ced6a1e14edf" -Subscription "1d95dcda-65b2-4273-81df-eb979c6b547b"
-
 # NOMS Production 1, NOMS Dev & Test Environments
 $subscriptionIds = @("1d95dcda-65b2-4273-81df-eb979c6b547b", "b1f3cebb-4988-4ff9-9259-f02ad7744fcb")
 
@@ -101,7 +98,7 @@ foreach ($subscriptionId in $subscriptionIds) {
     $AzureVMs = Get-AzVM | Select-Object Name
     Write-Output "Cross checking $($AzureVMs.count) VM's in current subsription"
     # Compare inactive AD computer accounts with Azure VMs
-    $doNotDeleteAzCompAccts = $azNomsInactiveCompAccts | Where-Object { $_.Name -in $AzureVMs.Name } # T1PWL0003 (RHEL 7.4 DevTest)
+    $doNotDeleteAzCompAccts = $azNomsInactiveCompAccts | Where-Object { $_.Name -in $AzureVMs.Name }
     $azNomsInactiveCompAccts = $azNomsInactiveCompAccts | Where-Object { $_.Name -notin $AzureVMs.Name }
     Write-Output "$($doNotDeleteAzCompAccts.Name) removed from the deletion list for current subsription, $($doNotDeleteAzCompAccts.Count) VM's"
     Write-Output "After this verification pass azNomsInactiveCompAccts count is: $($azNomsInactiveCompAccts.Count)"
@@ -110,9 +107,8 @@ foreach ($subscriptionId in $subscriptionIds) {
 # Output deleted VMs
 if ($azNomsInactiveCompAccts) {
     Write-Output "After verification azNomsInactiveCompAccts count is: $($azNomsInactiveCompAccts.Count), difference is: $($doNotDeleteAzCompAccts.Count)"
-    # Write-Output "Deleted VMs:"
-    # $azNomsInactiveCompAccts | ForEach-Object { Write-Output $_.Name }
-} else {
+}
+else {
     Write-Output "No deleted VMs found."
 }
 
@@ -129,7 +125,6 @@ $verifiedAwsInactiveComps = @()
 # $awsNamedInstances += "EC2AMAZ-1234567"
 
 foreach ($name in $awsInactiveCompAccts.Name) {
-    # write-output "Testing for $($name)"
     # Compare inactive AD computer accounts with current Mod-Platform instances
     if ($name -in $awsNamedInstances) {
         $doNotDeleteAwsCompAccts += $name
@@ -143,8 +138,6 @@ foreach ($name in $awsInactiveCompAccts.Name) {
 if ($awsInactiveCompAccts) {
     Write-Output "Checked $($awsInactiveCompAccts.count) inactive AWS comp accts, against $($awsNamedInstances.count) active instances, verified result count is: $($verifiedAwsInactiveComps.Count), difference is: $($doNotDeleteAwsCompAccts.Count), which is:"
     write-output $doNotDeleteAwsCompAccts
-    # Write-Output "Deleted VMs:"
-    # $awsInactiveCompAccts | ForEach-Object { Write-Output $_.Name }
 }
 else {
     Write-Output "No deleted VMs found."
@@ -159,7 +152,7 @@ if (!(Test-Path -Path $LogDir)) {
 }
 
 $inactiveComputers | Export-Csv $LogDir\ad_clean_computers_allInactiveComputers.csv -NoTypeInformation
-# $azNomsInactiveCompAccts | Export-Csv $LogDir\ad_clean_computers_verifiedInactiveazNomsComputers.csv -NoTypeInformation
+$azNomsInactiveCompAccts | Export-Csv $LogDir\ad_clean_computers_verifiedInactiveazNomsComputers.csv -NoTypeInformation
 $verifiedAwsInactiveComps | Out-File -FilePath $LogDir\ad_clean_computers_verifiedAwsInactiveComps.csv
 $UnusedComputers | Export-Csv $LogDir\ad_clean_computers_completelyUnusedComputers.csv -NoTypeInformation
 
