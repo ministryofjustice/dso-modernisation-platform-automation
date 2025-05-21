@@ -166,6 +166,32 @@ Write-Host "##output_path##$ZipPath"
 #-------------------------------
 # INACTIVE COMPUTER MANAGEMENT
 #-------------------------------
+#Import-Module ActiveDirectory
+
+# Get the secret value
+$hostname = (Get-ComputerInfo).CsName
+$adSecretValue = Get-SECSecretValue -SecretId "/$($hostname.ToLower())/dso-ad-computer-cleanup" -Region "eu-west-2"
+# $raw = $secretValue.SecretString.Trim('{}').Trim()
+# $parts = $raw -split ',\s*'
+
+# # Parse into hashtable
+# $secretJson = @{}
+# foreach ($part in $parts) {
+#     $kv = $part -split ':\s*', 2
+#     $secretJson[$kv[0].Trim()] = $kv[1].Trim()
+# }
+
+$username = $adSecretValue["username"]
+$password = $adSecretValue["password"]
+#$domainname = $adSecretValue["domainname"]
+$password = ConvertTo-SecureString -String $password -AsPlainText -Force
+
+$adcred = New-Object System.Management.Automation.PSCredential ($username, $Password)
+
+# Example: Get a user
+Get-ADComputer -Name "AD-AZURE-DC-B" -Credential $adcred
+
+
 
 # # Example to Disable Inactive Computers
 # ForEach ($computer in $inactiveComputers) {

@@ -70,13 +70,6 @@
               echo "ad_comp_cleanup_sh_args=${ad_comp_cleanup_sh_args}" >> $GITHUB_OUTPUT
               echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
     
-        #   - name: Upload aws cli commands artifact
-        #     uses: actions/upload-artifact@v4
-        #     with:
-        #       name: "aws_cli_commands.sh"
-        #       path: aws_cli_commands.sh
-        #       overwrite: true
-    
       check-instances:
         name: check instances
         runs-on: ubuntu-latest
@@ -303,11 +296,11 @@
             role-to-assume: ${{ env.ADMIN_ACCOUNT_ROLE }}
             aws-region: "eu-west-2"
 
-        # - name: Refresh the aws secret
-        #   id: refresh-secret
-        #   run: |
-        #     # populate/refresh the aws secret from the github secret
-        #     aws secretsmanager put-secret-value --secret-id "${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}" --secret-string "${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}"
+        - name: Refresh the ad aws secret
+          id: refresh-ad-secret
+          run: |
+            # populate/refresh the aws secret from the github secret
+            aws secretsmanager put-secret-value --secret-id "${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}" --secret-string "${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}"
            
         #     # aws secretsmanager get-secret-value --secret-id $arn --query SecretString --output text  #  - retrieve that from a script
 
