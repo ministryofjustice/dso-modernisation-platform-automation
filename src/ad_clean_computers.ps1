@@ -167,31 +167,25 @@ Write-Host "##output_path##$ZipPath"
 # INACTIVE COMPUTER MANAGEMENT
 #-------------------------------
 #Import-Module ActiveDirectory
+import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
 
 # Get the secret value
-$hostname = (Get-ComputerInfo).CsName
+hostname = (Get-ComputerInfo).CsName
 $adSecretValue = Get-SECSecretValue -SecretId "/$($hostname.ToLower())/dso-ad-computer-cleanup" -Region "eu-west-2"
-# $raw = $secretValue.SecretString.Trim('{}').Trim()
-# $parts = $raw -split ',\s*'
-
-# # Parse into hashtable
-# $secretJson = @{}
-# foreach ($part in $parts) {
-#     $kv = $part -split ':\s*', 2
-#     $secretJson[$kv[0].Trim()] = $kv[1].Trim()
-# }
-
-$username = $adSecretValue["username"]
-$password = $adSecretValue["password"]
-#$domainname = $adSecretValue["domainname"]
+$adSecretValue = $adSecretValue.SecretString | ConvertFrom-Json
+$username = $adSecretValue.username
+$password = $adSecretValue.password
+#$domainname = $adSecretValue.domainname
 $password = ConvertTo-SecureString -String $password -AsPlainText -Force
 
 $adcred = New-Object System.Management.Automation.PSCredential ($username, $Password)
 
-# Example: Get a user
-Get-ADComputer -Name "AD-AZURE-DC-B" -Credential $adcred
+Get-ADComputer "AD-AZURE-DC-B" -Credential $adcred
 
-
+$LogDir = "C:\ScriptLogs"
+Expand-Archive -Path "all_logs.zip" -DestinationPath $LogDir -Force
+$verifiedAzInactiveComps = Get-Content -Path  $LogDir\ad_clean_computers_verifiedInactiveazNomsComputers.csv
+$verifiedAwsInactiveComps = Get-Content -Path $LogDir\ad_clean_computers_verifiedAwsInactiveComps.csv
 
 # # Example to Disable Inactive Computers
 # ForEach ($computer in $inactiveComputers) {
@@ -200,16 +194,16 @@ Get-ADComputer -Name "AD-AZURE-DC-B" -Credential $adcred
 #     Get-ADComputer -Filter { DistinguishedName -eq $DistName } | Select-Object Name, Enabled
 # }
 
-# Delete Inactive Az Computers
-# ForEach ($computer in $azNomsInactiveCompAccts.Name) {
-#     Remove-ADComputer -Identity $computer -Confirm:$false
-#     #Write-Output "$($computer) - Deleted"
-# }
+Delete Inactive Az Computers
+ForEach ($computer in $verifiedAzInactiveComps.Name) {
+    #Remove-ADComputer -Identity $computer -Confirm:$false
+    Write-Output "$($computer) - Will be deleted"
+}
 
-# Delete Inactive AWS Computers
-# ForEach ($computer in $verifiedAwsInactiveComps) {
-#     Remove-ADComputer -Identity $computer -Confirm:$false
-#     #Write-Output "$($computer) - Deleted"
-# }
+Delete Inactive AWS Computers
+ForEach ($computer in $verifiedAwsInactiveComps) {
+    #Remove-ADComputer -Identity $computer -Confirm:$false
+    Write-Output "$($computer) - Will be Deleted"
+}
 
 # May need Get-ADComputer $computer.DistinguishedName | Remove-ADObject -Recursive -Confirm:$false

@@ -300,7 +300,7 @@
           id: refresh-ad-secret
           run: |
             # populate/refresh the aws secret from the github secret
-            aws secretsmanager put-secret-value --secret-id "${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}" --secret-string "${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}"
+            get --secret-id "${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}" --secret-string "${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}"
            
         #     # aws secretsmanager get-secret-value --secret-id $arn --query SecretString --output text  #  - retrieve that from a script
 
@@ -325,6 +325,7 @@
         #         --document-name "AWS-RunPowerShellScript" \
         #         --instance-ids ${{ env.DEVTEST_ADMIN_INSTANCE_ID }} \
         #         --parameters 'commands=[
+        #         "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip" C:\ScriptLogs\all_logs.zip,
         #         "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1 ad_clean_computers.ps1",
         #         "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1 -Wait",
         #         "aws s3 cp C:\ScriptLogs\all_logs.zip s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip"
