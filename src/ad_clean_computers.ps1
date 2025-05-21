@@ -107,8 +107,7 @@ foreach ($subscriptionId in $subscriptionIds) {
 # Output deleted VMs
 if ($azNomsInactiveCompAccts) {
     Write-Output "After verification azNomsInactiveCompAccts count is: $($azNomsInactiveCompAccts.Count), difference is: $($doNotDeleteAzCompAccts.Count)"
-}
-else {
+} else {
     Write-Output "No deleted VMs found."
 }
 
@@ -138,8 +137,7 @@ foreach ($name in $awsInactiveCompAccts.Name) {
 if ($awsInactiveCompAccts) {
     Write-Output "Checked $($awsInactiveCompAccts.count) inactive AWS comp accts, against $($awsNamedInstances.count) active instances, verified result count is: $($verifiedAwsInactiveComps.Count), difference is: $($doNotDeleteAwsCompAccts.Count), which is:"
     write-output $doNotDeleteAwsCompAccts
-}
-else {
+} else {
     Write-Output "No deleted VMs found."
 }
 
@@ -184,7 +182,7 @@ Get-ADComputer "AD-AZURE-DC-B" -Credential $adcred
 
 $LogDir = "C:\ScriptLogs"
 Expand-Archive -Path "all_logs.zip" -DestinationPath $LogDir -Force
-$verifiedAzInactiveComps = Get-Content -Path  $LogDir\ad_clean_computers_verifiedInactiveazNomsComputers.csv
+$verifiedAzInactiveComps = (Get-Content -Path  $LogDir\ad_clean_computers_verifiedInactiveazNomsComputers.csv | ConvertFrom-csv)
 $verifiedAwsInactiveComps = Get-Content -Path $LogDir\ad_clean_computers_verifiedAwsInactiveComps.csv
 
 # # Example to Disable Inactive Computers
@@ -194,13 +192,13 @@ $verifiedAwsInactiveComps = Get-Content -Path $LogDir\ad_clean_computers_verifie
 #     Get-ADComputer -Filter { DistinguishedName -eq $DistName } | Select-Object Name, Enabled
 # }
 
-Delete Inactive Az Computers
+# Delete Inactive Az Computers
 ForEach ($computer in $verifiedAzInactiveComps.Name) {
     #Remove-ADComputer -Identity $computer -Confirm:$false
     Write-Output "$($computer) - Will be deleted"
 }
 
-Delete Inactive AWS Computers
+# Delete Inactive AWS Computers
 ForEach ($computer in $verifiedAwsInactiveComps) {
     #Remove-ADComputer -Identity $computer -Confirm:$false
     Write-Output "$($computer) - Will be Deleted"
