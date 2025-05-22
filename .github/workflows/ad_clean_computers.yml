@@ -208,10 +208,9 @@
         - name: Refresh the aws secret
           id: refresh-secret
           run: |
-            # populate/refresh the aws secret from the github secret
             aws secretsmanager put-secret-value --secret-id "${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}" --secret-string "${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}"
            
-            # aws secretsmanager get-secret-value --secret-id $arn --query SecretString --output text  #  - retrieve that from a script
+            # aws secretsmanager get-secret-value --secret-id $arn --query SecretString --output text  # retrieve that from a script
 
         - name: Download consolidated hostname data
           uses: actions/download-artifact@v4
@@ -299,11 +298,8 @@
         - name: Refresh the ad aws secret
           id: refresh-ad-secret
           run: |
-            # populate/refresh the aws secret from the github secret
-            get --secret-id "${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}" --secret-string "${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}"
+            aws secretsmanager put-secret-value --secret-id "${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}" --secret-string "${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}"
            
-        #     # aws secretsmanager get-secret-value --secret-id $arn --query SecretString --output text  #  - retrieve that from a script
-
         - name: Download all_logs.zip
           uses: actions/download-artifact@v4
           with:
