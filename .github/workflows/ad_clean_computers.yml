@@ -4,6 +4,13 @@
     on:
       workflow_dispatch:
         inputs:
+          target_domain:
+            type: choice
+            description: Which domain to run against
+            default: DEVTEST
+            options:
+              - DEVTEST
+              - PROD       
           applications:
             description: 'e.g. nomis or leave blank for all'
             type: string
@@ -28,7 +35,7 @@
         runs-on: ubuntu-latest
         outputs:
           matrix: "${{ steps.strategy.outputs.matrix }}"
-          ad_comp_cleanup_sh_args: "${{ steps.options.outputs.ad_comp_cleanup_sh_args }}"
+          target_domain: "${{ steps.parseinput.outputs.target_domain }}"
           dryrun: "${{ steps.options.outputs.dryrun }}"
         steps:
           - name: Checkout Repository
@@ -131,7 +138,6 @@
                 done  
                   
                 # Save the results for this account
-                # pwd && ls -lh
                 echo "Hostname collection complete for ${{ matrix.account_name }}"
                 # cat "hostnames-${{ matrix.account_name }}.txt"
                 # cat "instances-${{ matrix.account_name }}.json"                
@@ -192,6 +198,7 @@
           ADMIN_ACCOUNT_ROLE: "arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd"
           DEVTEST_SECRET_ARN: ${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}
           DEVTEST_S3_BUCKET: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}
+          TARGET_DOMAIN : "${{ github.event.inputs.target_domain }}"
 
         steps:
         - name: Checkout Repository
@@ -210,8 +217,6 @@
           run: |
             aws secretsmanager put-secret-value --secret-id "${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}" --secret-string "${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}"
            
-            # aws secretsmanager get-secret-value --secret-id $arn --query SecretString --output text  # retrieve that from a script
-
         - name: Download consolidated hostname data
           uses: actions/download-artifact@v4
           with:

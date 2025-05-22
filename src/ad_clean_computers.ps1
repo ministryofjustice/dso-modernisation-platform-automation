@@ -33,7 +33,7 @@ ForEach ($computer in $verifiedAzInactiveComps.Name) {
     Write-Output "$($computer) - Will be deleted"
 }
 
-Write-Output "Deleting $($verifiedAwsInactiveComps.count) verified inactive computer accountsfrom the AWS network scopes"
+Write-Output "Deleting $($verifiedAwsInactiveComps.count) verified inactive computer accounts from the AWS network scopes"
 ForEach ($computer in $verifiedAwsInactiveComps) {
     #Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
     Write-Output "$($computer) - Will be Deleted"
