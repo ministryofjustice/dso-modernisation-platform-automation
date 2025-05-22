@@ -323,19 +323,9 @@
                 --parameters 'commands=[
                 "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip" C:\ScriptLogs\all_logs.zip,
                 "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1 ad_clean_computers.ps1",
-                "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1 -Wait",
-                #"aws s3 cp C:\ScriptLogs\all_logs.zip s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip"
+                "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1 -Wait"
                 ]' \
                 --output text \
                 --comment "run-ad-clean-computers-pwsh"
 
-        #     aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip all_logs.zip
-
-        # - name: Upload all results
-        #   uses: actions/upload-artifact@v4
-        #   with:
-        #      name: all_logs.zip
-        #      path: |
-        #          all_logs.zip
-        #      retention-days: 14
     
