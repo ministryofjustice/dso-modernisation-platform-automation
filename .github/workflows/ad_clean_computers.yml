@@ -246,18 +246,18 @@
         - name: Run the PowerShell script for AD comparison
           id: run-compare-pwsh
           run: |
-            aws s3 cp src/ad_clean_computers.ps1 s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1
+            aws s3 cp src/ad_verify_computers.ps1 s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_verify_computers.ps1
 
             aws ssm send-command \
                 --document-name "AWS-RunPowerShellScript" \
                 --instance-ids ${{ env.DEVTEST_ADMIN_INSTANCE_ID }} \
                 --parameters 'commands=[
-                "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1 ad_clean_computers.ps1",
-                "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1 -Wait",
+                "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_verify_computers.ps1 ad_verify_computers.ps1",
+                "pwsh.exe -ExecutionPolicy Bypass -File ad_verify_computers.ps1 -Wait",
                 "aws s3 cp C:\ScriptLogs\all_logs.zip s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip"
                 ]' \
                 --output text \
-                --comment "run-ad-clean-computers-pwsh"
+                --comment "run-ad-verify-computers-pwsh"
 
             aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip all_logs.zip
 
@@ -312,22 +312,22 @@
             unzip all_logs.zip -d logs/
             ls -lh ./logs 
 
-        # - name: Run the PowerShell script for AD comparison
-        #   id: run-compare-pwsh
-        #   run: |
-        #     aws s3 cp src/ad_clean_computers.ps1 s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1
+        - name: Run the PowerShell script for clean up
+          id: run-clean-pwsh
+          run: |
+            aws s3 cp src/ad_clean_computers.ps1 s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1
 
-        #     aws ssm send-command \
-        #         --document-name "AWS-RunPowerShellScript" \
-        #         --instance-ids ${{ env.DEVTEST_ADMIN_INSTANCE_ID }} \
-        #         --parameters 'commands=[
-        #         "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip" C:\ScriptLogs\all_logs.zip,
-        #         "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1 ad_clean_computers.ps1",
-        #         "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1 -Wait",
-        #         "aws s3 cp C:\ScriptLogs\all_logs.zip s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip"
-        #         ]' \
-        #         --output text \
-        #         --comment "run-ad-clean-computers-pwsh"
+            aws ssm send-command \
+                --document-name "AWS-RunPowerShellScript" \
+                --instance-ids ${{ env.DEVTEST_ADMIN_INSTANCE_ID }} \
+                --parameters 'commands=[
+                "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip" C:\ScriptLogs\all_logs.zip,
+                "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1 ad_clean_computers.ps1",
+                "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1 -Wait",
+                #"aws s3 cp C:\ScriptLogs\all_logs.zip s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip"
+                ]' \
+                --output text \
+                --comment "run-ad-clean-computers-pwsh"
 
         #     aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip all_logs.zip
 
