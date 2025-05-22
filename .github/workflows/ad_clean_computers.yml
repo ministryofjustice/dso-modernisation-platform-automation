@@ -321,7 +321,7 @@
                 --document-name "AWS-RunPowerShellScript" \
                 --instance-ids ${{ env.DEVTEST_ADMIN_INSTANCE_ID }} \
                 --parameters 'commands=[
-                "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip" C:\ScriptLogs\all_logs.zip,
+                "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/all_logs.zip" C:\ScriptLogs\all_logs.zip",
                 "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_clean_computers.ps1 ad_clean_computers.ps1",
                 "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1 -Wait"
                 ]' \
