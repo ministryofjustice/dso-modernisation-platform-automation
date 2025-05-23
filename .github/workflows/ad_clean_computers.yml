@@ -204,7 +204,7 @@
 
         - name: Set environment variables from secrets
           run: |
-            case "${{ matrix.target_domain }}" in
+            case "${{ github.event.inputs.target_domain }}" in
               DEVTEST)
                 echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
                 echo "DB_USERNAME=${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}" >> $GITHUB_ENV
