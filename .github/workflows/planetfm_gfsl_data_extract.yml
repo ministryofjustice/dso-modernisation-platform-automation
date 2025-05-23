@@ -41,3 +41,12 @@ jobs:
           role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
+
+      - name: Run cdecopy.sh on ndh-app EC2
+        env:
+          ec2_servertype_tag: "${{ steps.account_name.outputs.ec2_servertype_tag }}"
+        run: |
+          export TIMEOUT_SECS=3600
+          export SHOW_STDERR_ON_SUCCESS=1
+          echo "src/run_script_on_ec2.sh first '$ec2_servertype_tag' 'planetfm-gfsl-dataextract' 'src/planetfm/Add-GFSLDataExtract.ps1'"
+          src/run_script_on_ec2.sh first "$ec2_servertype_tag" "planetfm-gfsl-dataextract" "src/planetfm/Add-GFSLDataExtract.ps1"
