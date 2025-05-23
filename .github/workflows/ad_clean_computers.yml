@@ -189,18 +189,36 @@
       compare-with-active-directory:
         needs: consolidate-hostnames
         runs-on: ubuntu-latest
+        strategy:
+          matrix:
+            target_domain: [DEVTEST, PROD]
+  
         permissions:
           id-token: write
           contents: read
         
         env:
-          DEVTEST_ADMIN_INSTANCE_ID: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}
+          #DEVTEST_ADMIN_INSTANCE_ID: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}
           ADMIN_ACCOUNT_ROLE: "arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd"
           DEVTEST_SECRET_ARN: ${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}
           DEVTEST_S3_BUCKET: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}
           TARGET_DOMAIN : "${{ github.event.inputs.target_domain }}"
 
         steps:
+
+        - name: Set environment variables from secrets
+          run: |
+            case "${{ matrix.target_domain }}" in
+              DEVTEST)
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "DB_USERNAME=${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}" >> $GITHUB_ENV
+              ;;
+              PROD)
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "DB_USERNAME=${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}" >> $GITHUB_ENV
+              ;;
+            esac
+  
         - name: Checkout Repository
           uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
           with:
@@ -243,7 +261,7 @@
             # Send the encoded script to be executed
             aws ssm send-command \
                 --document-name "AWS-RunPowerShellScript" \
-                --instance-ids ${{ env.DEVTEST_ADMIN_INSTANCE_ID }} \
+                --instance-ids $ADMIN_INSTANCE_ID \
                 --parameters "commands=['[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(\"$ENCODED_SCRIPT\")) | Invoke-Expression']" \
                 --output text \
                 --comment "retrieve all-ec2-hostnames.txt"
@@ -255,7 +273,7 @@
 
             aws ssm send-command \
                 --document-name "AWS-RunPowerShellScript" \
-                --instance-ids ${{ env.DEVTEST_ADMIN_INSTANCE_ID }} \
+                --instance-ids $ADMIN_INSTANCE_ID \
                 --parameters 'commands=[
                 "aws s3 cp s3://${{ env.DEVTEST_S3_BUCKET }}/adcompscript/ad_verify_computers.ps1 ad_verify_computers.ps1",
                 "pwsh.exe -ExecutionPolicy Bypass -File ad_verify_computers.ps1 -Wait",
