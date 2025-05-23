@@ -23,10 +23,10 @@ jobs:
         id: account_name
         run: |
           account_name="hmpps-domain-services-production"
-          ec2_servertype_tag="HmppsJump2022"
-          echo "account_name=${account_name} ec2_servertype_tag=${ec2_servertype_tag}"
+          ec2_name_tag="pd-jump2022-1"
+          echo "account_name=${account_name} ec2_name_tag=${ec2_name_tag}"
           echo "account_name=${account_name}" >> $GITHUB_OUTPUT
-          echo "ec2_servertype_tag=${ec2_servertype_tag}" >> $GITHUB_OUTPUT
+          echo "ec2_name_tag=${ec2_name_tag}" >> $GITHUB_OUTPUT
 
       - name: Get Account Id
         id: account_id
@@ -44,9 +44,9 @@ jobs:
 
       - name: Run cdecopy.sh on ndh-app EC2
         env:
-          ec2_servertype_tag: "${{ steps.account_name.outputs.ec2_servertype_tag }}"
+          ec2_name_tag: "${{ steps.account_name.outputs.ec2_name_tag }}"
         run: |
           export TIMEOUT_SECS=3600
           export SHOW_STDERR_ON_SUCCESS=1
-          echo "src/run_script_on_ec2.sh first '$ec2_servertype_tag' 'planetfm-gfsl-dataextract' 'src/planetfm/Add-GFSLDataExtract.ps1'"
-          src/run_script_on_ec2.sh first "$ec2_servertype_tag" "planetfm-gfsl-dataextract" "src/planetfm/Add-GFSLDataExtract.ps1"
+          echo "src/run_script_on_ec2.sh first '$ec2_name_tag' 'planetfm-gfsl-dataextract' 'src/planetfm/Add-GFSLDataExtract.ps1'"
+          src/run_script_on_ec2.sh first "$ec2_name_tag" "planetfm-gfsl-dataextract" "src/planetfm/Add-GFSLDataExtract.ps1"
