@@ -189,10 +189,6 @@
       compare-with-active-directory:
         needs: consolidate-hostnames
         runs-on: ubuntu-latest
-        strategy:
-          matrix:
-            target_domain: [DEVTEST, PROD]
-  
         permissions:
           id-token: write
           contents: read
