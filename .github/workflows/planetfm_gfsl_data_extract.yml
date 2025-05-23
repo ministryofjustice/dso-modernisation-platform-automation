@@ -42,7 +42,7 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
 
-      - name: Run cdecopy.sh on ndh-app EC2
+      - name: Run Add-GFSLDataExtract.ps1 on EC2
         env:
           ec2_name_tag: "${{ steps.account_name.outputs.ec2_name_tag }}"
         run: |
