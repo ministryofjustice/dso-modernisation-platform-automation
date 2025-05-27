@@ -199,14 +199,14 @@
           run: |
             case "${{ github.event.inputs.target_domain }}" in
               DEVTEST)
-                echo "::add-mask::ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
-                echo "::add-mask::MODPLATFORM_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_SECRET_ARN }}" >> $GITHUB_ENV
-                echo "::add-mask::S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}" >> $GITHUB_ENV                
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "MODPLATFORM_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_SECRET_ARN }}" >> $GITHUB_ENV
+                echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}" >> $GITHUB_ENV                
               ;;
               PROD)
-                echo "::add-mask::ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
-                echo "::add-mask::MODPLATFORM_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_SECRET_ARN }}" >> $GITHUB_ENV                
-                echo "::add-mask::S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}" >> $GITHUB_ENV
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "MODPLATFORM_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_SECRET_ARN }}" >> $GITHUB_ENV                
+                echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}" >> $GITHUB_ENV
               ;;
             esac
   
@@ -312,18 +312,24 @@
 
         - name: Set environment variables from secrets
           run: |
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT_SECRET_ARN }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}"
             case "${{ github.event.inputs.target_domain }}" in
               DEVTEST)
-                echo "::add-mask::ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
-                echo "::add-mask::AD_SERVICE_ACCOUNT=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
-                echo "::add-mask::AD_SERVICE_ACCOUNT_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}" >> $GITHUB_ENV
-                echo "::add-mask::S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}" >> $GITHUB_ENV
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "AD_SERVICE_ACCOUNT=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
+                echo "AD_SERVICE_ACCOUNT_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}" >> $GITHUB_ENV
+                echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}" >> $GITHUB_ENV
               ;;
               PROD)
-                echo "::add-mask::ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
-                echo "::add-mask::AD_SERVICE_ACCOUNT=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
-                echo "::add-mask::AD_SERVICE_ACCOUNT_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT_SECRET_ARN }}" >> $GITHUB_ENV
-                echo "::add-mask::S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}" >> $GITHUB_ENV
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "AD_SERVICE_ACCOUNT=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
+                echo "AD_SERVICE_ACCOUNT_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT_SECRET_ARN }}" >> $GITHUB_ENV
+                echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}" >> $GITHUB_ENV
               ;;
             esac
 
