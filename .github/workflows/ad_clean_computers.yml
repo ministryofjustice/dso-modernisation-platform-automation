@@ -198,7 +198,7 @@
           ADMIN_ACCOUNT_ROLE: "arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd"
           DEVTEST_SECRET_ARN: ${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}
           DEVTEST_S3_BUCKET: ${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}
-          TARGET_DOMAIN : "${{ github.event.inputs.target_domain }}"
+          #TARGET_DOMAIN : "${{ github.event.inputs.target_domain }}"
 
         steps:
 
@@ -207,11 +207,11 @@
             case "${{ github.event.inputs.target_domain }}" in
               DEVTEST)
                 echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
-                echo "DB_USERNAME=${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}" >> $GITHUB_ENV
+                echo "ADMIN_ACCOUNT_ROLE=arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd" >> $GITHUB_ENV
               ;;
               PROD)
                 echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
-                echo "DB_USERNAME=${{ secrets.AD_COMPUTER_MANAGEMENT_SECRET_ARN }}" >> $GITHUB_ENV
+                echo "ADMIN_ACCOUNT_ROLE=arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd" >> $GITHUB_ENV
               ;;
             esac
   
@@ -288,9 +288,21 @@
                  all_logs.zip
              retention-days: 14
 
+      # Manual approval stage
+      approval-gate:
+        runs-on: ubuntu-latest
+        needs: compare-with-active-directory
+        environment: manual-approval  # Generic approval environment
+        steps:
+          - name: Display accounts for review
+            run: |
+              echo "⚠️  WARNING - COMPUTER ACCOUNTS TO BE DELETED:"
+              echo ""
+              echo "Please review the verified lists in the all_logs.zip artifact before approving deletion."
+
 
       delete-verified-inactive-computers:
-        needs: compare-with-active-directory
+        needs: [compare-with-active-directory, approval-gate]
         runs-on: ubuntu-latest
         permissions:
           id-token: write
