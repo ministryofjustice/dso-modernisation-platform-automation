@@ -200,13 +200,11 @@
             case "${{ github.event.inputs.target_domain }}" in
               DEVTEST)
                 echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
-                echo "ADMIN_ACCOUNT_ROLE=arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd" >> $GITHUB_ENV
                 echo "MODPLATFORM_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_SECRET_ARN }}" >> $GITHUB_ENV
                 echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}" >> $GITHUB_ENV                
               ;;
               PROD)
                 echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
-                echo "ADMIN_ACCOUNT_ROLE=arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd" >> $GITHUB_ENV
                 echo "MODPLATFORM_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_SECRET_ARN }}" >> $GITHUB_ENV                
                 echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}" >> $GITHUB_ENV
               ;;
@@ -220,7 +218,8 @@
         - name: Configure AWS credentials for Admin account
           uses: aws-actions/configure-aws-credentials@v4
           with:
-            role-to-assume: "arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd"
+            role-to-assume: >- 
+              arn:aws:iam::${{ github.event.inputs.target_domain == 'PROD' && secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_ACCOUNT_ID || secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
             aws-region: "eu-west-2"
 
         - name: Refresh the aws secret
@@ -316,14 +315,12 @@
             case "${{ github.event.inputs.target_domain }}" in
               DEVTEST)
                 echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
-                echo "ADMIN_ACCOUNT_ROLE=arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd" >> $GITHUB_ENV
                 echo "AD_SERVICE_ACCOUNT=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
                 echo "AD_SERVICE_ACCOUNT_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}" >> $GITHUB_ENV
                 echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}" >> $GITHUB_ENV                
               ;;
               PROD)
                 echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
-                echo "ADMIN_ACCOUNT_ROLE=arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd" >> $GITHUB_ENV
                 echo "AD_SERVICE_ACCOUNT=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
                 echo "AD_SERVICE_ACCOUNT_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT_SECRET_ARN }}" >> $GITHUB_ENV
                 echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}" >> $GITHUB_ENV
@@ -338,7 +335,8 @@
         - name: Configure AWS credentials for Admin account
           uses: aws-actions/configure-aws-credentials@v4
           with:
-            role-to-assume: "$ADMIN_ACCOUNT_ROLE"
+            role-to-assume: >- 
+              arn:aws:iam::${{ github.event.inputs.target_domain == 'PROD' && secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_ACCOUNT_ID || secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
             aws-region: "eu-west-2"
 
         - name: Refresh the ad aws secret
