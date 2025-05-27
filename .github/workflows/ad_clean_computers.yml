@@ -212,9 +212,6 @@
               ;;
             esac
   
-        - name: Debug ADMIN_ACCOUNT_ROLE
-          run: echo "ADMIN_ACCOUNT_ROLE is $ADMIN_ACCOUNT_ROLE"
-
         - name: Checkout Repository
           uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
           with:
@@ -223,7 +220,7 @@
         - name: Configure AWS credentials for Admin account
           uses: aws-actions/configure-aws-credentials@v4
           with:
-            role-to-assume: $ADMIN_ACCOUNT_ROLE
+            role-to-assume: "arn:aws:iam::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd"
             aws-region: "eu-west-2"
 
         - name: Refresh the aws secret
@@ -341,7 +338,7 @@
         - name: Configure AWS credentials for Admin account
           uses: aws-actions/configure-aws-credentials@v4
           with:
-            role-to-assume: $ADMIN_ACCOUNT_ROLE
+            role-to-assume: "$ADMIN_ACCOUNT_ROLE"
             aws-region: "eu-west-2"
 
         - name: Refresh the ad aws secret
