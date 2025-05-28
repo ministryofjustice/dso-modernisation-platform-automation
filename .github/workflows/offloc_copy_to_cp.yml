@@ -19,9 +19,9 @@ on:
     # check again at - 09:00
     # Need to check if file is actually correct date FIRST!
 
-# permissions:
-#   id-token: write
-#   contents: read
+permissions:
+  id-token: write
+  contents: read
 
 run-name: "NDH Offloc Copy to Cloud Platform (${{ inputs.dry_run == 'true' && ' dry run)' || ')' }}"
 
