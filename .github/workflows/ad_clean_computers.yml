@@ -197,6 +197,12 @@
 
         - name: Set environment variables from secrets
           run: |
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_SECRET_ARN }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_SECRET_ARN }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}"
             case "${{ github.event.inputs.target_domain }}" in
               DEVTEST)
                 echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
@@ -291,8 +297,6 @@
               sleep $RETRY_DELAY
             done
   
-            #aws s3 cp "s3://$S3_BUCKET/adcompscript/all_logs.zip" all_logs.zip
-
         - name: Upload all results
           uses: actions/upload-artifact@v4
           with:
@@ -382,7 +386,7 @@
         - name: Run the PowerShell script for clean up
           id: run-clean-pwsh
           run: |
-            aws s3 cp src/ad_clean_computers.ps1 "s3://$S3_BUCKET/adcompscript/ad_clean_computers.ps1"
+            aws s3 cp src/ad_clean_computers.ps1 s3://$S3_BUCKET/adcompscript/ad_clean_computers.ps1
 
             aws ssm send-command \
                 --document-name "AWS-RunPowerShellScript" \
