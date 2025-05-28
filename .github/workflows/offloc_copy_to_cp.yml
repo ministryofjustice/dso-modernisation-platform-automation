@@ -84,7 +84,7 @@ jobs:
             echo "[DRY RUN] Would test access to destination bucket: ${DEST_BUCKET}"
           else
             echo "Testing source bucket access..."
-            aws s3 ls "s3://${SOURCE_BUCKET}/" | head 1
+            aws s3 ls "s3://${SOURCE_BUCKET}/"
             echo "Testing destination bucket access..."
             aws s3 ls "s3://${DEST_BUCKET}/"
             echo "S3 bucket access confirmed"
