@@ -176,7 +176,7 @@
                 done
 
                 echo "Consolidation complete"
-                # echo "Total instance hostnames: $(jq 'length' all-ec2-hostnames.txt)"
+                echo "Total instance hostnames: $(jq 'length' all-ec2-hostnames.txt)"
                 
            - name: Upload consolidated results
              uses: actions/upload-artifact@v4
@@ -241,6 +241,7 @@
         - name: Read all-ec2-hostnames.txt content and base64 encode
           id: read_all_hostnames
           run: |
+            cat all-ec2-hostnames.txt
             FILE_CONTENT=$(cat all-ec2-hostnames.txt | base64)
             echo "content=$FILE_CONTENT" >> $GITHUB_OUTPUT
 
