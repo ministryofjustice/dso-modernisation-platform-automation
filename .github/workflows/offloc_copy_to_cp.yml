@@ -72,22 +72,43 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}"
           aws-region: eu-west-2
 
-      - name: Test S3 Bucket Access
+      - name: Test S3 Source Bucket Access
         env:
           SOURCE_BUCKET: ${{ secrets.OFFLOC_SOURCE_BUCKET }}
-          DEST_BUCKET: ${{ secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PREPROD }} # Preprod only at the moment
+          # DEST_BUCKET: ${{ secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PREPROD }} # Preprod only at the moment
           DRY_RUN: ${{ needs.setup.outputs.dry_run }}
         run: |
           echo "Testing access to S3 buckets..."
           if [[ "${DRY_RUN}" == "true" ]]; then
             echo "[DRY RUN] Would test access to source bucket: ${SOURCE_BUCKET}"
-            echo "[DRY RUN] Would test access to destination bucket: ${DEST_BUCKET}"
           else
             echo "Testing source bucket access..."
             aws s3 ls "s3://${SOURCE_BUCKET}/"
+            echo "S3 source bucket access confirmed"
+          fi
+
+      - name: Configure AWS Destination Credentials
+        env:
+          DEST_BUCKET_ACCOUNT_ID: ${{ secrets.CLOUD_PLATFORM_ACCOUNT_ID}}
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        with:
+          role-to-assume: "arn:aws:iam::${DEST_BUCKET_ACCOUNT_ID}:role/modernisation-platform-oidc-cicd"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-dest"
+          aws-region: eu-west-2
+
+      - name: Test S3 Source Bucket Access
+        env:
+          # SOURCE_BUCKET: ${{ secrets.OFFLOC_SOURCE_BUCKET }}
+          DEST_BUCKET: ${{ secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PREPROD }} # Preprod only at the moment
+          DRY_RUN: ${{ needs.setup.outputs.dry_run }}
+        run: |
+          echo "Testing access to S3 buckets..."
+          if [[ "${DRY_RUN}" == "true" ]]; then
+            echo "[DRY RUN] Would test access to destination bucket: ${DEST_BUCKET}"
+          else
             echo "Testing destination bucket access..."
             aws s3 ls "s3://${DEST_BUCKET}/"
-            echo "S3 bucket access confirmed"
+            echo "S3 destination bucket access confirmed"
           fi
 
       # - name: Check and Copy File
