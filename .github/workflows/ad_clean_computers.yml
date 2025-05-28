@@ -277,10 +277,10 @@
         - name: Upload all logs to the runner with retry
           run: |
             MAX_RETRIES=10
-            RETRY_DELAY=5
+            RETRY_DELAY=10
             COUNT=0
 
-            until aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/all_logs.zip\" all_logs.zip; do
+            until aws s3 cp s3://$S3_BUCKET/adcompscript/all_logs.zip all_logs.zip; do
               EXIT_CODE=$?
               COUNT=$((COUNT + 1))
               if [ $COUNT -ge $MAX_RETRIES ]; then
