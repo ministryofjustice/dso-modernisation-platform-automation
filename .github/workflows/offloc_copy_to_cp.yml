@@ -97,7 +97,7 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-dest"
           aws-region: eu-west-2
 
-      - name: Test S3 Source Bucket Access
+      - name: Test S3 Destination Bucket Access
         env:
           # SOURCE_BUCKET: ${{ secrets.OFFLOC_SOURCE_BUCKET }}
           DEST_BUCKET: ${{ secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PREPROD }} # Preprod only at the moment
@@ -107,9 +107,10 @@ jobs:
           if [[ "${DRY_RUN}" == "true" ]]; then
             echo "[DRY RUN] Would test access to destination bucket: ${DEST_BUCKET}"
           else
+            echo "Test file created at $(date)" > /tmp/test_file.txt
             echo "Testing destination bucket access..."
-            aws s3 ls "s3://${DEST_BUCKET}/"
-            echo "S3 destination bucket access confirmed"
+            aws s3 cp /tmp/test_file.txt "s3://${DEST_BUCKET}/"
+            # echo "S3 destination bucket access confirmed"
           fi
 
       # - name: Check and Copy File
