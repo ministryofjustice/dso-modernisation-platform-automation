@@ -4,9 +4,9 @@ name: NDH Offloc Copy to Cloud Platform
 on:
   workflow_dispatch:
     inputs:
-      dry_run:
+      check_files:
         type: choice
-        description: Run in dry run mode (leave as false unless testing)
+        description: Check files mode (shows what files exist without transferring)
         default: "true" # Default to true for testing
         options:
           - "true"
@@ -22,15 +22,18 @@ on:
 permissions:
   id-token: write
   contents: read
-
-run-name: "NDH Offloc Copy to Cloud Platform (${{ inputs.dry_run == 'true' && ' dry run)' || ')' }}"
+  
+run-name: "NDH Offloc Copy to Cloud Platform (${{ inputs.check_files == 'true' && ' check files)' || ')' }}"
 
 jobs:
   setup:
     name: Setup
     runs-on: ubuntu-latest
     outputs:
-      dry_run: "${{ steps.parseinput.outputs.dry_run }}"
+        check_files: "${{ steps.parseinput.outputs.check_files }}"
+        today: "${{ steps.parseinput.outputs.today }}"
+        file_name: "${{ steps.parseinput.outputs.file_name }}"
+        current_time: "${{ steps.parseinput.outputs.current_time }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
@@ -40,18 +43,37 @@ jobs:
       - name: Parse Workflow Inputs
         id: parseinput
         run: |
-          dry_run="${{ github.event.inputs.dry_run }}"
-          echo "::set-output name=dry_run::${dry_run}"
-          if [[ "${dry_run}" == "true" ]]; then
-            echo "Running in dry run mode."
-          else
-            echo "Running in normal mode."
-          fi      
+            check_files="${{ github.event.inputs.check_files }}"
+            echo "check_files=${check_files}" >> $GITHUB_OUTPUT
+            
+            # Generate date and file variables
+            TODAY=$(date +"%d%m%Y")
+            FILE_NAME="C_NOMIS_OFFENDER_${TODAY}_01.dat"
+            CURRENT_TIME=$(date)
+            
+            echo "today=${TODAY}" >> $GITHUB_OUTPUT
+            echo "file_name=${FILE_NAME}" >> $GITHUB_OUTPUT
+            echo "current_time=${CURRENT_TIME}" >> $GITHUB_OUTPUT
+            
+            echo "Setup complete:"
+            echo "- Check files mode: ${check_files}"
+            echo "- Today: ${TODAY}"
+            echo "- File name: ${FILE_NAME}"
+            echo "- Current time: ${CURRENT_TIME}"
+            
+            if [[ "${check_files}" == "true" ]]; then
+              echo "Running in check files mode."
+            else
+              echo "Running in transfer mode."
+            fi      
  
   copytocloudplatform:
     name: Copy to Cloud Platform
     needs: setup
     runs-on: ubuntu-latest
+    outputs:
+      source_file_exists: ${{ steps.check_source.outputs.source_file_exists }}
+      dest_file_exists: ${{ steps.check_dest.outputs.dest_file_exists }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
@@ -65,124 +87,152 @@ jobs:
           echo "account_id=${account_id}"
           echo "account_id=${account_id}" >> $GITHUB_OUTPUT
 
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials for Source
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
         with:
           role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-source"
           aws-region: eu-west-2
 
-      - name: Test S3 Source Bucket Access
+      - name: Check Source Bucket
+        id: check_source
         env:
-          SOURCE_BUCKET: ${{ secrets.OFFLOC_SOURCE_BUCKET }}
-          # DEST_BUCKET: ${{ secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PREPROD }} # Preprod only at the moment
-          DRY_RUN: ${{ needs.setup.outputs.dry_run }}
+            SOURCE_BUCKET: ${{ secrets.OFFLOC_SOURCE_BUCKET }}
+            FILE_NAME: ${{ needs.setup.outputs.file_name }}
+            TODAY: ${{ needs.setup.outputs.today }}
+            CURRENT_TIME: ${{ needs.setup.outputs.current_time }}
+            CHECK_FILES: ${{ needs.setup.outputs.check_files }}
         run: |
-          echo "Testing access to S3 buckets..."
-          if [[ "${DRY_RUN}" == "true" ]]; then
-            echo "[DRY RUN] Would test access to source bucket: ${SOURCE_BUCKET}"
-          else
-            echo "Testing source bucket access..."
-            aws s3 ls "s3://${SOURCE_BUCKET}/"
-            echo "S3 source bucket access confirmed"
-          fi
-
-      - name: Configure AWS Destination Credentials
-        env:
-          DEST_BUCKET_ACCOUNT_ID: ${{ secrets.CLOUD_PLATFORM_ACCOUNT_ID}}
+            LOCAL_FILE="/tmp/${FILE_NAME}"
+            
+            echo "🔍 Checking source bucket for: ${FILE_NAME}"
+            
+            # Check if today's file exists in source bucket
+            if aws s3 ls "s3://${SOURCE_BUCKET}/${FILE_NAME}" >/dev/null 2>&1; then
+              echo "File ${FILE_NAME} found in source bucket"
+              echo "source_file_exists=true" >> $GITHUB_OUTPUT
+              
+              if [[ "${CHECK_FILES}" == "false" ]]; then
+                # Download the file
+                echo "Downloading ${FILE_NAME}..."
+                aws s3 cp "s3://${SOURCE_BUCKET}/${FILE_NAME}" "${LOCAL_FILE}"
+                
+                if [[ $? -eq 0 ]]; then
+                  echo "File downloaded successfully to ${LOCAL_FILE}"
+                  echo "file_downloaded=true" >> $GITHUB_ENV
+                  echo "local_file=${LOCAL_FILE}" >> $GITHUB_ENV
+                else
+                  echo "Failed to download file"
+                  exit 1
+                fi
+              fi
+            else
+              echo "File for ${TODAY} is not yet available at ${CURRENT_TIME}"
+              echo "source_file_exists=false" >> $GITHUB_OUTPUT
+              
+              # Find the most recent file in source bucket
+              echo "Looking for most recent file in source bucket..."
+              RECENT_FILES=$(aws s3 ls "s3://${SOURCE_BUCKET}/" --recursive | grep "C_NOMIS_OFFENDER_.*_01\.dat" | sort -k1,2 -r | head -5)
+              
+              if [[ -n "${RECENT_FILES}" ]]; then
+                echo "Most recent files found:"
+                echo "${RECENT_FILES}"
+                
+                # Extract the most recent filename
+                MOST_RECENT=$(echo "${RECENT_FILES}" | head -1 | awk '{print $4}')
+                echo "Most recent file: ${MOST_RECENT}"
+              else
+                echo "No C_NOMIS_OFFENDER files found in source bucket"
+              fi
+              
+              if [[ "${CHECK_FILES}" == "false" ]]; then
+                exit 0
+              fi
+            fi
+  
+      - name: Configure AWS Credentials for Destination
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
         with:
-          # role-to-assume: "arn:aws:iam::${DEST_BUCKET_ACCOUNT_ID}:role/offloc-transfer-gha-role-preprod"
           role-to-assume: ${{ secrets.OFFLOC_TRANSFER_GHA_ROLE_ARN_PREPROD }}
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-dest"
           aws-region: eu-west-2
 
-      - name: Test S3 Destination Bucket Access
+      - name: Check Destination Bucket
+        id: check_dest
         env:
-          # SOURCE_BUCKET: ${{ secrets.OFFLOC_SOURCE_BUCKET }}
-          DEST_BUCKET: ${{ secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PREPROD }} # Preprod only at the moment
-          DRY_RUN: ${{ needs.setup.outputs.dry_run }}
+          DEST_BUCKET: ${{ secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PREPROD }}
+          FILE_NAME: ${{ needs.setup.outputs.file_name }}
+          TODAY: ${{ needs.setup.outputs.today }}
+          CURRENT_TIME: ${{ needs.setup.outputs.current_time }}
+          CHECK_FILES: ${{ needs.setup.outputs.check_files }}
         run: |
-          echo "Testing access to S3 buckets..."
-          if [[ "${DRY_RUN}" == "true" ]]; then
-            echo "[DRY RUN] Would test access to destination bucket: ${DEST_BUCKET}"
+          echo "🔍 Checking destination bucket for: ${FILE_NAME}"
+          
+          # Check if file already exists in destination bucket
+          if aws s3 ls "s3://${DEST_BUCKET}/${FILE_NAME}" >/dev/null 2>&1; then
+            echo "File ${FILE_NAME} found in destination bucket"
+            echo "dest_file_exists=true" >> $GITHUB_OUTPUT
           else
-            echo "Test file created at $(date)" > /tmp/test_file.txt
-            echo "Testing destination bucket access..."
-            aws s3 cp /tmp/test_file.txt "s3://${DEST_BUCKET}/"
-            # echo "S3 destination bucket access confirmed"
+            echo "File ${FILE_NAME} not found in destination bucket"
+            echo "dest_file_exists=false" >> $GITHUB_OUTPUT
+            
+            # Find the most recent file in destination bucket
+            echo "Looking for most recent file in destination bucket..."
+            RECENT_FILES=$(aws s3 ls "s3://${DEST_BUCKET}/" --recursive | grep "C_NOMIS_OFFENDER_.*_01\.dat" | sort -k1,2 -r | head -5)
+            
+            if [[ -n "${RECENT_FILES}" ]]; then
+              echo "Most recent files found:"
+              echo "${RECENT_FILES}"
+              
+              # Extract the most recent filename
+              MOST_RECENT=$(echo "${RECENT_FILES}" | head -1 | awk '{print $4}')
+              echo "Most recent file: ${MOST_RECENT}"
+            else
+              echo "No C_NOMIS_OFFENDER files found in destination bucket"
+            fi
           fi
 
-      # - name: Check and Copy File
-      #   env:
-      #     SOURCE_BUCKET: ${{ secrets.OFFLOC_SOURCE_BUCKET }}
-      #     DEST_BUCKET: ${{ secrets.secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PREPROD }}
-      #     DRY_RUN: ${{ needs.setup.outputs.dry_run }}
-      #   run: |
-      #     # Calculate cutoff time (23:00 local time of previous day)
-      #     cutoff_time=$(TZ=Europe/London date -d "yesterday 23:00" -u +"%Y-%m-%dT%H:%M:%SZ")
-      #     echo "Cutoff time (UTC): ${cutoff_time}"
-      #     cutoff_epoch=$(date -d "${cutoff_time}" +%s)
+      - name: Process File Transfer
+        if: needs.setup.outputs.check_files == 'false' && steps.check_source.outputs.source_file_exists == 'true'
+        env:
+          DEST_BUCKET: ${{ secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PREPROD }}
+          FILE_NAME: ${{ needs.setup.outputs.file_name }}
+          TODAY: ${{ needs.setup.outputs.today }}
+          CURRENT_TIME: ${{ needs.setup.outputs.current_time }}
+        run: |
+          LOCAL_FILE="${{ env.local_file }}"
           
-      #     # Find the most recent file in source bucket
-      #     echo "Searching for files in source bucket..."
-      #     if [[ "${DRY_RUN}" == "true" ]]; then
-      #       echo "[DRY RUN] Would search for files in s3://${SOURCE_BUCKET}/"
-      #       echo "[DRY RUN] Would check if file timestamp is newer than ${cutoff_time}"
-      #       echo "[DRY RUN] Would copy qualifying file to s3://${DEST_BUCKET}/"
-      #       exit 0
-      #     fi
-          
-      #     # Get list of files with timestamps
-      #     files_info=$(aws s3 ls "s3://${SOURCE_BUCKET}/" --recursive | sort -k1,2)
-          
-      #     if [[ -z "${files_info}" ]]; then
-      #       echo "No files found in source bucket"
-      #       exit 1
-      #     fi
-          
-      #     echo "Files found:"
-      #     echo "${files_info}"
-          
-      #     # Find the most recent file that meets our criteria
-      #     latest_file=""
-      #     latest_timestamp=""
-          
-      #     while IFS= read -r line; do
-      #       if [[ -n "${line}" ]]; then
-      #         # Parse S3 ls output: date time size filename
-      #         file_date=$(echo "${line}" | awk '{print $1}')
-      #         file_time=$(echo "${line}" | awk '{print $2}')
-      #         file_name=$(echo "${line}" | awk '{print $4}')
+          if [[ "${{ steps.check_dest.outputs.dest_file_exists }}" == "true" ]]; then
+            echo "File for ${TODAY} already available at ${CURRENT_TIME}"
+            
+            # Delete the local file since it's already uploaded
+            echo "Deleting local file..."
+            rm -f "${LOCAL_FILE}"
+            echo "Local file deleted"
+          else
+            echo "Uploading ${FILE_NAME} to destination bucket..."
+            aws s3 cp "${LOCAL_FILE}" "s3://${DEST_BUCKET}/${FILE_NAME}"
+            
+            if [[ $? -eq 0 ]]; then
+              echo "File for ${TODAY} uploaded, local file deleted at ${CURRENT_TIME}"
               
-      #         # Convert to UTC timestamp for comparison
-      #         file_datetime="${file_date}T${file_time}"
-      #         file_epoch=$(date -d "${file_datetime}" +%s 2>/dev/null || echo "0")
-              
-      #         if [[ ${file_epoch} -gt ${cutoff_epoch} ]]; then
-      #           if [[ -z "${latest_timestamp}" ]] || [[ ${file_epoch} -gt ${latest_timestamp} ]]; then
-      #             latest_file="${file_name}"
-      #             latest_timestamp=${file_epoch}
-      #             echo "Found qualifying file: ${file_name} (${file_datetime})"
-      #           fi
-      #         fi
-      #       fi
-      #     done <<< "${files_info}"
-          
-      #     if [[ -z "${latest_file}" ]]; then
-      #       echo "No files found newer than ${cutoff_time}"
-      #       exit 0
-      #     fi
-          
-      #     echo "Latest qualifying file: ${latest_file}"
-      #     echo "Copying to destination bucket..."
-          
-      #     # Copy the file
-      #     aws s3 cp "s3://${SOURCE_BUCKET}/${latest_file}" "s3://${DEST_BUCKET}/${latest_file}"
-          
-      #     if [[ $? -eq 0 ]]; then
-      #       echo "Successfully copied ${latest_file} to destination bucket"
-      #     else
-      #       echo "Failed to copy file"
-      #       exit 1
-      #     fi
+              # Delete the local file after successful upload
+              rm -f "${LOCAL_FILE}"
+              echo "Local file deleted"
+            else
+              echo "Failed to upload file"
+              # Delete the local file if upload fails
+              rm -f "${LOCAL_FILE}"
+              echo "Local file deleted after failed upload"
+              exit 1
+            fi
+          fi
+
+      - name: Summary
+        run: |
+          echo "📊 Summary:"
+          echo "- Mode: ${{ needs.setup.outputs.check_files == 'true' && 'Check Files' || 'Transfer' }}"
+          echo "- Target file: ${{ needs.setup.outputs.file_name }}"
+          echo "- Source file exists: ${{ steps.check_source.outputs.source_file_exists || 'unknown' }}"
+          echo "- Destination file exists: ${{ steps.check_dest.outputs.dest_file_exists || 'unknown' }}"
+          echo "- Current time: ${{ needs.setup.outputs.current_time }}"
