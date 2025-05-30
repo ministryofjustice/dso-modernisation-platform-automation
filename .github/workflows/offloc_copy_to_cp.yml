@@ -19,16 +19,15 @@ on:
           - "preprod"
           - "prod"
 
-#  schedule:
-    # Check if file exists in the source bucket at 02:20 UTC
-    #  - cron: "20 02 * * *"  # Runs at 02:20 UTC daily
-    #  - cron: "20 03 * * *"  # Runs at 03:20 UTC daily (to handle BST/GMT)
+  schedule:
+    - cron: "20 02 * * *"  # Runs at 02:20 UTC daily
+    - cron: "20 03 * * *"  # Runs at 03:20 UTC daily (to handle BST/GMT)
 
 permissions:
   id-token: write
   contents: read
   
-run-name: "NDH Offloc Copy to Cloud Platform ${{ inputs.cp_environment }} (${{ inputs.check_files == 'true' && ' check files)' || ')' }}"
+run-name: "NDH Offloc Copy to Cloud Platform ${{ inputs.cp_environment }} (${{ inputs.check_files == 'true' && 'check files)' || 'copy files)' }}"
 
 jobs:
   setup:
@@ -70,8 +69,8 @@ jobs:
             echo "- Check files mode: ${check_files}"
             echo "- Today: ${TODAY}"
             echo "- Source Offloc file date: ${SOURCE_OFFLOC_FILE_DATE}"
-            echo "- File name: ${FILE_NAME}"
-            echo "- Current time: ${CURRENT_TIME}"
+            echo "- Target Offloc file name: ${FILE_NAME}"
+            echo "- Pipeline run time: ${CURRENT_TIME}"
             
             if [[ "${check_files}" == "true" ]]; then
               echo "Running in check files mode."
@@ -268,10 +267,10 @@ jobs:
       - name: Summary
         run: |
           echo "Summary:"
-          echo "- Mode: ${{ needs.setup.outputs.check_files == 'true' && 'Check Files' || 'Upload to Cloud Platform' }}"
+          echo "- Mode: ${{ needs.setup.outputs.check_files == 'true' && 'Check Files' || 'Copy to Cloud Platform' }}"
           echo "- Environment: ${{ needs.setup.outputs.cp_environment }}"
           echo "- Source file: ${{ needs.setup.outputs.file_name }}"
           echo "- Target zip file: ${{ steps.prepare_file.outputs.zip_filename || 'Not created' }}"
           echo "- Source file exists: ${{ steps.check_source.outputs.source_file_exists || 'unknown' }}"
           echo "- Destination file exists: ${{ steps.check_dest.outputs.dest_file_exists || 'unknown' }}"
-          echo "- Current time: ${{ needs.setup.outputs.current_time }}"
+          echo "- Pipeline run time: ${{ needs.setup.outputs.current_time }}"
