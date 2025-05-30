@@ -33,13 +33,13 @@ $deletedAwsInactiveComps = @()
 Write-Output "Deleting $($verifiedAzInactiveComps.count) verified inactive computer accounts from the Azure network scopes"
 ForEach ($computer in $verifiedAzInactiveComps.Name) {
     #Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
-    $deletedAzInactiveComps += $_.Name
+    $deletedAzInactiveComps += $_
 }
 
 Write-Output "Deleting $($verifiedAwsInactiveComps.count) verified inactive computer accounts from the AWS network scopes"
 ForEach ($computer in $verifiedAwsInactiveComps) {
     #Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
-    $deletedAwsInactiveComps += $_.Name
+    $deletedAwsInactiveComps += $_
 }
 
 # May need Get-ADComputer $computer.DistinguishedName | Remove-ADObject -Recursive -Confirm:$false
@@ -60,7 +60,7 @@ if ($deletedAwsInactiveComps) {
 }
 
 $currentDate = Get-Date -F 'dd-MM-yy'
-Copy-Item -Path LogDir\ad_clean_computers_allInactiveComputers.csv -Destination $LogDir\inactiveCompDNs-$domainname-$currentDate.csv
+Copy-Item -Path $LogDir\ad_clean_computers_allInactiveComputers.csv -Destination $LogDir\inactiveCompDNs-$domainname-$currentDate.csv
 $deletedAzInactiveComps | Export-Csv $LogDir\deletedAzInactiveComps-$domainname-$currentDate.csv -NoTypeInformation
 $deletedAwsInactiveComps | Export-Csv $LogDir\deletedAwsInactiveComps-$domainname-$currentDate.csv -NoTypeInformation
 
