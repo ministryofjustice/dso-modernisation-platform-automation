@@ -237,33 +237,6 @@
           with:
             name: consolidated-ec2-hostnames
 
-        # - name: Read all-ec2-hostnames.txt content and base64 encode
-        #   id: read_all_hostnames
-        #   run: |
-        #     # cat all-ec2-hostnames.txt
-        #     # FILE_CONTENT=$(cat all-ec2-hostnames.txt | base64)
-        #     # echo "content=$FILE_CONTENT" >> $GITHUB_OUTPUT
-
-        # - name: Transfer all-ec2-hostnames.txt content to admin instance
-        #   run: |
-        #     # Create the PowerShell script content
-        #     SCRIPT_CONTENT="
-        #     \$encodedContent = '${{ steps.read_all_hostnames.outputs.content }}'
-        #     \$decodedContent = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(\$encodedContent))
-        #     Set-Content -Path 'C:\\ScriptLogs\\all-ec2-hostnames.txt' -Value \$decodedContent
-        #     "
-            
-        #     # Encode the script
-        #     ENCODED_SCRIPT=$(echo "$SCRIPT_CONTENT" | base64 -w 0)
-            
-        #     # Send the encoded script to be executed
-        #     aws ssm send-command \
-        #         --document-name "AWS-RunPowerShellScript" \
-        #         --instance-ids $ADMIN_INSTANCE_ID \
-        #         --parameters "commands=['[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(\"$ENCODED_SCRIPT\")) | Invoke-Expression']" \
-        #         --output text \
-        #         --comment "retrieve all-ec2-hostnames.txt"
-
         - name: Copy files and run the Pwsh script for AD comparison
           id: run-compare-pwsh
           run: |
@@ -275,7 +248,7 @@
               --instance-ids "$ADMIN_INSTANCE_ID" \
               --parameters 'commands=[
               "aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/ad_verify_computers.ps1\" ad_verify_computers.ps1",
-              "aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/all-ec2-hostnames.txt\" all-ec2-hostnames.txt",
+              #"aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/all-ec2-hostnames.txt\" C:\\ScriptLogs\\all-ec2-hostnames.txt",
               "pwsh.exe -ExecutionPolicy Bypass -File ad_verify_computers.ps1 -Wait",
               "aws s3 cp C:\\ScriptLogs\\all_logs.zip \"s3://'"$S3_BUCKET"'/adcompscript/all_logs.zip\""
               ]' \
@@ -356,6 +329,8 @@
               ;;
             esac
 
+            CURRENT_DATE=$(date +"%d-%m-%y")
+
         - name: Checkout Repository
           uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
           with:
@@ -396,7 +371,8 @@
                 --parameters 'commands=[
                 "aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/all_logs.zip\" C:\\ScriptLogs\\all_logs.zip",
                 "aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/ad_clean_computers.ps1\" ad_clean_computers.ps1",
-                "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1"
+                "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1 -Wait",
+                "ls deleted*$CURRENT_DATE.csv | xargs -I {} aws s3 cp {} s3://$S3_BUCKET/adcompscript/logs/"
                 ]' \
                 --output text \
                 --comment "run-ad-clean-computers-pwsh"
