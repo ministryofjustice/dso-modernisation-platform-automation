@@ -3,6 +3,7 @@
 #-------------------------------
 #Import-Module ActiveDirectory
 import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
+$currentDate = Get-Date -F 'dd-MM-yy'
 
 # Get the secret value
 $hostname = (Get-ComputerInfo).CsName
@@ -34,7 +35,9 @@ Write-Output "Deleting $($verifiedAzInactiveComps.count) verified inactive compu
 ForEach ($computer in $verifiedAzInactiveComps.Name) {
     #Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
     $deletedAzInactiveComps += [PSCustomObject]@{
-        Name              = $Computer.Name
+        Name              = $Computer
+        Domain            = $domainname
+        Deleted           = $currentDate
     }
 }
 
@@ -43,6 +46,8 @@ ForEach ($computer in $verifiedAwsInactiveComps) {
     #Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
     $deletedAwsInactiveComps += [PSCustomObject]@{
         Name              = $Computer
+        Domain            = $domainname
+        Deleted           = $currentDate
     }
 }
 
@@ -63,7 +68,6 @@ if ($deletedAwsInactiveComps) {
     Write-Output "No deleted AWS instances found."
 }
 
-$currentDate = Get-Date -F 'dd-MM-yy'
 Copy-Item -Path $LogDir\ad_clean_computers_allInactiveComputers.csv -Destination $LogDir\inactiveCompDNs-$domainname-$currentDate.csv
 $deletedAzInactiveComps | Export-Csv $LogDir\deletedAzInactiveComps-$domainname-$currentDate.csv -NoTypeInformation
 $deletedAwsInactiveComps | Export-Csv $LogDir\deletedAwsInactiveComps-$domainname-$currentDate.csv -NoTypeInformation
