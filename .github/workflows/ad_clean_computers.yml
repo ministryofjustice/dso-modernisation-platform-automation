@@ -388,5 +388,5 @@
           uses: actions/upload-artifact@v4
           with:
             name: final-results
-            path: "*$CURRENT_DATE.csv"
+            path: "*$($CURRENT_DATE).csv"
             retention-days: 30
