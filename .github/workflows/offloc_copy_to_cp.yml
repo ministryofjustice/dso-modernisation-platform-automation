@@ -57,7 +57,7 @@ jobs:
             
             # Generate date and file variables
             TODAY=$(date +"%d%m%Y")
-            SOURCE_OFFLOC_FILE_DATE=$(date -d "$TODAY -1 day" +"%d%m%Y")
+            SOURCE_OFFLOC_FILE_DATE=$(date -d "yesterday" +"%d%m%Y")
             FILE_NAME="C_NOMIS_OFFENDER_${SOURCE_OFFLOC_FILE_DATE}_01.dat"
             CURRENT_TIME=$(date)
             
