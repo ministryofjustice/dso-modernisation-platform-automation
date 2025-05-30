@@ -27,7 +27,7 @@ permissions:
   id-token: write
   contents: read
   
-run-name: "NDH Offloc Copy to Cloud Platform ${{ inputs.cp_environment }} (${{ inputs.check_files == 'true' && 'check files)' || 'copy files)' }}"
+run-name: ${{ format('NDH Offloc Copy to Cloud Platform {0}{1}', inputs.cp_environment, inputs.check_files == 'true' && ' (check files)' || '') }}
 
 jobs:
   setup:
