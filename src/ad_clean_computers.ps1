@@ -34,6 +34,7 @@ Write-Output "Deleting $($verifiedAzInactiveComps.count) verified inactive compu
 ForEach ($computer in $verifiedAzInactiveComps.Name) {
     #Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
     $deletedAzInactiveComps += [PSCustomObject]@{
+        Name              = $Computer.Name
     }
 }
 
@@ -41,6 +42,7 @@ Write-Output "Deleting $($verifiedAwsInactiveComps.count) verified inactive comp
 ForEach ($computer in $verifiedAwsInactiveComps) {
     #Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
     $deletedAwsInactiveComps += [PSCustomObject]@{
+        Name              = $Computer
     }
 }
 
