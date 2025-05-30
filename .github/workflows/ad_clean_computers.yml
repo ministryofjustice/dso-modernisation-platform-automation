@@ -329,7 +329,7 @@
               ;;
             esac
 
-            CURRENT_DATE=$(date +"%d-%m-%y")
+            echo "CURRENT_DATE=$(date +"%d-%m-%y")" >> $GITHUB_ENV
 
         - name: Checkout Repository
           uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
