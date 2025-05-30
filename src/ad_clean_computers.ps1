@@ -33,13 +33,13 @@ $deletedAwsInactiveComps = @()
 Write-Output "Deleting $($verifiedAzInactiveComps.count) verified inactive computer accounts from the Azure network scopes"
 ForEach ($computer in $verifiedAzInactiveComps.Name) {
     #Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
-    $deletedAzInactiveComps += $computer
+    $deletedAzInactiveComps += $_.Name
 }
 
 Write-Output "Deleting $($verifiedAwsInactiveComps.count) verified inactive computer accounts from the AWS network scopes"
 ForEach ($computer in $verifiedAwsInactiveComps) {
     #Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
-    $deletedAwsInactiveComps += $computer
+    $deletedAwsInactiveComps += $_.Name
 }
 
 # May need Get-ADComputer $computer.DistinguishedName | Remove-ADObject -Recursive -Confirm:$false
