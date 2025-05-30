@@ -380,10 +380,13 @@
 
             aws s3 cp "s3://$S3_BUCKET/adcompscript/logs/" . --recursive --exclude "*" --include "*$CURRENT_DATE.csv"
 
+        
+        - name: Show resolved pattern
+          run: echo "Pattern is *$CURRENT_DATE.csv"
+
         - name: Upload final results
           uses: actions/upload-artifact@v4
           with:
-              name: final-results
-              path: |
-                  "*${{ steps.set_vars.outputs.CURRENT_DATE }}.csv"
-              retention-days: 30    
+            name: final-results
+            path: "*$CURRENT_DATE.csv"
+            retention-days: 30
