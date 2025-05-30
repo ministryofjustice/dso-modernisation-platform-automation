@@ -377,7 +377,7 @@
                 --output text \
                 --comment "run-ad-clean-computers-pwsh"
 
-            aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/logs/\" . --recursive --exclude * --include *'"$CURRENT_DATE"'.csv
+            aws s3 cp s3://$S3_BUCKET/adcompscript/logs/ . --recursive --exclude * --include *$CURRENT_DATE.csv
 
         - name: Upload final results
           uses: actions/upload-artifact@v4
