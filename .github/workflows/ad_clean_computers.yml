@@ -307,6 +307,7 @@
         steps:
 
         - name: Set environment variables from secrets
+          id: set_vars
           run: |
             echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}"
             echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}"
@@ -377,12 +378,12 @@
                 --output text \
                 --comment "run-ad-clean-computers-pwsh"
 
-            #aws s3 cp s3://$S3_BUCKET/adcompscript/logs/ . --recursive --exclude * --include *$CURRENT_DATE.csv
+            aws s3 cp "s3://$S3_BUCKET/adcompscript/logs/" . --recursive --exclude "*" --include "*$CURRENT_DATE.csv"
 
         - name: Upload final results
           uses: actions/upload-artifact@v4
           with:
               name: final-results
               path: |
-                  *$CURRENT_DATE.csv
+                  "*${{ steps.set_vars.outputs.CURRENT_DATE }}.csv"
               retention-days: 30    
