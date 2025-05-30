@@ -372,7 +372,7 @@
                 "aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/all_logs.zip\" C:\\ScriptLogs\\all_logs.zip",
                 "aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/ad_clean_computers.ps1\" ad_clean_computers.ps1",
                 "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1 -Wait",
-                "Get-ChildItem -Filter *$CURRENT_DATE.csv | ForEach-Object { aws s3 cp \$_.FullName s3://$S3_BUCKET/adcompscript/logs/ }\"
+                "aws s3 cp C:\\ScriptLogs\\' 's3://$S3_BUCKET/adcompscript/logs/' --recursive --exclude '*' --include '*$CURRENT_DATE.csv'\"
                 ]' \
                 --output text \
                 --comment "run-ad-clean-computers-pwsh"
