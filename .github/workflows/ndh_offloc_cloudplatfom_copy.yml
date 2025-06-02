@@ -18,8 +18,8 @@ on:
         options:
           - "preprod"
           - "prod"
-
-  schedule:
+        
+  schedule:                # Only runs on prod environment 
     - cron: "20 02 * * *"  # Runs at 02:20 UTC daily
     - cron: "20 03 * * *"  # Runs at 03:20 UTC daily (to handle BST/GMT)
 
@@ -27,7 +27,8 @@ permissions:
   id-token: write
   contents: read
   
-run-name: ${{ format('NDH Offloc Copy to Cloud Platform {0}{1}', inputs.cp_environment, inputs.check_files == 'true' && ' (check files)' || '') }}
+run-name: ${{ github.event_name == 'schedule' && 'NDH Offloc Copy to Cloud Platform prod' || format('NDH Offloc Copy to Cloud Platform {0}{1}', inputs.cp_environment, inputs.check_files == 'true' && ' (check files)' || '') }}
+
 
 jobs:
   setup:
@@ -48,12 +49,23 @@ jobs:
       - name: Parse Workflow Inputs
         id: parseinput
         run: |
-            check_files="${{ github.event.inputs.check_files }}"
-            echo "check_files=${check_files}" >> $GITHUB_OUTPUT
+            # Check trigger types and set values
+            if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+              check_files="${{ github.event.inputs.check_files }}"
+              cp_environment="${{ github.event.inputs.cp_environment }}"
+              echo "Manual trigger detected - using provided inputs"
+            elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+              check_files="false"
+              cp_environment="prod"
+              echo "Scheduled trigger detected - using production environment and set check_files to false "
+            else
+              echo "Unsupported event ${GITHUB_EVENT_NAME}"
+              exit 1
+            fi
 
-            cp_environment="${{ github.event.inputs.cp_environment }}"
+            echo "check_files=${check_files}" >> $GITHUB_OUTPUT
             echo "cp_environment=${cp_environment}" >> $GITHUB_OUTPUT
-            
+
             # Generate date and file variables
             TODAY=$(date +"%d%m%Y")
             SOURCE_OFFLOC_FILE_DATE=$(date -d "yesterday" +"%d%m%Y")
