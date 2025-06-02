@@ -1,8 +1,5 @@
 $ErrorActionPreference = "Stop"
 
-Write-Output "Debug PSModulePath"
-Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" -Name PSModulePath
-
 Write-Output "Getting Account Id"
 $SecretId = "/microsoft/AD/azure.hmpp.root/shared-passwords"
 $AccountId = aws sts get-caller-identity --query Account --output text
@@ -31,16 +28,18 @@ $SecretValue = "$SecretValueRaw" | ConvertFrom-Json
 $securePassword = ConvertTo-SecureString $SecretValue.svc_rds -AsPlainText -Force
 $credentials = New-Object System.Management.Automation.PSCredential("HMPP\svc_rds", $securePassword)
 
-Write-Output "Running PSScriptBlock under domain user"
-Invoke-Command -ComputerName localhost -Credential $credentials -Authentication CredSSP -ScriptBlock {
-  Write-Output "Retrieving SecretsManager GFSL secret"
-  $SecretId = "/GFSL/planetfm-data-extract"
-  $SecretValueRaw = aws secretsmanager get-secret-value --secret-id "${SecretId}" --query SecretString --output text
-  $SecretValue = "$SecretValueRaw" | ConvertFrom-Json
+Write-Output "Retrieving SecretsManager GFSL secret"
+$SecretId = "/GFSL/planetfm-data-extract"
+$SecretValueRaw = aws secretsmanager get-secret-value --secret-id "${SecretId}" --query SecretString --output text
+$SecretValue = "$SecretValueRaw" | ConvertFrom-Json
 
-  Write-Output "Extracting Source and Destination URL from secret"
-  $sourcePath = $SecretValue.SourcePath
-  $destinationUrl = $SecretValue.DestinationUrl
+Write-Output "Extracting Source and Destination URL from secret"
+$sourcePath = $SecretValue.SourcePath
+$destinationUrl = $SecretValue.DestinationUrl
+
+Write-Output "Running PSScriptBlock under domain user"
+Invoke-Command -ComputerName localhost -Credential $credentials -Authentication CredSSP -ArgumentList $sourcePath, $destinationUrl -ScriptBlock  {
+  param ($sourcePath, $destinationUrl)
 
   # Get list of files in source directory
   Write-Output "Getting list of files from $sourcePath"
