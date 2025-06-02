@@ -246,7 +246,7 @@ jobs:
           if [[ "${{ steps.check_dest.outputs.dest_file_exists }}" == "true" ]]; then
             echo "File for ${TODAY} already available at ${CURRENT_TIME}"
             echo "Deleting zip file..."
-            rm -f "${ZIP_FILE}"  # Use full path
+            rm -f "${ZIP_FILE}"
             echo "Zip file deleted"
           else
             echo "Uploading ${ZIP_FILENAME} to destination bucket..."
@@ -254,11 +254,11 @@ jobs:
             
             if [[ $? -eq 0 ]]; then
               echo "File ${ZIP_FILENAME} uploaded, local file deleted at ${CURRENT_TIME}"
-              rm -f "${ZIP_FILE}"  # Use full path
+              rm -f "${ZIP_FILE}"
               echo "Zip file deleted"
             else
               echo "Failed to upload file"
-              rm -f "${ZIP_FILE}"  # Use full path
+              rm -f "${ZIP_FILE}"
               echo "Zip file deleted after failed upload"
               exit 1
             fi
