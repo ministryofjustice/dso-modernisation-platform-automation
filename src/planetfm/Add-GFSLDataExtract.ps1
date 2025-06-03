@@ -4,7 +4,9 @@ Write-Output "Debug PSVersion"
 $PSVersionTable.PSVersion
 Write-Output "Debug PSModulePath"
 Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" -Name PSModulePath
+Write-Output $Env:PSModulePath
 
+$Env:PSModulePath = ""
 Write-Output "Importing Security Module"
 Import-Module Microsoft.PowerShell.Security
 
