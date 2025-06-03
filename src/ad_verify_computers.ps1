@@ -70,7 +70,7 @@ Write-Output "azNomsInactiveCompAccts count: $($azNomsInactiveCompAccts.count), 
 #----------------------------------
 # CROSS REFERENCE AZURE TO BE SAFE
 #----------------------------------
-#import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
+import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
 Import-Module Az.Accounts, Az.Compute
 Import-Module Microsoft.PowerShell.Security
 
