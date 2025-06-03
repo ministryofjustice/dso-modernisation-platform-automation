@@ -5,6 +5,9 @@ $PSVersionTable.PSVersion
 Write-Output "Debug PSModulePath"
 Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" -Name PSModulePath
 
+Write-Output "Importing Security Module"
+Import-Module Microsoft.PowerShell.Security
+
 Write-Output "Getting Account Id"
 $SecretId = "/microsoft/AD/azure.hmpp.root/shared-passwords"
 $AccountId = aws sts get-caller-identity --query Account --output text
