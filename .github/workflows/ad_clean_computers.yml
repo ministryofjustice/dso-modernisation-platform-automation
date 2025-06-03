@@ -241,6 +241,7 @@
           id: run-compare-pwsh
           run: |
             aws s3 cp src/ad_verify_computers.ps1 "s3://$S3_BUCKET/adcompscript/ad_verify_computers.ps1"
+            aws s3 cp src/ad_clean_computers.ps1 "s3://$S3_BUCKET/adcompscript/ad_clean_computers.ps1"
             aws s3 cp all-ec2-hostnames.txt "s3://$S3_BUCKET/adcompscript/all-ec2-hostnames.txt"
             aws s3 rm s3://$S3_BUCKET/adcompscript/ --recursive --exclude "*" --include "*.zip"
 
@@ -365,8 +366,6 @@
         - name: Run the PowerShell script for clean up
           id: run-clean-pwsh
           run: |
-            aws s3 cp src/ad_clean_computers.ps1 s3://$S3_BUCKET/adcompscript/ad_clean_computers.ps1
-
             aws ssm send-command \
                 --document-name "AWS-RunPowerShellScript" \
                 --instance-ids $ADMIN_INSTANCE_ID \
