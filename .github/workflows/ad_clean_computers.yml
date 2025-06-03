@@ -378,8 +378,9 @@
                 --output text \
                 --comment "run-ad-clean-computers-pwsh"
 
+            sleep 120
             aws s3 cp "s3://$S3_BUCKET/adcompscript/logs/" . --recursive --exclude "*" --include "*$CURRENT_DATE.csv"
-            #aws s3 rm s3://$S3_BUCKET/adcompscript/ --recursive --exclude "*" --include "*.ps1"
+            aws s3 rm s3://$S3_BUCKET/adcompscript/ --recursive --exclude "*" --include "*.ps1"
 
         - name: Find final files
           id: find_final_files
