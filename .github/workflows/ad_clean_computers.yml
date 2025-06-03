@@ -20,7 +20,7 @@
           dryrun:
             type: choice
             description: Dryrun mode (leave as false unless testing)
-            default: true
+            default: false
             options:
               - true
               - false
@@ -242,6 +242,7 @@
           run: |
             aws s3 cp src/ad_verify_computers.ps1 "s3://$S3_BUCKET/adcompscript/ad_verify_computers.ps1"
             aws s3 cp all-ec2-hostnames.txt "s3://$S3_BUCKET/adcompscript/all-ec2-hostnames.txt"
+            aws s3 rm s3://$S3_BUCKET/adcompscript/ --recursive --exclude "*" --include "*.zip"
 
             aws ssm send-command \
               --document-name "AWS-RunPowerShellScript" \
@@ -379,7 +380,7 @@
                 --comment "run-ad-clean-computers-pwsh"
 
             aws s3 cp "s3://$S3_BUCKET/adcompscript/logs/" . --recursive --exclude "*" --include "*$CURRENT_DATE.csv"
-            ls -lh
+            aws s3 rm s3://$S3_BUCKET/adcompscript/ --recursive --exclude "*" --include "*.ps1"
 
         - name: Find final files
           id: find_final_files

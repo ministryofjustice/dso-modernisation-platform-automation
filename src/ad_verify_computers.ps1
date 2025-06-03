@@ -25,16 +25,27 @@ Write-Output "Found $($UnusedComputers.count) unused, aged computer accounts, wh
 $azNomsProdIpRange = "10.40."
 $azNomsDevTestIpRange = "10.101."
 $azNomsDevTestMgmtIpRange = "10.102."
+$azNomsTestDRIpRange = "10.111."
+$azNomsMgmtDRIpRange = "10.112."
 $AwsMpCore = "10.20."
 $AwsMpNonLive = "10.26."
 $AwsMpLive = "10.27."
+
+# # hmpps azure cidr ranges
+# aks-studio-hosting-live-1-vnet = "10.244.0.0/20"
+# aks-studio-hosting-dev-1-vnet  = "10.247.0.0/20"
+# aks-studio-hosting-ops-1-vnet  = "10.247.32.0/20"
+# nomisapi-t2-root-vnet          = "10.47.0.192/26"
+# nomisapi-t3-root-vnet          = "10.47.0.0/26"
+# nomisapi-preprod-root-vnet     = "10.47.0.64/26"
+# nomisapi-prod-root-vnet        = "10.47.0.128/26"
 
 $azNomsInactiveCompAccts = @()
 $awsInactiveCompAccts = @()
 
 foreach ($Computer in $inactiveComputers) {
     $IPAddress = $Computer.IPv4Address
-    if ($IPAddress -like "$azNomsProdIpRange*" -or $IPAddress -like "$azNomsDevTestIpRange*" -or $IPAddress -like "$azNomsDevTestMgmtIpRange*") {
+    if ($IPAddress -like "$azNomsProdIpRange*" -or $IPAddress -like "$azNomsDevTestIpRange*" -or $IPAddress -like "$azNomsDevTestMgmtIpRange*" -or $IPAddress -like "$azNomsTestDRIpRange*" -or $IPAddress -like "$azNomsMgmtDRIpRange*") {
         $azNomsInactiveCompAccts += [PSCustomObject]@{
             Name              = $Computer.Name
             IPAddress         = $IPAddress
@@ -107,7 +118,8 @@ foreach ($subscriptionId in $subscriptionIds) {
 # Output deleted VMs
 if ($azNomsInactiveCompAccts) {
     Write-Output "After verification azNomsInactiveCompAccts count is: $($azNomsInactiveCompAccts.Count), difference is: $($doNotDeleteAzCompAccts.Count)"
-} else {
+}
+else {
     Write-Output "No deleted VMs found."
 }
 
@@ -137,7 +149,8 @@ foreach ($name in $awsInactiveCompAccts.Name) {
 if ($awsInactiveCompAccts) {
     Write-Output "Checked $($awsInactiveCompAccts.count) inactive AWS comp accts, against $($awsNamedInstances.count) active instances, verified result count is: $($verifiedAwsInactiveComps.Count), difference is: $($doNotDeleteAwsCompAccts.Count), which is:"
     write-output $doNotDeleteAwsCompAccts
-} else {
+}
+else {
     Write-Output "No deleted VMs found."
 }
 
