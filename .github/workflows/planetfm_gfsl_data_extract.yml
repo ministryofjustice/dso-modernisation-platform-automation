@@ -51,7 +51,7 @@ jobs:
           echo "ec2_name_tag=${ec2_name_tag}" >> $GITHUB_OUTPUT
 
   upload:
-    name: upload
+    name: Upload
     needs: setup
     if: ${{ needs.setup.outputs.account_name != '' }}
     runs-on: ubuntu-latest
