@@ -1,13 +1,13 @@
 $ErrorActionPreference = "Stop"
 
-Write-Output "Debug PSVersion"
-$PSVersionTable.PSVersion
-Write-Output "Debug PSModulePath"
-Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" -Name PSModulePath
-Write-Output $Env:PSModulePath
+Write-Output "Debug PSVersionTable"
+$PSVersionTable
 
-$Env:PSModulePath = ""
+# Security module compatibility can be problematic if switching
+# between powershell 5 & 7. It can pick up the wrong version so
+# clearing PSModulePath to ensure it is loaded cleanly
 Write-Output "Importing Security Module"
+$Env:PSModulePath = ""
 Import-Module Microsoft.PowerShell.Security
 
 Write-Output "Getting Account Id"
