@@ -3,6 +3,11 @@ name: PlanetFM GFSL Data Extract
 
 on:
   workflow_dispatch:
+  schedule:
+    # files are created on share just before 06:00 localtime
+    # schedule pipeline at 06:30 localtime - 2 entries to deal with BST/GMT
+    - cron: "30 5 * * *"
+    - cron: "30 6 * * *"
 
 permissions:
   id-token: write
@@ -10,8 +15,45 @@ permissions:
 
 jobs:
 
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+      account_name: "${{ steps.parseinput.outputs.account_name }}"
+      ec2_name_tag: "${{ steps.parseinput.outputs.ec2_name_tag }}"
+    steps:
+      - name: Parse Workflow Inputs
+        id: parseinput
+        run: |
+          account_name="hmpps-domain-services-production"
+          ec2_name_tag="pd-jump2022-1"
+
+          if [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            cron_time="${{ github.event.schedule }}"
+            is_bst=1
+            if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
+              is_bst=0
+            fi
+            if [[ "${cron_time}" == '30 5 * * *' ]]; then
+              if ((is_bst == 0)); then
+                account_name=
+                ec2_name_tag=
+              fi
+            elif [[ "${cron_time}" == '30 6 * * *' ]]; then
+              if ((is_bst == 1)); then
+                account_name=
+                ec2_name_tag=
+              fi
+            fi
+          fi
+          echo "account_name=${account_name} ec2_name_tag=${ec2_name_tag}"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+          echo "ec2_name_tag=${ec2_name_tag}" >> $GITHUB_OUTPUT
+
   upload:
-    name: upload-from-hmpps-domain-services-production
+    name: Upload
+    needs: setup
+    if: ${{ needs.setup.outputs.account_name != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -19,19 +61,10 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      - name: Get Account Name
-        id: account_name
-        run: |
-          account_name="hmpps-domain-services-production"
-          ec2_servertype_tag="HmppsJump2022"
-          echo "account_name=${account_name} ec2_servertype_tag=${ec2_servertype_tag}"
-          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
-          echo "ec2_servertype_tag=${ec2_servertype_tag}" >> $GITHUB_OUTPUT
-
       - name: Get Account Id
         id: account_id
         run: |
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.account_name.outputs.account_name] }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[needs.setup.outputs.account_name] }}"
           echo "account_id=${account_id}"
           echo "account_id=${account_id}" >> $GITHUB_OUTPUT
 
@@ -41,3 +74,12 @@ jobs:
           role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
+
+      - name: Run Add-GFSLDataExtract.ps1 on EC2
+        env:
+          ec2_name_tag: "${{ needs.setup.outputs.ec2_name_tag }}"
+        run: |
+          export TIMEOUT_SECS=3600
+          export SHOW_STDERR_ON_SUCCESS=1
+          echo "src/run_script_on_ec2.sh first '$ec2_name_tag' 'planetfm-gfsl-dataextract' 'src/planetfm/Add-GFSLDataExtract.ps1'"
+          src/run_script_on_ec2.sh first "$ec2_name_tag" "planetfm-gfsl-dataextract" "src/planetfm/Add-GFSLDataExtract.ps1"
