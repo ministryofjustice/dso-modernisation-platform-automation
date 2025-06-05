@@ -28,6 +28,8 @@
     permissions:
       id-token: write
       contents: read
+
+    run-name: "AD Computer Account Cleanup (${{ inputs.target_domain }}) domain"
     
     jobs:
       check-strategy:
@@ -256,6 +258,7 @@
               ]' \
               --output text \
               --comment "run-ad-verify-computers-pwsh"
+            sleep 60
 
         - name: Upload all logs to the runner with retry
           run: |
