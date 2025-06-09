@@ -1,0 +1,378 @@
+---
+    name: AD Computer Account Cleanup
+    
+    on:
+      workflow_dispatch:
+        inputs:
+          target_domain:
+            type: choice
+            description: Which domain to run against
+            default: DEVTEST
+            options:
+              - DEVTEST
+              - PROD       
+          applications:
+            description: 'e.g. nomis or leave blank for all'
+            type: string
+          environments:
+            description: 'e.g. development or leave blank for all'
+            type: string
+    
+    permissions:
+      id-token: write
+      contents: read
+
+    run-name: "AD Computer Account Cleanup (${{ inputs.target_domain }}) domain $(date +\"%d-%m-%y\")"
+    
+    jobs:
+      check-strategy:
+        name: Check Strategy
+        runs-on: ubuntu-latest
+        outputs:
+          matrix: "${{ steps.strategy.outputs.matrix }}"
+          target_domain: "${{ steps.parseinput.outputs.target_domain }}"
+        steps:
+          - name: Checkout Repository
+            uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+            with:
+              ref: ${{ github.ref }}
+    
+          - name: Strategy
+            id: strategy
+            run: |
+              echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
+              if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+                matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+              else
+                echo "Unsupported event ${GITHUB_EVENT_NAME}"
+                exit 1
+              fi
+              # echo '' > aws_cli_commands.sh
+              echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+              echo "${matrix}" >> $GITHUB_OUTPUT
+              echo 'EOF' >> $GITHUB_OUTPUT
+              echo "{$matrix}"
+    
+      check-instances:
+        name: check instances
+        runs-on: ubuntu-latest
+        needs: check-strategy
+        strategy:
+          fail-fast: false
+          matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
+          max-parallel: 1
+        steps:
+          - name: Get Account Details
+            id: account
+            run: |
+              echo "account name: ${{ matrix.account_name }}"
+              account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+              role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+              echo "role arn:     ${role_arn}"
+              echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+    
+          - name: Configure AWS Credentials
+            uses: aws-actions/configure-aws-credentials@f24d7193d98baebaeacc7e2227925dd47cc267f5  # v4.2.0
+            with:
+              role-to-assume: "${{ steps.account.outputs.role_arn }}"
+              role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+              aws-region: eu-west-2
+    
+          - name: Checkout Repository
+            uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+            with:
+              ref: ${{ github.ref }}
+
+          - name: Collect EC2 instances from ${{ matrix.account_name }}
+            id: collect-instances
+            run: |
+                # Get all running instances in eu-west-2 region
+                INSTANCES_JSON=$(aws ec2 describe-instances \
+                --filters "Name=instance-state-name,Values=running" \
+                --query "Reservations[].Instances[].[InstanceId, PrivateIpAddress, Tags[?Key=='Name'].Value | [0]]" \
+                --output json)
+                
+                echo "$INSTANCES_JSON" > instances-${{ matrix.account_name }}.json
+                echo "Found $(echo $INSTANCES_JSON | jq length) instance(s) in ${{ matrix.account_name }} account"
+            
+          - name: Run hostname command on instances in ${{ matrix.account_name }}
+            id: collect-hostnames
+            run: |
+                echo "Collecting hostnames via SSM for ${{ matrix.account_name }}"
+                # Process each instance
+                > hostnames-${{ matrix.account_name }}.txt
+                cat instances-${{ matrix.account_name }}.json | jq -c '.[]' | while read -r instance; do
+                  INSTANCE_ID=$(echo $instance | jq -r '.[0]')
+                  PRIVATE_IP=$(echo $instance | jq -r '.[1]')
+                  NAME_TAG=$(echo $instance | jq -r '.[2]')
+                  
+                  echo "Processing InstanceID: $INSTANCE_ID, Name Tag: ($NAME_TAG)"
+
+                  OSHOSTNAME=$(src/run_script_on_ec2.sh first "$NAME_TAG" "get-the-os-level-hostname" "hostname")
+                  echo "OS hostname is: $OSHOSTNAME"
+                  echo "$OSHOSTNAME" >> hostnames-${{ matrix.account_name }}.txt
+                done  
+                  
+                # Save the results for this account
+                echo "Hostname collection complete for ${{ matrix.account_name }}"
+                # cat "hostnames-${{ matrix.account_name }}.txt"
+                # cat "instances-${{ matrix.account_name }}.json"                
+
+          - name: Upload results for ${{ matrix.account_name }}
+            uses: actions/upload-artifact@v4
+            with:
+                name: ec2-hostnames-${{ matrix.account_name }}
+                path: |
+                    hostnames-${{ matrix.account_name }}.txt
+                retention-days: 1
+      
+      consolidate-hostnames:
+        needs: check-instances
+        runs-on: ubuntu-latest
+        steps:
+           - name: Download all artifacts
+             uses: actions/download-artifact@v4
+            
+           - name: Consolidate hostname data
+             run: |
+                echo "Consolidating hostname data from all accounts"
+                
+                # Initialize our consolidated list of instances across accounts
+                > all-ec2-hostnames.txt
+                
+                # Process each account's data
+                for account_dir in ec2-hostnames-*; do
+                    ACCOUNT_NAME=$(echo $account_dir | sed 's/ec2-hostnames-//')
+                    echo "Processing data from $ACCOUNT_NAME account"
+                    
+                    # Add hostnames to the master text file
+                    if [ -f "$account_dir/hostnames-$ACCOUNT_NAME.txt" ]; then
+                    cat "$account_dir/hostnames-$ACCOUNT_NAME.txt" >> all-ec2-hostnames.txt
+                    fi
+                done
+
+                echo "Consolidation complete"
+                
+           - name: Upload consolidated results
+             uses: actions/upload-artifact@v4
+             with:
+                name: consolidated-ec2-hostnames
+                path: |
+                    all-ec2-hostnames.txt
+                retention-days: 1
+
+      compare-with-active-directory:
+        needs: consolidate-hostnames
+        runs-on: ubuntu-latest
+        permissions:
+          id-token: write
+          contents: read
+        
+        steps:
+
+        - name: Set environment variables from secrets
+          run: |
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_SECRET_ARN }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_SECRET_ARN }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}"
+            case "${{ github.event.inputs.target_domain }}" in
+              DEVTEST)
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "MODPLATFORM_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_SECRET_ARN }}" >> $GITHUB_ENV
+                echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}" >> $GITHUB_ENV                
+              ;;
+              PROD)
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "MODPLATFORM_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_SECRET_ARN }}" >> $GITHUB_ENV                
+                echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}" >> $GITHUB_ENV
+              ;;
+            esac
+  
+        - name: Checkout Repository
+          uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+          with:
+            ref: ${{ github.ref }}
+
+        - name: Configure AWS credentials for Admin account
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            role-to-assume: >- 
+              arn:aws:iam::${{ github.event.inputs.target_domain == 'PROD' && secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_ACCOUNT_ID || secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
+            aws-region: "eu-west-2"
+
+        - name: Refresh the aws secret
+          id: refresh-secret
+          run: |
+            aws secretsmanager put-secret-value --secret-id $MODPLATFORM_SECRET_ARN --secret-string "${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}"
+           
+        - name: Download consolidated hostname data
+          uses: actions/download-artifact@v4
+          with:
+            name: consolidated-ec2-hostnames
+
+        - name: Copy files and run the Pwsh script for AD comparison
+          id: run-compare-pwsh
+          run: |
+            aws s3 cp src/ad_verify_computers.ps1 "s3://$S3_BUCKET/adcompscript/ad_verify_computers.ps1"
+            aws s3 cp src/ad_clean_computers.ps1 "s3://$S3_BUCKET/adcompscript/ad_clean_computers.ps1"
+            aws s3 cp all-ec2-hostnames.txt "s3://$S3_BUCKET/adcompscript/all-ec2-hostnames.txt"
+            aws s3 rm s3://$S3_BUCKET/adcompscript/ --recursive --exclude "*" --include "*.zip"
+
+            aws ssm send-command \
+              --document-name "AWS-RunPowerShellScript" \
+              --instance-ids "$ADMIN_INSTANCE_ID" \
+              --parameters 'commands=[
+              "aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/ad_verify_computers.ps1\" ad_verify_computers.ps1",
+              "aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/all-ec2-hostnames.txt\" C:\\ScriptLogs\\all-ec2-hostnames.test",
+              "pwsh.exe -ExecutionPolicy Bypass -File ad_verify_computers.ps1 -Wait",
+              "aws s3 cp C:\\ScriptLogs\\all_logs.zip \"s3://'"$S3_BUCKET"'/adcompscript/all_logs.zip\""
+              ]' \
+              --output text \
+              --comment "run-ad-verify-computers-pwsh"
+            sleep 60
+
+        - name: Upload all logs to the runner with retry
+          run: |
+            MAX_RETRIES=10
+            RETRY_DELAY=10
+            COUNT=0
+
+            until aws s3 cp s3://$S3_BUCKET/adcompscript/all_logs.zip all_logs.zip; do
+              EXIT_CODE=$?
+              COUNT=$((COUNT + 1))
+              if [ $COUNT -ge $MAX_RETRIES ]; then
+                echo "Upload failed after $COUNT attempts."
+                exit $EXIT_CODE
+              fi
+              echo "Upload failed. Retrying in $RETRY_DELAY seconds... (Attempt $COUNT of $MAX_RETRIES)"
+              sleep $RETRY_DELAY
+            done
+  
+        - name: Upload all results
+          uses: actions/upload-artifact@v4
+          with:
+             name: all_logs.zip
+             path: |
+                 all_logs.zip
+             retention-days: 1
+
+        - name: Manual review message
+          run: |
+            echo "⚠️  WARNING - COMPUTER ACCOUNTS TO BE DELETED:"
+            echo ""
+            echo "Please review the verified lists in the all_logs.zip artifact before approving deletion."             
+
+      # Manual approval stage
+      approval-gate:
+        runs-on: ubuntu-latest
+        needs: compare-with-active-directory
+        environment: generic-dso-manual-approval  # Generic approval environment
+
+        steps:
+          - name: Approval checkpoint
+            run: |
+              echo "✅ Deletion approved for ${{ needs.collect-accounts.outputs.account-count }} accounts"
+
+      delete-verified-inactive-computers:
+        needs: [compare-with-active-directory, approval-gate]
+        runs-on: ubuntu-latest
+        permissions:
+          id-token: write
+          contents: read
+        
+        steps:
+
+        - name: Set environment variables from secrets
+          id: set_vars
+          run: |
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT_SECRET_ARN }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}"
+            case "${{ github.event.inputs.target_domain }}" in
+              DEVTEST)
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "AD_SERVICE_ACCOUNT=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
+                echo "AD_SERVICE_ACCOUNT_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}" >> $GITHUB_ENV
+                echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}" >> $GITHUB_ENV
+              ;;
+              PROD)
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "AD_SERVICE_ACCOUNT=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
+                echo "AD_SERVICE_ACCOUNT_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT_SECRET_ARN }}" >> $GITHUB_ENV
+                echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}" >> $GITHUB_ENV
+              ;;
+            esac
+
+            echo "CURRENT_DATE=$(date +"%d-%m-%y")" >> $GITHUB_ENV
+
+        - name: Checkout Repository
+          uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+          with:
+            ref: ${{ github.ref }}
+
+        - name: Configure AWS credentials for Admin account
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            role-to-assume: >- 
+              arn:aws:iam::${{ github.event.inputs.target_domain == 'PROD' && secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_ACCOUNT_ID || secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
+            aws-region: "eu-west-2"
+
+        - name: Refresh the ad aws secret
+          id: refresh-ad-secret
+          run: |
+            aws secretsmanager put-secret-value --secret-id $AD_SERVICE_ACCOUNT_SECRET_ARN --secret-string $AD_SERVICE_ACCOUNT
+           
+        - name: Download all_logs.zip
+          uses: actions/download-artifact@v4
+          with:
+            name: all_logs.zip
+
+        - name: extract log files
+          id: extract-logs
+          run: |
+            mkdir -p logs
+            unzip all_logs.zip -d logs/
+            ls -lh ./logs 
+
+        - name: Run the PowerShell script for clean up
+          id: run-clean-pwsh
+          run: |
+            aws ssm send-command \
+                --document-name "AWS-RunPowerShellScript" \
+                --instance-ids $ADMIN_INSTANCE_ID \
+                --parameters 'commands=[
+                "aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/all_logs.zip\" C:\\ScriptLogs\\all_logs.zip",
+                "aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/ad_clean_computers.ps1\" ad_clean_computers.ps1",
+                "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_computers.ps1 -Wait",
+                "aws s3 cp C:\\ScriptLogs\\ \"s3://'"$S3_BUCKET"'/adcompscript/logs/\" --recursive --exclude * --include *'"$CURRENT_DATE"'.csv"
+                ]' \
+                --output text \
+                --comment "run-ad-clean-computers-pwsh"
+
+            sleep 120
+            aws s3 cp "s3://$S3_BUCKET/adcompscript/logs/" . --recursive --exclude "*" --include "*$CURRENT_DATE.csv"
+            aws s3 rm s3://$S3_BUCKET/adcompscript/ --recursive --exclude "*" --include "*.ps1"
+
+        - name: Find final files
+          id: find_final_files
+          run: |
+            FILES=$(ls *$CURRENT_DATE.csv 2>/dev/null || true)
+            echo "$FILES"
+            echo "files<<EOF" >> $GITHUB_OUTPUT
+            echo "$FILES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            
+        - name: Upload final results
+          if: steps.find_final_files.outputs.files != ''
+          uses: actions/upload-artifact@v4
+          with:
+            name: final-results
+            path: ${{ steps.find_final_files.outputs.files }}
+            retention-days: 30
+            
