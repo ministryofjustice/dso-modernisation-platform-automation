@@ -20,8 +20,7 @@ $LogDir = "C:\ScriptLogs"
 Expand-Archive -Path "$LogDir\all_logs.zip" -DestinationPath $LogDir -Force
 $verifiedAzInactiveComps = (Get-Content -Path  $LogDir\ad_clean_computers_verifiedInactiveazNomsComputers.csv | ConvertFrom-csv)
 $verifiedAwsInactiveComps = Get-Content -Path $LogDir\ad_clean_computers_verifiedAwsInactiveComps.csv
-$verifiedAwsInactiveComps = Get-Content -Path $LogDir\ad_clean_computers_verifiedAwsInactiveComps.csv
-$unusedInactiveComps = Get-Content -Path $LogDir\ad_clean_computers_completelyUnusedComputers.csv
+$unusedInactiveComps = (Get-Content -Path $LogDir\ad_clean_computers_completelyUnusedComputers.csv | ConvertFrom-csv)
 
 # # Alternative Example to Disable Inactive Computers
 # ForEach ($computer in $inactiveComputers) {
@@ -47,7 +46,7 @@ ForEach ($computer in $unusedInactiveComps.Name) {
 Write-Output "Deleting $($verifiedAzInactiveComps.count) verified inactive computer accounts from the Azure network scopes"
 ForEach ($computer in $verifiedAzInactiveComps.Name) {
     #Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
-    Get-ADComputer $computer.DistinguishedName | Remove-ADObject -Recursive -Confirm:$false -Credential $adcred
+    (Get-ADComputer $computer).DistinguishedName | Remove-ADObject -Recursive -Confirm:$false -Credential $adcred
     $deletedAzInactiveComps += [PSCustomObject]@{
         Name    = $Computer
         Domain  = $domainname
@@ -58,7 +57,7 @@ ForEach ($computer in $verifiedAzInactiveComps.Name) {
 Write-Output "Deleting $($verifiedAwsInactiveComps.count) verified inactive computer accounts from the AWS network scopes"
 ForEach ($computer in $verifiedAwsInactiveComps) {
     #Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
-    Get-ADComputer $computer.DistinguishedName | Remove-ADObject -Recursive -Confirm:$false -Credential $adcred
+    (Get-ADComputer $computer).DistinguishedName | Remove-ADObject -Recursive -Confirm:$false -Credential $adcred
     $deletedAwsInactiveComps += [PSCustomObject]@{
         Name    = $Computer
         Domain  = $domainname
