@@ -1,0 +1,288 @@
+---
+name: NDH Offloc Copy to Cloud Platform
+
+on:
+  workflow_dispatch:
+    inputs:
+      check_files:
+        type: choice
+        description: Check files mode (show what files exist in each bucket without transferring)
+        default: "false" # Change to true to enable check files mode
+        options:
+          - "true"
+          - "false"
+      cp_environment:
+        type: choice
+        description: Cloud Platform environment to copy files to
+        default: "prod"
+        options:
+          - "preprod"
+          - "prod"
+        
+  schedule:                # Only runs on prod environment 
+    - cron: "20 02 * * *"  # Runs at 02:20 UTC daily
+    - cron: "20 03 * * *"  # Runs at 03:20 UTC daily (to handle BST/GMT)
+
+permissions:
+  id-token: write
+  contents: read
+  
+run-name: ${{ github.event_name == 'schedule' && 'NDH Offloc Copy to Cloud Platform prod' || format('NDH Offloc Copy to Cloud Platform {0}{1}', inputs.cp_environment, inputs.check_files == 'true' && ' (check files)' || '') }}
+
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+        check_files: "${{ steps.parseinput.outputs.check_files }}"
+        cp_environment: "${{ steps.parseinput.outputs.cp_environment }}"
+        today: "${{ steps.parseinput.outputs.today }}"
+        file_name: "${{ steps.parseinput.outputs.file_name }}"
+        current_time: "${{ steps.parseinput.outputs.current_time }}"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Parse Workflow Inputs
+        id: parseinput
+        run: |
+            # Check trigger types and set values
+            if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+              check_files="${{ github.event.inputs.check_files }}"
+              cp_environment="${{ github.event.inputs.cp_environment }}"
+              echo "Manual trigger detected - using provided inputs"
+            elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+              check_files="false"
+              cp_environment="prod"
+              echo "Scheduled trigger detected - using production environment and set check_files to false "
+            else
+              echo "Unsupported event ${GITHUB_EVENT_NAME}"
+              exit 1
+            fi
+
+            echo "check_files=${check_files}" >> $GITHUB_OUTPUT
+            echo "cp_environment=${cp_environment}" >> $GITHUB_OUTPUT
+
+            # Generate date and file variables
+            TODAY=$(date +"%d%m%Y")
+            SOURCE_OFFLOC_FILE_DATE=$(date -d "yesterday" +"%d%m%Y")
+            FILE_NAME="C_NOMIS_OFFENDER_${SOURCE_OFFLOC_FILE_DATE}_01.dat"
+            CURRENT_TIME=$(date)
+            
+            echo "today=${TODAY}" >> $GITHUB_OUTPUT
+            echo "source_offloc_file_date=${SOURCE_OFFLOC_FILE_DATE}" >> $GITHUB_OUTPUT
+            echo "file_name=${FILE_NAME}" >> $GITHUB_OUTPUT
+            echo "current_time=${CURRENT_TIME}" >> $GITHUB_OUTPUT
+            
+            echo "Setup complete:"
+            echo "- Check files mode: ${check_files}"
+            echo "- Today: ${TODAY}"
+            echo "- Source Offloc file date: ${SOURCE_OFFLOC_FILE_DATE}"
+            echo "- Target Offloc file name: ${FILE_NAME}"
+            echo "- Pipeline run time: ${CURRENT_TIME}"
+            
+            if [[ "${check_files}" == "true" ]]; then
+              echo "Running in check files mode."
+            else
+              echo "Running in transfer mode."
+            fi      
+ 
+  copytocloudplatform:
+    name: Copy to Cloud Platform
+    needs: setup
+    runs-on: ubuntu-latest
+    outputs:
+      source_file_exists: ${{ steps.check_source.outputs.source_file_exists }}
+      dest_file_exists: ${{ steps.check_dest.outputs.dest_file_exists }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Get Account Id
+        id: account_id
+        run: |
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids.nomis-data-hub-production }}"
+          echo "account_id=${account_id}"
+          echo "account_id=${account_id}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials for Source
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        with:
+          role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-source"
+          aws-region: eu-west-2
+
+      - name: Check Source File
+        id: check_source
+        env:
+            SOURCE_BUCKET: ${{ secrets.OFFLOC_SOURCE_BUCKET }}
+            FILE_NAME: ${{ needs.setup.outputs.file_name }}
+            TODAY: ${{ needs.setup.outputs.today }}
+            CURRENT_TIME: ${{ needs.setup.outputs.current_time }}
+        run: |
+            echo "Checking source bucket for: ${FILE_NAME}"
+            
+            # Check if the target file exists in source bucket
+            if aws s3 ls "s3://${SOURCE_BUCKET}/${FILE_NAME}" >/dev/null 2>&1; then
+              echo "File ${FILE_NAME} found in source bucket"
+              echo "source_file_exists=true" >> $GITHUB_OUTPUT
+            else
+              echo "File for ${TODAY} is not yet available at ${CURRENT_TIME}"
+              echo "source_file_exists=false" >> $GITHUB_OUTPUT
+              
+              # Find the most recent file in source bucket
+              echo "Looking for most recent file in source bucket..."
+              RECENT_FILES=$(aws s3 ls "s3://${SOURCE_BUCKET}/" --recursive | grep "C_NOMIS_OFFENDER_.*_01\.dat" | sort -k1,2 -r | head -5)
+              
+              if [[ -n "${RECENT_FILES}" ]]; then
+                echo "Most recent files found:"
+                echo "${RECENT_FILES}"
+                
+                # Extract the most recent filename
+                MOST_RECENT=$(echo "${RECENT_FILES}" | head -1 | awk '{print $4}')
+                echo "Most recent file: ${MOST_RECENT}"
+              else
+                echo "C_NOMIS_OFFENDER files not found in source bucket"
+              fi
+            fi
+
+      - name: Download File
+        id: download_file
+        if: needs.setup.outputs.check_files == 'false' && steps.check_source.outputs.source_file_exists == 'true'
+        env:
+            SOURCE_BUCKET: ${{ secrets.OFFLOC_SOURCE_BUCKET }}
+            FILE_NAME: ${{ needs.setup.outputs.file_name }}
+        run: |
+            LOCAL_FILE="/tmp/${FILE_NAME}"
+            
+            echo "Downloading ${FILE_NAME}..."
+            aws s3 cp "s3://${SOURCE_BUCKET}/${FILE_NAME}" "${LOCAL_FILE}"
+            
+            if [[ $? -eq 0 ]]; then
+              echo "File downloaded successfully to ${LOCAL_FILE}"
+              echo "file_downloaded=true" >> $GITHUB_OUTPUT
+              echo "local_file=${LOCAL_FILE}" >> $GITHUB_OUTPUT
+            else
+              echo "Failed to download file"
+              exit 1
+            fi
+
+      - name: Prepare File for Upload
+        id: prepare_file
+        if: needs.setup.outputs.check_files == 'false' && steps.download_file.outputs.file_downloaded == 'true'
+        run: |
+            LOCAL_FILE="${{ steps.download_file.outputs.local_file }}"
+            TODAY_YYYYMMDD=$(date +"%Y%m%d")
+            ZIP_FILE="/tmp/${TODAY_YYYYMMDD}.zip"
+            
+            echo "Creating zip file: ${ZIP_FILE}"
+            zip -j "${ZIP_FILE}" "${LOCAL_FILE}"
+            
+            if [[ $? -eq 0 ]]; then
+              echo "File zipped successfully to ${ZIP_FILE}"
+              echo "zip_file=${ZIP_FILE}" >> $GITHUB_OUTPUT
+              echo "zip_filename=${TODAY_YYYYMMDD}.zip" >> $GITHUB_OUTPUT
+              
+              # Clean up original file
+              rm -f "${LOCAL_FILE}"
+              echo "Original .dat file deleted"
+            else
+              echo "Failed to zip file"
+              exit 1
+            fi
+
+      - name: Configure AWS Credentials for Destination
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        with:
+          role-to-assume: ${{ needs.setup.outputs.cp_environment == 'preprod' && secrets.OFFLOC_TRANSFER_GHA_ROLE_ARN_PREPROD || secrets.OFFLOC_TRANSFER_GHA_ROLE_ARN_PROD }}
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-dest"
+          aws-region: eu-west-2
+
+      - name: Check Destination Bucket
+        id: check_dest
+        env:
+          DEST_BUCKET: ${{ needs.setup.outputs.cp_environment == 'preprod' && secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PREPROD || secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PROD }}
+          TODAY: ${{ needs.setup.outputs.today }}
+          CURRENT_TIME: ${{ needs.setup.outputs.current_time }}
+          CHECK_FILES: ${{ needs.setup.outputs.check_files }}
+        run: |
+          # Use zip filename from previous step, or calculate if not available (for check_files mode)
+          if [[ "${{ steps.prepare_file.outputs.zip_filename }}" != "" ]]; then
+            ZIP_FILENAME="${{ steps.prepare_file.outputs.zip_filename }}"
+          else
+            TODAY_YYYYMMDD=$(date +"%Y%m%d")
+            ZIP_FILENAME="${TODAY_YYYYMMDD}.zip"
+          fi
+          
+          echo "Checking destination bucket for: ${ZIP_FILENAME}"
+          
+          # Check if zip file already exists in destination bucket
+          if aws s3 ls "s3://${DEST_BUCKET}/${ZIP_FILENAME}" >/dev/null 2>&1; then
+            echo "File ${ZIP_FILENAME} already exists in destination bucket"
+            echo "dest_file_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "File ${ZIP_FILENAME} not found in destination bucket"
+            echo "dest_file_exists=false" >> $GITHUB_OUTPUT
+            
+            # Find the most recent zip files in destination bucket
+            echo "Looking for most recent zip files in destination bucket..."
+            RECENT_FILES=$(aws s3 ls "s3://${DEST_BUCKET}/" --recursive | grep ".*\.zip$" | sort -k1,2 -r | head -5)
+            
+            if [[ -n "${RECENT_FILES}" ]]; then
+              echo "Most recent zip files found:"
+              echo "${RECENT_FILES}"
+              
+              # Extract the most recent filename
+              MOST_RECENT=$(echo "${RECENT_FILES}" | head -1 | awk '{print $4}')
+              echo "Most recent zip file: ${MOST_RECENT}"
+            else
+              echo "No zip files found in destination bucket"
+            fi
+          fi
+
+      - name: Process File Transfer
+        if: needs.setup.outputs.check_files == 'false' && steps.check_source.outputs.source_file_exists == 'true'
+        env:
+          DEST_BUCKET: ${{ needs.setup.outputs.cp_environment == 'preprod' && secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PREPROD || secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PROD }}
+          TODAY: ${{ needs.setup.outputs.today }}
+          CURRENT_TIME: ${{ needs.setup.outputs.current_time }}
+        run: |
+          ZIP_FILE="${{ steps.prepare_file.outputs.zip_file }}"
+          ZIP_FILENAME="${{ steps.prepare_file.outputs.zip_filename }}"
+          
+          if [[ "${{ steps.check_dest.outputs.dest_file_exists }}" == "true" ]]; then
+            echo "File for ${TODAY} already available at ${CURRENT_TIME}"
+            echo "Deleting zip file..."
+            rm -f "${ZIP_FILE}"
+            echo "Zip file deleted"
+          else
+            echo "Uploading ${ZIP_FILENAME} to destination bucket..."
+            aws s3 cp "${ZIP_FILE}" "s3://${DEST_BUCKET}/${ZIP_FILENAME}"  # Use full path for source, filename for destination
+            
+            if [[ $? -eq 0 ]]; then
+              echo "File ${ZIP_FILENAME} uploaded, local file deleted at ${CURRENT_TIME}"
+              rm -f "${ZIP_FILE}"
+              echo "Zip file deleted"
+            else
+              echo "Failed to upload file"
+              rm -f "${ZIP_FILE}"
+              echo "Zip file deleted after failed upload"
+              exit 1
+            fi
+          fi
+
+      - name: Summary
+        run: |
+          echo "Summary:"
+          echo "- Mode: ${{ needs.setup.outputs.check_files == 'true' && 'Check Files' || 'Copy to Cloud Platform' }}"
+          echo "- Environment: ${{ needs.setup.outputs.cp_environment }}"
+          echo "- Source file: ${{ needs.setup.outputs.file_name }}"
+          echo "- Target zip file: ${{ steps.prepare_file.outputs.zip_filename || 'Not created' }}"
+          echo "- Source file exists: ${{ steps.check_source.outputs.source_file_exists || 'unknown' }}"
+          echo "- Destination file exists: ${{ steps.check_dest.outputs.dest_file_exists || 'unknown' }}"
+          echo "- Pipeline run time: ${{ needs.setup.outputs.current_time }}"

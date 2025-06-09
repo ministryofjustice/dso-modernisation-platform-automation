@@ -10,14 +10,14 @@ VERBOSE=0
 LBS=
 EC2_RUN_SCRIPT=$(dirname "$0")/../run_script_on_ec2.sh
 STAGE3_WAIT_SECS=600
-STAGE1_TIMEOUT_SECS=600
-STAGE2_TIMEOUT_SECS=600
+STAGE1_TIMEOUT_SECS=900
+STAGE2_TIMEOUT_SECS=900
 STAGE3_TIMEOUT_SECS=$((STAGE3_WAIT_SECS+300))
-STAGE4_TIMEOUT_SECS=600
-STAGE5_TIMEOUT_SECS=600
-STAGE6_TIMEOUT_SECS=600
-STAGE7_TIMEOUT_SECS=600
-STAGE8_TIMEOUT_SECS=600
+STAGE4_TIMEOUT_SECS=900
+STAGE5_TIMEOUT_SECS=900
+STAGE6_TIMEOUT_SECS=900
+STAGE7_TIMEOUT_SECS=900
+STAGE8_TIMEOUT_SECS=900
 
 usage() {
   echo "Usage $0: <opts> <cmd>
@@ -427,7 +427,7 @@ lb_wait_for_target_group_health() {
   expected_healthy_ec2_count=$3
 
   set_env_lb "$lb_env"
-  n=10
+  n=15
   for i in $(seq 1 $n); do
     healthy_ec2_count=$(lb_get_target_group_health)
     if ((healthy_ec2_count == expected_healthy_ec2_count )); then
@@ -616,7 +616,7 @@ pipeline_stage_ec2_start() {
       fi
     fi
   done
-  n=10
+  n=15
   for i in $(seq 1 $n); do
     if [[ -z $ec2wait ]]; then
       return 0
@@ -735,7 +735,7 @@ pipeline_stage_ec2_stop_or_shutdown() {
     fi
   done
 
-  n=60
+  n=90
   for i in $(seq 1 $n); do
     if [[ -z $ec2wait ]]; then
       return 0

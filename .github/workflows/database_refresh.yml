@@ -91,7 +91,7 @@ jobs:
           ansible-playbook site.yml -e role=oracle-db-refresh --tags get_latest_backup_control_file --limit ${{ inputs.source_oem_hostname }} --extra-vars "SOURCE_DB=${{ inputs.source_db_name }}"
         working-directory: configuration-management/ansible
       - name: Upload control file
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        uses: actions/upload-artifact@6027e3dd177782cd8ab9af838c04fd81a07f1d47 # v4.3.3
         with:
           name: control_file
           path: "${{ inputs.source_db_name }}_control.txt"
@@ -134,7 +134,7 @@ jobs:
           ansible -m ping ${{ inputs.target_db_hostname }}
         working-directory: configuration-management/ansible
       - name: Download control file
-        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: control_file
       - name: Copy control file to target
