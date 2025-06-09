@@ -22,7 +22,7 @@
       id-token: write
       contents: read
 
-    run-name: "AD Computer Account Cleanup (${{ inputs.target_domain }}) domain $(date +\"%d-%m-%y\")"
+    run-name: "AD Computer Account Cleanup (${{ inputs.target_domain }})"
     
     jobs:
       check-strategy:
