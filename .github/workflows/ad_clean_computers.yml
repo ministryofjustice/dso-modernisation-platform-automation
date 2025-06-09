@@ -226,7 +226,7 @@
               --instance-ids "$ADMIN_INSTANCE_ID" \
               --parameters 'commands=[
               "aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/ad_verify_computers.ps1\" ad_verify_computers.ps1",
-              "aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/all-ec2-hostnames.txt\" C:\\ScriptLogs\\all-ec2-hostnames.test",
+              "aws s3 cp \"s3://'"$S3_BUCKET"'/adcompscript/all-ec2-hostnames.txt\" C:\\ScriptLogs\\all-ec2-hostnames.txt",
               "pwsh.exe -ExecutionPolicy Bypass -File ad_verify_computers.ps1 -Wait",
               "aws s3 cp C:\\ScriptLogs\\all_logs.zip \"s3://'"$S3_BUCKET"'/adcompscript/all_logs.zip\""
               ]' \
