@@ -20,6 +20,8 @@ $LogDir = "C:\ScriptLogs"
 Expand-Archive -Path "$LogDir\all_logs.zip" -DestinationPath $LogDir -Force
 $verifiedAzInactiveComps = (Get-Content -Path  $LogDir\ad_clean_computers_verifiedInactiveazNomsComputers.csv | ConvertFrom-csv)
 $verifiedAwsInactiveComps = Get-Content -Path $LogDir\ad_clean_computers_verifiedAwsInactiveComps.csv
+$verifiedAwsInactiveComps = Get-Content -Path $LogDir\ad_clean_computers_verifiedAwsInactiveComps.csv
+$unusedInactiveComps = Get-Content -Path $LogDir\ad_clean_computers_completelyUnusedComputers.csv
 
 # # Alternative Example to Disable Inactive Computers
 # ForEach ($computer in $inactiveComputers) {
@@ -30,47 +32,62 @@ $verifiedAwsInactiveComps = Get-Content -Path $LogDir\ad_clean_computers_verifie
 
 $deletedAzInactiveComps = @()
 $deletedAwsInactiveComps = @()
+$deletedUnusedAgedComps = @()
+
+Write-Output "Deleting $($unusedInactiveComps.count) unused inactive computer accounts"
+ForEach ($computer in $unusedInactiveComps.Name) {
+    Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
+    $deletedUnusedAgedComps += [PSCustomObject]@{
+        Name    = $Computer
+        Domain  = $domainname
+        Deleted = $currentDate
+    }
+}
 
 Write-Output "Deleting $($verifiedAzInactiveComps.count) verified inactive computer accounts from the Azure network scopes"
 ForEach ($computer in $verifiedAzInactiveComps.Name) {
-    Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
+    #Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
+    Get-ADComputer $computer.DistinguishedName | Remove-ADObject -Recursive -Confirm:$false -Credential $adcred
     $deletedAzInactiveComps += [PSCustomObject]@{
-        Name              = $Computer
-        Domain            = $domainname
-        Deleted           = $currentDate
+        Name    = $Computer
+        Domain  = $domainname
+        Deleted = $currentDate
     }
 }
 
 Write-Output "Deleting $($verifiedAwsInactiveComps.count) verified inactive computer accounts from the AWS network scopes"
 ForEach ($computer in $verifiedAwsInactiveComps) {
-    Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
+    #Remove-ADComputer -Identity $computer -Confirm:$false -Credential $adcred
+    Get-ADComputer $computer.DistinguishedName | Remove-ADObject -Recursive -Confirm:$false -Credential $adcred
     $deletedAwsInactiveComps += [PSCustomObject]@{
-        Name              = $Computer
-        Domain            = $domainname
-        Deleted           = $currentDate
+        Name    = $Computer
+        Domain  = $domainname
+        Deleted = $currentDate
     }
 }
-
-# May need Get-ADComputer $computer.DistinguishedName | Remove-ADObject -Recursive -Confirm:$false
 
 # Output results after deletion runs
 if ($deletedAzInactiveComps) {
     Write-Output "Deleted $($deletedAzInactiveComps.count) computers in the Azure scopes for $($domainname) domain."
     write-output $deletedAzInactiveComps
-} else {
+}
+else {
     Write-Output "No deleted Azure VM's found."
 }
 
 if ($deletedAwsInactiveComps) {
     Write-Output "Deleted $($deletedAwsInactiveComps.count) computers in the AWS scopes for $($domainname) domain."
     write-output $deletedAwsInactiveComps
-} else {
+}
+else {
     Write-Output "No deleted AWS instances found."
 }
 
 Copy-Item -Path $LogDir\ad_clean_computers_allInactiveComputers.csv -Destination $LogDir\inactiveCompDNs-$domainname-$currentDate.csv
 $deletedAzInactiveComps | Export-Csv $LogDir\deletedAzInactiveComps-$domainname-$currentDate.csv -NoTypeInformation
 $deletedAwsInactiveComps | Export-Csv $LogDir\deletedAwsInactiveComps-$domainname-$currentDate.csv -NoTypeInformation
+$deletedUnusedAgedComps | Export-Csv $LogDir\deletedUnusedAgedComps-$domainname-$currentDate.csv -NoTypeInformation
+
 
 # Get-ChildItem -Path $LogDir | Where-Object {
 #     $_.Name -in @("*-$domainname-$currentDate.csv")
