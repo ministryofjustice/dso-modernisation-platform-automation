@@ -1,4 +1,4 @@
-name: Oracle Licence Audit Across Applications
+name: Oracle Licence Audit
 
 on:
   workflow_dispatch:
