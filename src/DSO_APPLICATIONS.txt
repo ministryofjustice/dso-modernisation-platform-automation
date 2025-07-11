@@ -1,4 +1,6 @@
 corporate-staff-rostering
+delius-core
+delius-mis
 hmpps-domain-services
 hmpps-oem
 nomis
