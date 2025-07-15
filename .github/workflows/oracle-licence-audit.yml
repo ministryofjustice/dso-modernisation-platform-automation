@@ -1,0 +1,170 @@
+name: Oracle Licence Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      applications:
+        description: 'e.g. hmpps-delius or leave blank for all'
+        type: string
+        default: ''
+      environments:
+        description: 'e.g. development or leave blank for all'
+        type: string
+        default: ''
+      SourceCodeVersion:
+        description: 'Branch/tag/commit for hmpps-delius-operational-automation'
+        type: string
+        default: 'main'
+      SourceConfigVersion:
+        description: 'Branch/tag/commit for modernisation-platform-configuration-management'
+        type: string
+        default: 'main'
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+jobs:
+  check-strategy:
+    name: Build Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.calc_matrix.outputs.matrix }}
+    steps:
+      - name: Checkout AMI-Cleanup Helpers
+        uses: actions/checkout@v4
+        with:
+          path: dso-modernisation-platform-automation
+
+      - name: Calculate strategy matrix
+        id: calc_matrix
+        run: |
+          matrix=$(dso-modernisation-platform-automation/src/get_dba_aws_accounts.sh gha \
+            "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+          echo "matrix<<EOF" >> $GITHUB_OUTPUT
+          echo "$matrix" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  oracle-licence-audit:
+    name: Oracle Licence Audit
+    needs: check-strategy
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ministryofjustice/hmpps-delius-operational-automation:0.80.0
+    strategy:
+      matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
+      fail-fast: false
+      max-parallel: 1
+    env:
+      ansible_config: ansible/ansible.cfg
+      command: ansible-playbook operations/ansible/site.yml -e force_role=oracle-licence-audit
+      inventory: inventory/ansible
+
+    steps:
+      - name: Checkout ansible config
+        uses: actions/checkout@v4
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          path: ansible
+          ref: ${{ github.event.inputs.SourceCodeVersion }}
+
+      - name: Checkout Inventory & Roles
+        uses: actions/checkout@v4
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          path: inventory
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
+
+      - name: Fetch Required Roles & Site
+        uses: actions/checkout@v4
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          path: operations
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ansible/roles/oracle-licence-audit
+            ansible/roles/get-ec2-facts
+            ansible/roles/get-modernisation-platform-facts
+            ansible/roles/epel
+            ansible/site.yml
+
+      - name: Determine Database Targets
+        id: databasetargets
+        shell: bash
+        run: |
+          ENV="${{ matrix.account_name }}"
+          case "$ENV" in
+            delius-mis*)
+              TARGET="server_type_mis_db"
+              ;;
+            delius-*)
+              TARGET="server_type_delius_core_db"
+              ;;
+            hmpps-oem-*)
+              # hmpps-oem database group is the entire environment
+              #TARGET="environment_name_${ENV//-/_}"
+              TARGET="" # No need to audit the OEM applications
+              ;;
+            nomis-combined-reporting-*)
+              TARGET="server_type_ncr_db"
+              ;;
+            nomis-*)
+              # there are two groups, fall back on the one that exists
+              TARGET="server_type_nomis_db,server_type_nomis_db19c"
+              ;;
+            corporate-staff-rostering-*)
+              TARGET="server_type_csr_db"
+              ;;
+            oasys-national*)
+              TARGET="server_type_ncr_db"
+              ;;
+            oasys-*)
+              TARGET="server_type_oasys_db"
+              ;;
+            *)
+              # no TARGET → will be empty
+              TARGET=""
+              ;;
+          esac
+          echo "targets=$TARGET" >> $GITHUB_OUTPUT
+
+      - name: Validate Ansible Inventory Target
+        if: steps.databasetargets.outputs.targets != ''
+        id: valid_databasetargets
+        run: |
+          export ANSIBLE_CONFIG=$ansible_config
+          IFS=',' read -ra GROUPS <<< "${{ steps.databasetargets.outputs.targets }}"
+          MISSING=""
+          INV_GRAPH=$(ansible-inventory -i $inventory --graph)
+          for group in "${GROUPS[@]}"; do
+            if ! echo "$INV_GRAPH" | grep -qw "$group"; then
+              echo "❌ Group '$group' not found in inventory"
+              TARGET=""
+            else
+              echo "✅ Group '$group' found in inventory"
+              TARGET="$group"
+            fi
+          done
+          echo "targets=$TARGET" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        if: steps.valid_databasetargets.outputs.targets != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
+          role-session-name: "oracle-audit-${{ matrix.account_name }}-${{ github.run_number }}"
+          aws-region: eu-west-2
+          output-credentials: true
+
+      - name: Run Oracle Licence Audit
+        if: steps.valid_databasetargets.outputs.targets != ''
+        run: |
+          export ANSIBLE_CONFIG=$ansible_config
+          $command \
+            -i $inventory \
+            -e ansible_aws_ssm_bucket_name=${{ vars.ANSIBLE_AWS_SSM_BUCKET_NAME }} \
+            -e targets=${{ steps.databasetargets.outputs.targets }} \
+            -e environment_name=${{ matrix.account_name }} \
+            --tags collection
