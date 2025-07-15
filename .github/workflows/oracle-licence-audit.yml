@@ -140,6 +140,7 @@ jobs:
         id: valid_databasetargets
         shell: bash
         run: |
+          set -x
           export ANSIBLE_CONFIG=$ansible_config
           echo "Inventory path: $inventory"
           echo "ANSIBLE_CONFIG: $ANSIBLE_CONFIG"
