@@ -133,6 +133,7 @@ jobs:
       - name: Validate Ansible Inventory Target
         if: steps.databasetargets.outputs.targets != ''
         id: valid_databasetargets
+        shell: bash
         run: |
           export ANSIBLE_CONFIG=$ansible_config
           IFS=',' read -ra GROUPS <<< "${{ steps.databasetargets.outputs.targets }}"
