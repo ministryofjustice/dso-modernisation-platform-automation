@@ -135,6 +135,15 @@ jobs:
           esac
           echo "targets=$TARGET" >> $GITHUB_OUTPUT
 
+      - name: Configure AWS Credentials
+        if: steps.databasetargets.outputs.targets != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
+          role-session-name: "oracle-audit-${{ matrix.account_name }}-${{ github.run_number }}"
+          aws-region: eu-west-2
+          output-credentials: true
+
       - name: Validate Ansible Inventory Target
         if: steps.databasetargets.outputs.targets != ''
         id: valid_databasetargets
@@ -165,15 +174,6 @@ jobs:
             fi
           done
           echo "targets=$TARGET" >> $GITHUB_OUTPUT
-
-      - name: Configure AWS Credentials
-        if: steps.valid_databasetargets.outputs.targets != ''
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
-          role-session-name: "oracle-audit-${{ matrix.account_name }}-${{ github.run_number }}"
-          aws-region: eu-west-2
-          output-credentials: true
 
       - name: Run Oracle Licence Audit
         if: steps.valid_databasetargets.outputs.targets != ''
