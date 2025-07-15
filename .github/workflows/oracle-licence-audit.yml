@@ -135,16 +135,27 @@ jobs:
         id: valid_databasetargets
         shell: bash
         run: |
+          set -x
           export ANSIBLE_CONFIG=$ansible_config
+          echo "Inventory path: $inventory"
+          echo "ANSIBLE_CONFIG: $ANSIBLE_CONFIG"
+
+          ansible-inventory -i "$inventory" --graph > inventory.out 2> inventory.err || true
+          echo '--- STDOUT ---'
+          cat inventory.out
+          echo '--- STDERR ---'
+          cat inventory.err
+          INV_GRAPH=$(< inventory.out)
+
           IFS=',' read -ra GROUPS <<< "${{ steps.databasetargets.outputs.targets }}"
           MISSING=""
           INV_GRAPH=$(ansible-inventory -i $inventory --graph)
           for group in "${GROUPS[@]}"; do
             if ! echo "$INV_GRAPH" | grep -qw "$group"; then
-              echo "❌ Group '$group' not found in inventory"
+              echo "Group '$group' not found in inventory"
               TARGET=""
             else
-              echo "✅ Group '$group' found in inventory"
+              echo "Group '$group' found in inventory"
               TARGET="$group"
             fi
           done
