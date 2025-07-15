@@ -40,7 +40,7 @@ jobs:
       - name: Calculate strategy matrix
         id: calc_matrix
         run: |
-          matrix=$(dso-modernisation-platform-automation/src/get_dso_aws_accounts.sh gha \
+          matrix=$(dso-modernisation-platform-automation/src/get_dba_aws_accounts.sh gha \
             "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
           echo "matrix<<EOF" >> $GITHUB_OUTPUT
           echo "$matrix" >> $GITHUB_OUTPUT

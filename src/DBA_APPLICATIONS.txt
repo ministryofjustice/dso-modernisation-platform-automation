@@ -1,9 +1,8 @@
 corporate-staff-rostering
-hmpps-domain-services
+delius-core
+delius-mis
 hmpps-oem
 nomis
 nomis-combined-reporting
-nomis-data-hub
 oasys
 oasys-national-reporting
-planetfm
