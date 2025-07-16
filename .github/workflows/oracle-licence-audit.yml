@@ -158,11 +158,12 @@ jobs:
         id: valid_databasetargets
         shell: bash
         run: |
-          set -x
           export ANSIBLE_CONFIG=$ansible_config
-          IFS=',' read -ra GROUPS <<< "${{ steps.databasetargets.outputs.targets }}"
-          INV_GRAPH=$(ansible-inventory -i "$inventory" --graph)
-          for group in "${GROUPS[@]}"; do
+          targets_str="${{ steps.databasetargets.outputs.targets }}"
+          INV_GRAPH=$(ansible-inventory -i "$inventory" --graph) || INV_GRAPH=""
+          TARGET=""
+          # ${var//,/ } replaces all commas with spaces
+          for group in ${targets_str//,/ }; do
             if echo "$INV_GRAPH" | grep -qw "$group"; then
               echo "Group '$group' found in inventory"
               TARGET="$group"
