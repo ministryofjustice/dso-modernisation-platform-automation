@@ -4,13 +4,27 @@ on:
   workflow_dispatch:
     inputs:
       applications:
-        description: 'e.g. hmpps-delius or leave blank for all'
-        type: string
+        description: 'e.g. delius-core, nomis or leave blank for all'
         default: ''
+        type: choice
+        options:
+          - "corporate-staff-rostering"
+          - "delius-core"
+          - "delius-mis"
+          - "hmpps-oem"
+          - "nomis"
+          - "nomis-combined-reporting"
+          - "oasys"
+          - "oasys-national-reporting"
       environments:
         description: 'e.g. development or leave blank for all'
-        type: string
         default: ''
+        type: choice
+        options:
+          - "development"
+          - "test"
+          - "preproduction"
+          - "production"
       SourceCodeVersion:
         description: 'Branch/tag/commit for hmpps-delius-operational-automation'
         type: string
@@ -152,7 +166,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
-          role-session-name: "oracle-audit-${{ matrix.account_name }}-${{ github.run_number }}"
+          role-session-name: "oracle-licence-audit-${{ matrix.account_name }}-${{ github.run_number }}"
           aws-region: eu-west-2
           output-credentials: true
 
