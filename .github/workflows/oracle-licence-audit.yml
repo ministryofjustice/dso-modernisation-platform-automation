@@ -60,8 +60,6 @@ jobs:
       ansible_config: ansible/ansible.cfg
       command: ansible-playbook operations/ansible/site.yml -e force_role=oracle-licence-audit
       inventory: inventory/ansible
-      TARGET_ACCOUNT_NUMBER: "${{ fromJSON(secrets.environment_management).account_ids[matrix.account_name] }}"
-
     steps:
       - name: Checkout ansible config
         uses: actions/checkout@v4
@@ -136,11 +134,21 @@ jobs:
           esac
           echo "targets=$TARGET" >> $GITHUB_OUTPUT
 
+      - name: Get Account Details
+        id: account
+        if: steps.databasetargets.outputs.targets != ''
+        run: |
+          echo "account name: ${{ matrix.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
       - name: Configure AWS Credentials
         if: steps.databasetargets.outputs.targets != ''
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ env.TARGET_ACCOUNT_NUMBER }}:role/modernisation-platform-oidc-cicd
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "oracle-audit-${{ matrix.account_name }}-${{ github.run_number }}"
           aws-region: eu-west-2
           output-credentials: true
