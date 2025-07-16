@@ -58,7 +58,7 @@ jobs:
       max-parallel: 1
     env:
       ansible_config: ansible/ansible.cfg
-      command: ansible-playbook operations/ansible/site.yml -e force_role=oracle-licence-audit
+      command: ansible-playbook roles/ansible/site.yml -e force_role=oracle-licence-audit
       inventory: inventory/ansible
     steps:
       - name: Checkout ansible config
@@ -67,6 +67,7 @@ jobs:
           repository: ministryofjustice/modernisation-platform-configuration-management
           path: ansible
           ref: ${{ github.event.inputs.SourceCodeVersion }}
+          fetch-depth: 0
 
       - name: Checkout Inventory & Roles
         uses: actions/checkout@v4
@@ -84,8 +85,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
-          path: operations
-          ref: ${{ github.event.inputs.SourceConfigVersion }}
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ansible/roles/oracle-licence-audit
@@ -93,6 +92,9 @@ jobs:
             ansible/roles/get-modernisation-platform-facts
             ansible/roles/epel
             ansible/site.yml
+          path: roles
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
+          fetch-depth: 0
 
       - name: Determine Database Targets
         id: databasetargets
@@ -137,6 +139,7 @@ jobs:
       - name: Get Account Details
         id: account
         if: steps.databasetargets.outputs.targets != ''
+        shell: bash
         run: |
           echo "account name: ${{ matrix.account_name }}"
           account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
@@ -161,25 +164,38 @@ jobs:
           export ANSIBLE_CONFIG=$ansible_config
           targets_str="${{ steps.databasetargets.outputs.targets }}"
           INV_GRAPH=$(ansible-inventory -i "$inventory" --graph) || INV_GRAPH=""
-          TARGET=""
-          # ${var//,/ } replaces all commas with spaces
+          # Prepare an array to hold valid groups
+          VALID_GROUPS=()
+
+          # Split on commas and test each one
           for group in ${targets_str//,/ }; do
             if echo "$INV_GRAPH" | grep -qw "$group"; then
               echo "Group '$group' found in inventory"
-              TARGET="$group"
+              VALID_GROUPS+=("$group")
             else
               echo "Group '$group' not found in inventory"
             fi
           done
-          echo "targets=$TARGET" >> $GITHUB_OUTPUT
+
+          # Join the VALID_GROUPS array back into a comma-separated string
+          if [ ${#VALID_GROUPS[@]} -gt 0 ]; then
+            # Temporarily set IFS to comma for the join
+            IFS=',' read -r -a _ <<< "${VALID_GROUPS[*]}"
+            JOINED="${VALID_GROUPS[*]}"
+            IFS=$'\n'   # restore IFS if you need the default
+          else
+            JOINED=""
+          fi
+
+          # Export for GitHub Actions
+          echo "targets=$JOINED" >> "$GITHUB_OUTPUT"
 
       - name: Run Oracle Licence Audit
         if: steps.valid_databasetargets.outputs.targets != ''
+        shell: bash
         run: |
           export ANSIBLE_CONFIG=$ansible_config
           $command \
             -i $inventory \
-            -e ansible_aws_ssm_bucket_name=${{ vars.ANSIBLE_AWS_SSM_BUCKET_NAME }} \
-            -e targets=${{ steps.databasetargets.outputs.targets }} \
-            -e environment_name=${{ matrix.account_name }} \
+            --limit '${{ steps.valid_databasetargets.outputs.targets }}' \
             --tags collection
