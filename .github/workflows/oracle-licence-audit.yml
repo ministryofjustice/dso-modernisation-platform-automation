@@ -3,14 +3,38 @@ name: Oracle Licence Audit
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: 'Collect audit data or summarise results'
+        default: 'collection'
+        required: true
+        type: choice
+        options: # These are the two tags that can be used with the oracle-licence-audit role
+          - 'collection'
+          - 'summary'
       applications:
-        description: 'e.g. hmpps-delius or leave blank for all'
-        type: string
+        description: 'e.g. delius-core, nomis or leave blank to run for all'
         default: ''
+        type: choice
+        options: # Should match the list in the src/DBA_APPLICATIONS.txt file
+          - ''
+          - 'corporate-staff-rostering'
+          - 'delius-core'
+          - 'delius-mis'
+          - 'hmpps-oem'
+          - 'nomis'
+          - 'nomis-combined-reporting'
+          - 'oasys'
+          - 'oasys-national-reporting'
       environments:
-        description: 'e.g. development or leave blank for all'
-        type: string
+        description: 'e.g. development or leave blank to run for all'
         default: ''
+        type: choice
+        options:
+          - ''
+          - 'development'
+          - 'test'
+          - 'preproduction'
+          - 'production'
       SourceCodeVersion:
         description: 'Branch/tag/commit for hmpps-delius-operational-automation'
         type: string
@@ -27,12 +51,13 @@ permissions:
 
 jobs:
   check-strategy:
+    if: ${{ github.event.inputs.operation == 'collection' }}
     name: Build Matrix
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.calc_matrix.outputs.matrix }}
     steps:
-      - name: Checkout AMI-Cleanup Helpers
+      - name: Checkout helper scripts
         uses: actions/checkout@v4
         with:
           path: dso-modernisation-platform-automation
@@ -47,6 +72,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
   oracle-licence-audit:
+    if: ${{ github.event.inputs.operation == 'collection' }}
     name: Oracle Licence Audit
     needs: check-strategy
     runs-on: ubuntu-latest
@@ -58,9 +84,8 @@ jobs:
       max-parallel: 1
     env:
       ansible_config: ansible/ansible.cfg
-      command: ansible-playbook operations/ansible/site.yml -e force_role=oracle-licence-audit
+      command: ansible-playbook roles/ansible/site.yml -e force_role=oracle-licence-audit
       inventory: inventory/ansible
-
     steps:
       - name: Checkout ansible config
         uses: actions/checkout@v4
@@ -68,20 +93,24 @@ jobs:
           repository: ministryofjustice/modernisation-platform-configuration-management
           path: ansible
           ref: ${{ github.event.inputs.SourceCodeVersion }}
+          fetch-depth: 0
 
       - name: Checkout Inventory & Roles
         uses: actions/checkout@v4
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ansible/hosts
+            ansible/group_vars
           path: inventory
           ref: ${{ github.event.inputs.SourceConfigVersion }}
+          fetch-depth: 0
 
       - name: Fetch Required Roles & Site
         uses: actions/checkout@v4
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
-          path: operations
-          ref: ${{ github.event.inputs.SourceConfigVersion }}
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ansible/roles/oracle-licence-audit
@@ -89,6 +118,9 @@ jobs:
             ansible/roles/get-modernisation-platform-facts
             ansible/roles/epel
             ansible/site.yml
+          path: roles
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
+          fetch-depth: 0
 
       - name: Determine Database Targets
         id: databasetargets
@@ -104,14 +136,13 @@ jobs:
               ;;
             hmpps-oem-*)
               # hmpps-oem database group is the entire environment
-              #TARGET="environment_name_${ENV//-/_}"
-              TARGET="" # No need to audit the OEM applications
+              TARGET="environment_name_${ENV//-/_}"
               ;;
             nomis-combined-reporting-*)
               TARGET="server_type_ncr_db"
               ;;
             nomis-*)
-              # there are two groups, fall back on the one that exists
+              # there are two groups, fall back on the one that exists or run both
               TARGET="server_type_nomis_db,server_type_nomis_db19c"
               ;;
             corporate-staff-rostering-*)
@@ -130,41 +161,143 @@ jobs:
           esac
           echo "targets=$TARGET" >> $GITHUB_OUTPUT
 
-      - name: Validate Ansible Inventory Target
+      - name: Get Account Details
+        id: account
         if: steps.databasetargets.outputs.targets != ''
-        id: valid_databasetargets
+        shell: bash
         run: |
-          export ANSIBLE_CONFIG=$ansible_config
-          IFS=',' read -ra GROUPS <<< "${{ steps.databasetargets.outputs.targets }}"
-          MISSING=""
-          INV_GRAPH=$(ansible-inventory -i $inventory --graph)
-          for group in "${GROUPS[@]}"; do
-            if ! echo "$INV_GRAPH" | grep -qw "$group"; then
-              echo "❌ Group '$group' not found in inventory"
-              TARGET=""
-            else
-              echo "✅ Group '$group' found in inventory"
-              TARGET="$group"
-            fi
-          done
-          echo "targets=$TARGET" >> $GITHUB_OUTPUT
+          echo "account name: ${{ matrix.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials
-        if: steps.valid_databasetargets.outputs.targets != ''
+        if: steps.databasetargets.outputs.targets != ''
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
-          role-session-name: "oracle-audit-${{ matrix.account_name }}-${{ github.run_number }}"
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "oracle-licence-audit-${{ matrix.account_name }}-${{ github.run_number }}"
           aws-region: eu-west-2
           output-credentials: true
 
+      - name: Validate Ansible Inventory Target
+        if: steps.databasetargets.outputs.targets != ''
+        id: valid_databasetargets
+        shell: bash
+        run: |
+          export ANSIBLE_CONFIG=$ansible_config
+          targets_str="${{ steps.databasetargets.outputs.targets }}"
+          INV_GRAPH=$(ansible-inventory -i "$inventory" --graph) || INV_GRAPH=""
+          # Prepare an array to hold valid groups
+          VALID_GROUPS=()
+
+          # Split on commas and test each one
+          for group in ${targets_str//,/ }; do
+            if echo "$INV_GRAPH" | grep -qw "$group"; then
+              echo "Group '$group' found in inventory"
+              VALID_GROUPS+=("$group")
+            else
+              echo "Group '$group' not found in inventory"
+            fi
+          done
+
+          # Join the VALID_GROUPS array back into a comma-separated string
+          if [ ${#VALID_GROUPS[@]} -gt 0 ]; then
+            # Temporarily set IFS to comma for the join
+            IFS=',' read -r -a _ <<< "${VALID_GROUPS[*]}"
+            JOINED="${VALID_GROUPS[*]}"
+            IFS=$'\n'   # restore IFS if you need the default
+          else
+            JOINED=""
+          fi
+
+          # Export for GitHub Actions
+          echo "targets=$JOINED" >> "$GITHUB_OUTPUT"
+
       - name: Run Oracle Licence Audit
         if: steps.valid_databasetargets.outputs.targets != ''
+        shell: bash
         run: |
           export ANSIBLE_CONFIG=$ansible_config
           $command \
             -i $inventory \
-            -e ansible_aws_ssm_bucket_name=${{ vars.ANSIBLE_AWS_SSM_BUCKET_NAME }} \
-            -e targets=${{ steps.databasetargets.outputs.targets }} \
-            -e environment_name=${{ matrix.account_name }} \
-            --tags collection
+            --limit '${{ steps.valid_databasetargets.outputs.targets }}' \
+            --tags '${{ github.event.inputs.operation }}'
+
+  # The summary task only needs to run once on one environment, so we're using hmpps-oem-development
+  # as the target environment. This is because it needs access to the S3 bucket where the audit
+  # results are stored, and the bucket is shared across all environments.
+  audit-summary:
+    if: ${{ github.event.inputs.operation == 'summary' }}
+    name: Oracle Licence Audit Summary
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ministryofjustice/hmpps-delius-operational-automation:0.80.0
+    env:
+      ansible_config: ansible/ansible.cfg
+      command: ansible-playbook roles/ansible/site.yml -e force_role=oracle-licence-audit
+      inventory: inventory/ansible
+      environment_name: hmpps-oem-development
+    steps:
+      - name: Checkout ansible config
+        uses: actions/checkout@v4
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          path: ansible
+          ref: ${{ github.event.inputs.SourceCodeVersion }}
+          fetch-depth: 0
+
+      - name: Checkout Inventory & Roles
+        uses: actions/checkout@v4
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ansible/hosts
+            ansible/group_vars
+          path: inventory
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
+          fetch-depth: 0
+
+      - name: Fetch Required Roles & Site
+        uses: actions/checkout@v4
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ansible/roles/oracle-licence-audit
+            ansible/roles/get-ec2-facts
+            ansible/roles/get-modernisation-platform-facts
+            ansible/roles/epel
+            ansible/site.yml
+          path: roles
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
+          fetch-depth: 0
+
+      - name: Get Account Details
+        id: account
+        shell: bash
+        run: |
+          echo "account name: ${{ env.environment_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.environment_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "oracle-licence-audit-${{ env.environment_name }}-${{ github.run_number }}"
+          aws-region: eu-west-2
+          output-credentials: true
+          
+      - name: Run Audit Summary
+        shell: bash
+        run: |
+          export ANSIBLE_CONFIG=$ansible_config
+          $command \
+            -i $inventory \
+            --limit 'environment_name_${environment_name//-/_}' \
+            --tags '${{ github.event.inputs.operation }}'
