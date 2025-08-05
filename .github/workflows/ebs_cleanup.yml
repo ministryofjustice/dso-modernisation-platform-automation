@@ -117,10 +117,10 @@ jobs:
         id: check
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
-          environment=$(echo "${{ matrix.account_name }}" | rev | cut -d- -f2- | rev)
-          echo src/ebs_cleanup.sh -e "$environment" -d ${{ needs.check-strategy.outputs.ebs_cleanup_sh_args }} delete
-          cleanup_output=$(src/ebs_cleanup.sh -e "$environment" -d ${{ needs.check-strategy.outputs.ebs_cleanup_sh_args }} delete | tee /dev/tty)
-          if echo $cleanup_output | grep -qE "Dryrun - would delete volume .+ in ${environment}"; then
+          echo src/ebs_cleanup.sh -e "${{ matrix.account_name }}" -d ${{ needs.check-strategy.outputs.ebs_cleanup_sh_args }} delete
+          cleanup_output=$(src/ebs_cleanup.sh -e "${{ matrix.account_name }}" -d ${{ needs.check-strategy.outputs.ebs_cleanup_sh_args }} delete)
+          echo "${cleanup_output[@]}"
+          if echo $cleanup_output | grep -qE "Dryrun - would delete volume .+ in ${{ matrix.account_name }}"; then
             echo "cleanup=1" >> $GITHUB_OUTPUT
           else
             echo "cleanup=0" >> $GITHUB_OUTPUT
@@ -131,20 +131,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: "cleanup_envs.txt"
-          path: dso-modernisation-platform-automation
 
       - name: Append environment to list
         if: ${{ steps.check.outputs.cleanup == 1 }}
-        working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
+        working-directory: ${{ github.workspace }}
         run: |
-          ${{ matrix.account_name }} >> cleanup_envs.txt
+          echo ${{ matrix.account_name }} >> cleanup_envs.txt
 
       - name: Upload cleanup_envs.txt Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
         uses: actions/upload-artifact@v4
         with:
           name: "cleanup_envs.txt"
-          path: dso-modernisation-platform-automation/cleanup_envs.txt
+          path: cleanup_envs.txt
           overwrite: true
 
   cleanup-strategy:
@@ -156,7 +155,6 @@ jobs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
     steps:
       - name: Download cleanup envs Artifact
-        if: ${{ steps.check.outputs.cleanup == 1 }}
         uses: actions/download-artifact@v4
         with:
           name: "cleanup_envs.txt"
@@ -189,6 +187,7 @@ jobs:
     name: Cleanup ebs
     needs:
       - check-strategy
+      - cleanup-strategy
     runs-on: ubuntu-latest
     if: ${{ needs.cleanup-strategy.outputs.run_cleanup == 1 && needs.check-strategy.outputs.dryrun == 0 }}
     strategy:
@@ -210,7 +209,14 @@ jobs:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
+      
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+          path: dso-modernisation-platform-automation
 
       - name: Run Commands
+        working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
           src/ebs_cleanup.sh -e "${{ matrix.account_name }}" ${{ needs.check-strategy.outputs.ebs_cleanup_sh_args }} delete
