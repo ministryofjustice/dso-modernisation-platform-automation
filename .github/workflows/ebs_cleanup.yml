@@ -11,7 +11,7 @@ on:
         description: 'e.g. development or leave blank for all'
         type: string
       ebs_cleanup_sh_args:
-        description: 'Command line options to ebs_cleanup.sh script. -m <age_in_months> 
+        description: 'Command line options to ebs_cleanup.sh script. -m <age_in_months>'
         type: string
         default: ""
       dryrun:
