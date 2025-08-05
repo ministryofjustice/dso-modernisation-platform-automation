@@ -122,6 +122,7 @@ action() {
   while read -r create_time volume_id state; do
  
     volumes_found=$((volumes_found + 1))
+    echo "volumes_found $volumes_found"
     created_epoch=$($date_cmd -d "$create_time" +%s)
     age_months_dec=$(awk "BEGIN { printf \"%.1f\", ($now - $created_epoch) / 2592000 }") # 1 decimal place
     age_months=$(awk "BEGIN { print int($age_months_dec) }")
@@ -145,6 +146,7 @@ action() {
       esac
     fi
   done <<< "$aws_output"
+  echo "vol found: $volumes_found"
   
   if [[ "$volumes_found" -eq 0 ]]; then
     echo $none_message
