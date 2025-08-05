@@ -136,7 +136,7 @@ jobs:
         if: ${{ steps.check.outputs.cleanup == 1 }}
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
-          ${{ matrix.account_name }} >> cleanup_envs.txt
+          echo ${{ matrix.account_name }} >> cleanup_envs.txt
 
       - name: Upload cleanup_envs.txt Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
