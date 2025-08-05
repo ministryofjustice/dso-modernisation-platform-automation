@@ -111,44 +111,39 @@ set_date_cmd(){
 
 action() {
   echo $message
-  volumes_found=0
 
   aws_output=$(aws ec2 describe-volumes \
     --region "$region" \
     --query "Volumes[*].{ID:VolumeId,CreateTime:CreateTime,State:State}" \
     --output text \
     $filters $profile)
-
-  while read -r create_time volume_id state; do
- 
-    volumes_found=$((volumes_found + 1))
-    echo "volumes_found $volumes_found"
-    created_epoch=$($date_cmd -d "$create_time" +%s)
-    age_months_dec=$(awk "BEGIN { printf \"%.1f\", ($now - $created_epoch) / 2592000 }") # 1 decimal place
-    age_months=$(awk "BEGIN { print int($age_months_dec) }")
-
-    if [ "$age_months" -ge "$max_age_months" ]; then
-      case $action in
-        all)
-          echo "$volume_id $state $age_months_dec months old in $environment" ;;
-        attached)
-          echo "$volume_id $age_months_dec months oldn $environment" ;;
-        unattached)
-          echo "$volume_id $age_months_dec months old in $environment" ;;
-        delete)
-          if [[ "$dryrun" == true ]]; then
-            echo "Dryrun - would delete volume $volume_id - $age_months_dec months old in $environment"
-          else
-            echo "Deleting volume $volume_id - $age_months_dec months old in $environment"
-            #aws ec2 delete-volume --volume-id "$volume_id" --region "$region" $profile
-          fi
-          ;;
-      esac
-    fi
-  done <<< "$aws_output"
-  echo "vol found: $volumes_found"
   
-  if [[ "$volumes_found" -eq 0 ]]; then
+  if [[ -n "$aws_output" ]]; then
+    while read -r create_time volume_id state; do
+      created_epoch=$($date_cmd -d "$create_time" +%s)
+      age_months_dec=$(awk "BEGIN { printf \"%.1f\", ($now - $created_epoch) / 2592000 }") # 1 decimal place
+      age_months=$(awk "BEGIN { print int($age_months_dec) }")
+
+      if [ "$age_months" -ge "$max_age_months" ]; then
+        case $action in
+          all)
+            echo "$volume_id $state $age_months_dec months old in $environment" ;;
+          attached)
+            echo "$volume_id $age_months_dec months oldn $environment" ;;
+          unattached)
+            echo "$volume_id $age_months_dec months old in $environment" ;;
+          delete)
+            if [[ "$dryrun" == true ]]; then
+              echo "Dryrun - would delete volume $volume_id - $age_months_dec months old in $environment"
+            else
+              echo "Deleting volume $volume_id - $age_months_dec months old in $environment"
+              #aws ec2 delete-volume --volume-id "$volume_id" --region "$region" $profile
+            fi
+            ;;
+        esac
+      fi
+    done <<< "$aws_output"
+  else
     echo $none_message
   fi
 }
