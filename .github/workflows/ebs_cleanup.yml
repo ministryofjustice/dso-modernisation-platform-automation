@@ -175,7 +175,7 @@ jobs:
           }
           run_cleanup=1
           echo "Setting strategy matrix for EBS Cleanup"
-          accounts=$(cat ${{ github.workspace }}/dso-modernisation-platform-automation/cleanup_envs.txt)
+          accounts=$(cat cleanup_envs.txt)
           matrix=$(get_matrix $accounts)
           [[ -z $accounts ]] && run_cleanup=0
           echo "run_cleanup=${run_cleanup}"
