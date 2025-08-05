@@ -72,7 +72,12 @@ check_action() {
       filters='--filters Name=status,Values=available' ;;
     delete)
       filters='--filters Name=status,Values=available'
-      message="Deleting EBS volumes older than $max_age_months months in $region..." ;;
+      if [[ "$dryrun" == true ]]; then
+        message="Dryrun - Pretend deleting EBS volumes older than $max_age_months months in $region..."
+      else
+        message="Deleting EBS volumes older than $max_age_months months in $region..."
+      fi
+      ;;
     *)
       action=unattached
       filters='--filters Name=status,Values=available'
