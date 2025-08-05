@@ -187,6 +187,7 @@ jobs:
     name: Cleanup ebs
     needs:
       - check-strategy
+      - cleanup-strategy
     runs-on: ubuntu-latest
     if: ${{ needs.cleanup-strategy.outputs.run_cleanup == 1 && needs.check-strategy.outputs.dryrun == 0 }}
     strategy:
