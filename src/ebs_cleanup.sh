@@ -49,8 +49,9 @@ shift $((OPTIND -1))
 action=$1
 
 check_profile() {
-  if [[ ! -z "${environment:-}" ]]; then
-    pass
+  # could check if we are actully logged in when environment is set, choosing to fail at the apply step if not logged in so it isnt very slow.
+  if [[ -n "${environment:-}" ]]; then
+    :
   elif env_alias=$(aws iam list-account-aliases --output text 2>/dev/null); then
     environment=$(echo "$env_alias" | awk '{print $2}')
   else
