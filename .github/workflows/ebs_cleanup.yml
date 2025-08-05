@@ -131,7 +131,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: "cleanup_envs.txt"
-          path: dso-modernisation-platform-automation
 
       - name: Append environment to list
         if: ${{ steps.check.outputs.cleanup == 1 }}
