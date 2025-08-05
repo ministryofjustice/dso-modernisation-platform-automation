@@ -136,11 +136,7 @@ jobs:
         if: ${{ steps.check.outputs.cleanup == 1 }}
         working-directory: ${{ github.workspace }}
         run: |
-          echo 'previous file'
-          cat cleanup_envs.txt
           echo ${{ matrix.account_name }} >> cleanup_envs.txt
-          echo 'new file'
-          cat cleanup_envs.txt
 
       - name: Upload cleanup_envs.txt Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
@@ -177,10 +173,6 @@ jobs:
           }
           run_cleanup=1
           echo "Setting strategy matrix for EBS Cleanup"
-          
-          echo 'show file'
-          cat cleanup_envs.txt
-          
           accounts=$(cat cleanup_envs.txt)
           matrix=$(get_matrix $accounts)
           [[ -z $accounts ]] && run_cleanup=0
