@@ -119,7 +119,7 @@ jobs:
         run: |
           environment=$(echo "${{ matrix.account_name }}" | rev | cut -d- -f2- | rev)
           echo src/ebs_cleanup.sh -e "$environment" -d ${{ needs.check-strategy.outputs.ebs_cleanup_sh_args }} delete
-          cleanup_output=$(src/ebs_cleanup.sh -e "$environment" -d ${{ needs.check-strategy.outputs.ebs_cleanup_sh_args }} delete | tee /dev/tty)
+          cleanup_output=$(src/ebs_cleanup.sh -e "$environment" -d ${{ needs.check-strategy.outputs.ebs_cleanup_sh_args }} delete | tee)
           if echo $cleanup_output | grep -qE "Dryrun - would delete volume .+ in ${environment}"; then
             echo "cleanup=1" >> $GITHUB_OUTPUT
           else
