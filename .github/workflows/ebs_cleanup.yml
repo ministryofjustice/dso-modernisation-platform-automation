@@ -159,6 +159,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: "cleanup_envs.txt"
+          path: dso-modernisation-platform-automation
       
       - name: Strategy
         id: strategy
@@ -174,7 +175,7 @@ jobs:
           }
           run_cleanup=1
           echo "Setting strategy matrix for EBS Cleanup"
-          accounts=$(cat cleanup_envs.txt)
+          accounts=$(cat ${{ github.workspace }}/dso-modernisation-platform-automation/cleanup_envs.txt)
           matrix=$(get_matrix $accounts)
           [[ -z $accounts ]] && run_cleanup=0
           echo "run_cleanup=${run_cleanup}"
