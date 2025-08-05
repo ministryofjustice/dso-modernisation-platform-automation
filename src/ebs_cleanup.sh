@@ -112,13 +112,16 @@ set_date_cmd(){
 action() {
   echo $message
   volumes_found=0
-  aws ec2 describe-volumes \
+
+  aws_output=$(aws ec2 describe-volumes \
     --region "$region" \
     --query "Volumes[*].{ID:VolumeId,CreateTime:CreateTime,State:State}" \
     --output text \
-    $filters $profile | while read -r create_time volume_id state; do
+    $filters $profile)
+
+  while read -r create_time volume_id state; do
  
-    ((volumes_found++))
+    volumes_found=$((volumes_found + 1))
     created_epoch=$($date_cmd -d "$create_time" +%s)
     age_months_dec=$(awk "BEGIN { printf \"%.1f\", ($now - $created_epoch) / 2592000 }") # 1 decimal place
     age_months=$(awk "BEGIN { print int($age_months_dec) }")
@@ -141,7 +144,8 @@ action() {
           ;;
       esac
     fi
-  done
+  done <<< "$aws_output"
+  
   if [[ "$volumes_found" -eq 0 ]]; then
     echo $none_message
   fi
