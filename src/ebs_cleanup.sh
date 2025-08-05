@@ -137,7 +137,7 @@ action() {
               echo "Dryrun - would delete volume $volume_id - $age_months_dec months old in $environment"
             else
               echo "Deleting volume $volume_id - $age_months_dec months old in $environment"
-              #aws ec2 delete-volume --volume-id "$volume_id" --region "$region" $profile
+              aws ec2 delete-volume --volume-id "$volume_id" --region "$region" $profile
             fi
             ;;
         esac
