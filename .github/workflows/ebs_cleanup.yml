@@ -155,7 +155,6 @@ jobs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
     steps:
       - name: Download cleanup envs Artifact
-        if: ${{ steps.check.outputs.cleanup == 1 }}
         uses: actions/download-artifact@v4
         with:
           name: "cleanup_envs.txt"
@@ -174,13 +173,6 @@ jobs:
           }
           run_cleanup=1
           echo "Setting strategy matrix for EBS Cleanup"
-          echo "ls"
-          ls
-          echo "ls .."
-          ls ..
-          echo "ls ${{ github.workspace }}/.."
-          ls ${{ github.workspace }}/..
-
           accounts=$(cat cleanup_envs.txt)
           matrix=$(get_matrix $accounts)
           [[ -z $accounts ]] && run_cleanup=0
