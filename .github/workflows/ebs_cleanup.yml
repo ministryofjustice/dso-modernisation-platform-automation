@@ -217,6 +217,6 @@ jobs:
       #     path: dso-modernisation-platform-automation
 
       - name: Run Commands
-        working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
+        working-directory: ${{ github.workspace }}
         run: |
           src/ebs_cleanup.sh -e "${{ matrix.account_name }}" ${{ needs.check-strategy.outputs.ebs_cleanup_sh_args }} delete
