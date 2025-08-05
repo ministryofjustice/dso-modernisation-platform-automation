@@ -174,9 +174,12 @@ jobs:
           }
           run_cleanup=1
           echo "Setting strategy matrix for EBS Cleanup"
+          echo "ls"
           ls
+          echo "ls .."
           ls ..
-          ls ${{ github.workspace }}
+          echo "ls ${{ github.workspace }}/.."
+          ls ${{ github.workspace }}/..
 
           accounts=$(cat cleanup_envs.txt)
           matrix=$(get_matrix $accounts)
