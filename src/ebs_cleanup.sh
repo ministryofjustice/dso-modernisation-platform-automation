@@ -65,11 +65,17 @@ check_action() {
   message="Scanning for $action EBS volumes older than $max_age_months months in $environment $region..."
   case $action in
     all)
-      filters='' ;;
+      filters=''
+      none_message="No volumes found older than $max_age_months months in $region"
+      ;;
     attached)
-      filters='--filters Name=status,Values=in-use' ;;
+      filters='--filters Name=status,Values=in-use'
+      none_message="No attached volumes found older than $max_age_months months in $region"
+      ;;
     unattached)
-      filters='--filters Name=status,Values=available' ;;
+      filters='--filters Name=status,Values=available'
+      none_message="No unattached volumes found older than $max_age_months months in $region"
+      ;;
     delete)
       filters='--filters Name=status,Values=available'
       if [[ "$dryrun" == true ]]; then
@@ -77,11 +83,14 @@ check_action() {
       else
         message="Deleting EBS volumes older than $max_age_months months in $region..."
       fi
+      none_message="No unattached volumes found older than $max_age_months months in $region to delete"
       ;;
     *)
       action=unattached
       filters='--filters Name=status,Values=available'
-      message="Scanning for $action EBS volumes older than $max_age_months months in $environment $region..." ;;
+      message="Scanning for $action EBS volumes older than $max_age_months months in $environment $region..."
+      none_message="No unattached volumes found older than $max_age_months months in $region"
+      ;;
   esac
 }
 
@@ -102,12 +111,14 @@ set_date_cmd(){
 
 action() {
   echo $message
+  volumes_found=0
   aws ec2 describe-volumes \
     --region "$region" \
     --query "Volumes[*].{ID:VolumeId,CreateTime:CreateTime,State:State}" \
     --output text \
     $filters $profile | while read -r create_time volume_id state; do
-
+ 
+    ((volumes_found++))
     created_epoch=$($date_cmd -d "$create_time" +%s)
     age_months_dec=$(awk "BEGIN { printf \"%.1f\", ($now - $created_epoch) / 2592000 }") # 1 decimal place
     age_months=$(awk "BEGIN { print int($age_months_dec) }")
@@ -131,6 +142,9 @@ action() {
       esac
     fi
   done
+  if [[ "$volumes_found" -eq 0 ]]; then
+    echo $none_message
+  fi
 }
 
 main
