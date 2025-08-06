@@ -11,7 +11,7 @@ on:
         description: 'e.g. development or leave blank for all'
         type: string
       age_in_months:
-        description: 'Search for volumes older than _ months, default=1'
+        description: 'volumes older than _ months, default=1'
         type: string
         default: ""
 
