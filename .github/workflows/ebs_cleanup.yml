@@ -160,8 +160,7 @@ jobs:
           echo "${{ steps.check.outputs.action_lines }}"
           echo "${{ steps.check.outputs.action_lines }}" >> action_lines.txt
           echo "" > action_lines.txt
-          echo end
-          echo 
+          cat action_lines.txt
 
       - name: Upload cleanup_envs.txt Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
@@ -221,6 +220,8 @@ jobs:
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
           echo "${matrix}" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
+          echo ls
+          ls
           echo "ACTIONS:"
           cat action_lines.txt
 
