@@ -159,7 +159,7 @@ jobs:
           echo ${{ matrix.account_name }} >> cleanup_envs.txt
           echo "${{ steps.check.outputs.action_lines }}"
           echo "${{ steps.check.outputs.action_lines }}" >> action_lines.txt
-          echo "" > action_lines.txt
+          echo "" >> action_lines.txt
           cat action_lines.txt
 
       - name: Upload cleanup_envs.txt Artifact
