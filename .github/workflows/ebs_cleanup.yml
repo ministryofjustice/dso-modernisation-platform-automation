@@ -136,6 +136,7 @@ jobs:
             echo "$action_lines"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
+          echo "$GITHUB_OUTPUT"
           else
             echo "cleanup=0" >> $GITHUB_OUTPUT
           fi
@@ -161,6 +162,7 @@ jobs:
           echo "${{ steps.extract.outputs.action_lines }}" >> action_lines.txt
           echo "" > action_lines.txt
           echo end
+          echo 
 
       - name: Upload cleanup_envs.txt Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
