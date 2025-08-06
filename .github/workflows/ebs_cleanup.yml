@@ -10,17 +10,10 @@ on:
       environments:
         description: 'e.g. development or leave blank for all'
         type: string
-      ebs_cleanup_sh_args:
-        description: 'Command line options to ebs_cleanup.sh script. -m <age_in_months>'
+      age_in_months:
+        description: 'volumes older than _ months'
         type: string
-        default: ""
-      dryrun:
-        type: choice
-        description: Dryrun mode (leave as false unless testing)
-        default: false
-        options:
-          - true
-          - false
+        default: "1"
 
 permissions:
   id-token: write
@@ -32,8 +25,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
-      ebs_cleanup_sh_args: "${{ steps.options.outputs.ebs_cleanup_sh_args }}"
-      dryrun: "${{ steps.options.outputs.dryrun }}"
 
     steps:
       - name: Checkout Repository
@@ -51,36 +42,18 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo '' > cleanup_envs.txt
+          echo '' > action_lines.txt
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
           echo "${matrix}" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
           echo "{$matrix}"
 
-      - name: Options
-        id: options
-        run: |
-          dryrun=0
-          echo "Setting options event=${GITHUB_EVENT_NAME}"
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            ebs_cleanup_sh_args="${{ github.event.inputs.ebs_cleanup_sh_args }}"
-            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
-              dryrun=1
-            fi
-          else
-            echo "Unsupported event ${GITHUB_EVENT_NAME}"
-            exit 1
-          fi
-          echo "ebs_cleanup_sh_args=${ebs_cleanup_sh_args} dryrun=${dryrun}"
-          echo "ebs_cleanup_sh_args=${ebs_cleanup_sh_args}" >> $GITHUB_OUTPUT
-          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
-
       # need to use this artifact method because we need to update from multiple matrices, using output vars wont suffice
-      - name: Upload cleanup envs list artifact 
+      - name: Upload action lines artifact 
         uses: actions/upload-artifact@v4
         with:
-          name: "cleanup_envs.txt"
-          path: cleanup_envs.txt
+          name: "action_lines.txt"
+          path: action_lines.txt
           overwrite: true
 
   check-ebs:
@@ -117,106 +90,59 @@ jobs:
         id: check
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
-          echo src/ebs_cleanup.sh -e "${{ matrix.account_name }}" -d ${{ needs.check-strategy.outputs.ebs_cleanup_sh_args }} delete
-          cleanup_output=$(src/ebs_cleanup.sh -e "${{ matrix.account_name }}" -d ${{ needs.check-strategy.outputs.ebs_cleanup_sh_args }} delete)
+          echo src/ebs_cleanup.sh -e "${{ matrix.account_name }}" -d -m ${{ github.event.inputs.age_in_months }} delete
+          cleanup_output=$(src/ebs_cleanup.sh -e "${{ matrix.account_name }}" -d -m ${{ github.event.inputs.age_in_months }} delete)
           echo "${cleanup_output[@]}"
-          if echo $cleanup_output | grep -qE "Dryrun - would delete volume .+ in ${{ matrix.account_name }}"; then
+          action_lines=$(echo "${cleanup_output[@]}" | grep -E "Dryrun - would delete volume .+ in ${{ matrix.account_name }}" || true)
+          if [[ -n $action_lines ]]; then
             echo "cleanup=1" >> $GITHUB_OUTPUT
+            {
+            echo "action_lines<<EOF"
+            echo "$action_lines"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
           else
             echo "cleanup=0" >> $GITHUB_OUTPUT
           fi
-      
-      - name: Download cleanup envs Artifact
+
+      - name: Download action lines Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
         uses: actions/download-artifact@v4
         with:
-          name: "cleanup_envs.txt"
+          name: "action_lines.txt"
 
-      - name: Append environment to list
+      - name: Append environment and action lines to lists
         if: ${{ steps.check.outputs.cleanup == 1 }}
         working-directory: ${{ github.workspace }}
         run: |
-          echo ${{ matrix.account_name }} >> cleanup_envs.txt
-
-      - name: Upload cleanup_envs.txt Artifact
+          echo "${{ steps.check.outputs.action_lines }}"
+          echo "${{ steps.check.outputs.action_lines }}" >> action_lines.txt
+          touch action_lines.txt
+      
+      - name: Upload action lines Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
         uses: actions/upload-artifact@v4
         with:
-          name: "cleanup_envs.txt"
-          path: cleanup_envs.txt
+          name: "action_lines.txt"
+          path: action_lines.txt
           overwrite: true
+
 
   cleanup-strategy:
     name: Cleanup Strategy
     needs: check-ebs
     runs-on: ubuntu-latest
-    outputs:
-      run_cleanup: "${{ steps.strategy.outputs.run_cleanup }}"
-      matrix: "${{ steps.strategy.outputs.matrix }}"
     steps:
-      - name: Download cleanup envs Artifact
+      - name: Download action lines Artifact
         uses: actions/download-artifact@v4
         with:
-          name: "cleanup_envs.txt"
+          name: "action_lines.txt"
       
       - name: Strategy
         id: strategy
         run: |
-          get_matrix() {
-            echo '{"include":['
-            (
-              for account in $@; do
-                echo '{"account_name": "'"$account"'"},'
-              done
-            ) | sed '$s/,$//'
-            echo ']}'
-          }
-          run_cleanup=1
-          echo "Setting strategy matrix for EBS Cleanup"
-          accounts=$(cat cleanup_envs.txt)
-          matrix=$(get_matrix $accounts)
-          [[ -z $accounts ]] && run_cleanup=0
-          echo "run_cleanup=${run_cleanup}"
-          echo "${matrix}"
-          echo "run_cleanup=${run_cleanup}" >> $GITHUB_OUTPUT
-          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
-          echo "${matrix}" >> $GITHUB_OUTPUT
-          echo 'EOF' >> $GITHUB_OUTPUT
+          echo "ACTIONS: $(cat action_lines.txt)"
+          echo '>'
+          echo "To delete these volumes you can use src/ebs_cleanup.sh or:"
+          sed -nE "s/.*(vol-[a-zA-Z0-9]+).* in ([a-z-]+)$/aws ec2 delete-volume --volume-id \1 --region eu-west-2 --profile \2/p" action_lines.txt
 
-  cleanup-ebs:
-    name: Cleanup ebs
-    needs:
-      - check-strategy
-      - cleanup-strategy
-    runs-on: ubuntu-latest
-    if: ${{ needs.cleanup-strategy.outputs.run_cleanup == 1 && needs.check-strategy.outputs.dryrun == 0 }}
-    strategy:
-      matrix: ${{ fromJson(needs.cleanup-strategy.outputs.matrix) }}
-      max-parallel: 1
-    steps:
-      - name: Get Account Details
-        id: account
-        run: |
-          echo "account name: ${{ matrix.account_name }}"
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
-          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
-          echo "role arn:     ${role_arn}"
-          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
-        with:
-          role-to-assume: "${{ steps.account.outputs.role_arn }}"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
-          aws-region: eu-west-2
-      
-      - name: Checkout Repository
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
-        with:
-          ref: ${{ github.ref }}
-          path: dso-modernisation-platform-automation
-
-      - name: Run Commands
-        working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
-        run: |
-          src/ebs_cleanup.sh -e "${{ matrix.account_name }}" ${{ needs.check-strategy.outputs.ebs_cleanup_sh_args }} delete
