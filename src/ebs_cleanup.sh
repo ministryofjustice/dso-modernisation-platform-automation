@@ -117,8 +117,9 @@ action() {
     --query "Volumes[*].{ID:VolumeId,CreateTime:CreateTime,State:State}" \
     --output text \
     $filters $profile)
-  
-  if [[ -n "$aws_output" ]]; then
+
+  # while read .... do ... <<< $aws_output - this structure because it handles variables better than piping |, e.g. if you wanted to iterate an outside variable within the loop  
+  if [[ -n "$aws_output" ]]; then # because this loop would run once even without any aws_output
     while read -r create_time volume_id state; do
       created_epoch=$($date_cmd -d "$create_time" +%s)
       age_months_dec=$(awk "BEGIN { printf \"%.1f\", ($now - $created_epoch) / 2592000 }") # 1 decimal place
