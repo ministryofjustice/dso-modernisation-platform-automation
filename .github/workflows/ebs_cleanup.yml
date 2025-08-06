@@ -136,7 +136,7 @@ jobs:
             echo "$action_lines"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
-          echo "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
           else
             echo "cleanup=0" >> $GITHUB_OUTPUT
           fi
