@@ -146,7 +146,7 @@ jobs:
           echo ${{ matrix.account_name }} >> cleanup_envs.txt
           echo "${{ steps.check.outputs.action_lines }}"
           echo "${{ steps.check.outputs.action_lines }}" >> action_lines.txt
-          echo "" >> action_lines.txt
+          touch action_lines.txt
 
       - name: Upload cleanup_envs.txt Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
@@ -208,7 +208,6 @@ jobs:
           echo 'EOF' >> $GITHUB_OUTPUT
           echo "ACTIONS:"
           cat action_lines.txt
-          echo '>'
           echo "To delete these volumes you can use src/ebs_cleanup.sh or:"
           sed -nE "s/.*(vol-[a-zA-Z0-9]+).* in ([a-z-]+)$/aws ec2 delete-volume --volume-id \1 --region eu-west-2 --profile \2/p" action_lines.txt
 
