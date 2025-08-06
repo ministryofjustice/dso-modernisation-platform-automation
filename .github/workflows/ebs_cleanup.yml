@@ -206,10 +206,9 @@ jobs:
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
           echo "${matrix}" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
-          echo ''
           echo "ACTIONS:"
           cat action_lines.txt
-          echo ''
+          echo '>'
           echo "To delete these volumes you can use src/ebs_cleanup.sh or:"
           sed -nE "s/.*(vol-[a-zA-Z0-9]+).* in ([a-z-]+)$/aws ec2 delete-volume --volume-id \1 --region eu-west-2 --profile \2/p" action_lines.txt
 
