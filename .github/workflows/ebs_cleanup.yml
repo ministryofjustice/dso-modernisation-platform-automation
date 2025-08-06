@@ -11,9 +11,9 @@ on:
         description: 'e.g. development or leave blank for all'
         type: string
       age_in_months:
-        description: 'volumes older than _ months, default=1'
+        description: 'volumes older than _ months'
         type: string
-        default: ""
+        default: "1"
 
 permissions:
   id-token: write
@@ -25,7 +25,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
-      age_in_months: "${{ steps.options.outputs.age_in_months }}"
 
     steps:
       - name: Checkout Repository
@@ -43,34 +42,13 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo '' > cleanup_envs.txt
           echo '' > action_lines.txt
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
           echo "${matrix}" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
           echo "{$matrix}"
 
-      - name: Options
-        id: options
-        run: |
-          echo "Setting options event=${GITHUB_EVENT_NAME}"
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            age_in_months="${{ github.event.inputs.age_in_months }}"
-          else
-            echo "Unsupported event ${GITHUB_EVENT_NAME}"
-            exit 1
-          fi
-          echo "age_in_months=${age_in_months}"
-          echo "age_in_months=${age_in_months}" >> $GITHUB_OUTPUT
-
       # need to use this artifact method because we need to update from multiple matrices, using output vars wont suffice
-      - name: Upload cleanup envs list artifact 
-        uses: actions/upload-artifact@v4
-        with:
-          name: "cleanup_envs.txt"
-          path: cleanup_envs.txt
-          overwrite: true
-      
       - name: Upload action lines artifact 
         uses: actions/upload-artifact@v4
         with:
@@ -112,8 +90,8 @@ jobs:
         id: check
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
-          echo src/ebs_cleanup.sh -e "${{ matrix.account_name }}" -d ${{ needs.check-strategy.outputs.age_in_months }} delete
-          cleanup_output=$(src/ebs_cleanup.sh -e "${{ matrix.account_name }}" -d ${{ needs.check-strategy.outputs.age_in_months }} delete)
+          echo src/ebs_cleanup.sh -e "${{ matrix.account_name }}" -d -m ${{ github.event.inputs.age_in_months }} delete
+          cleanup_output=$(src/ebs_cleanup.sh -e "${{ matrix.account_name }}" -d -m ${{ github.event.inputs.age_in_months }} delete)
           echo "${cleanup_output[@]}"
           action_lines=$(echo "${cleanup_output[@]}" | grep -E "Dryrun - would delete volume .+ in ${{ matrix.account_name }}" || true)
           if [[ -n $action_lines ]]; then
@@ -126,12 +104,6 @@ jobs:
           else
             echo "cleanup=0" >> $GITHUB_OUTPUT
           fi
-      
-      - name: Download cleanup envs Artifact
-        if: ${{ steps.check.outputs.cleanup == 1 }}
-        uses: actions/download-artifact@v4
-        with:
-          name: "cleanup_envs.txt"
 
       - name: Download action lines Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
@@ -143,18 +115,9 @@ jobs:
         if: ${{ steps.check.outputs.cleanup == 1 }}
         working-directory: ${{ github.workspace }}
         run: |
-          echo ${{ matrix.account_name }} >> cleanup_envs.txt
           echo "${{ steps.check.outputs.action_lines }}"
           echo "${{ steps.check.outputs.action_lines }}" >> action_lines.txt
           touch action_lines.txt
-
-      - name: Upload cleanup_envs.txt Artifact
-        if: ${{ steps.check.outputs.cleanup == 1 }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: "cleanup_envs.txt"
-          path: cleanup_envs.txt
-          overwrite: true
       
       - name: Upload action lines Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
@@ -170,14 +133,7 @@ jobs:
     needs: check-ebs
     runs-on: ubuntu-latest
     outputs:
-      run_cleanup: "${{ steps.strategy.outputs.run_cleanup }}"
-      matrix: "${{ steps.strategy.outputs.matrix }}"
     steps:
-      - name: Download cleanup envs Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: "cleanup_envs.txt"
-
       - name: Download action lines Artifact
         uses: actions/download-artifact@v4
         with:
@@ -186,26 +142,6 @@ jobs:
       - name: Strategy
         id: strategy
         run: |
-          get_matrix() {
-            echo '{"include":['
-            (
-              for account in $@; do
-                echo '{"account_name": "'"$account"'"},'
-              done
-            ) | sed '$s/,$//'
-            echo ']}'
-          }
-          run_cleanup=1
-          echo "Setting strategy matrix for EBS Cleanup"
-          accounts=$(cat cleanup_envs.txt)
-          matrix=$(get_matrix $accounts)
-          [[ -z $accounts ]] && run_cleanup=0
-          echo "run_cleanup=${run_cleanup}"
-          echo "${matrix}"
-          echo "run_cleanup=${run_cleanup}" >> $GITHUB_OUTPUT
-          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
-          echo "${matrix}" >> $GITHUB_OUTPUT
-          echo 'EOF' >> $GITHUB_OUTPUT
           echo "ACTIONS: $(cat action_lines.txt)"
           echo '>'
           echo "To delete these volumes you can use src/ebs_cleanup.sh or:"
