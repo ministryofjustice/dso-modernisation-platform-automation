@@ -157,8 +157,10 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           echo ${{ matrix.account_name }} >> cleanup_envs.txt
-          echo "${{ steps.extract.outputs.action_lines }}" > action_lines.txt
+          echo "${{ steps.extract.outputs.action_lines }}"
+          echo "${{ steps.extract.outputs.action_lines }}" >> action_lines.txt
           echo "" > action_lines.txt
+          echo end
 
       - name: Upload cleanup_envs.txt Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
