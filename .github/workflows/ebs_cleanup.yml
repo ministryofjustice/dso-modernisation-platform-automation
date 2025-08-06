@@ -136,7 +136,6 @@ jobs:
             echo "$action_lines"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
-          cat "$GITHUB_OUTPUT"
           else
             echo "cleanup=0" >> $GITHUB_OUTPUT
           fi
@@ -158,8 +157,8 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           echo ${{ matrix.account_name }} >> cleanup_envs.txt
-          echo "${{ steps.extract.outputs.action_lines }}"
-          echo "${{ steps.extract.outputs.action_lines }}" >> action_lines.txt
+          echo "${{ steps.check.outputs.action_lines }}"
+          echo "${{ steps.check.outputs.action_lines }}" >> action_lines.txt
           echo "" > action_lines.txt
           echo end
           echo 
