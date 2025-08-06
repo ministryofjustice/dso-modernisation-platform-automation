@@ -211,5 +211,5 @@ jobs:
           cat action_lines.txt
           echo ''
           echo "To delete these volumes you can use src/ebs_cleanup.sh or:"
-          sed -nE "s/.*(vol-[a-zA-Z0-9]+).* in ([a-z-]+)$/aws ec2 delete-volume --volume-id \1 --region $region --profile \2/p" action_lines.txt
+          sed -nE "s/.*(vol-[a-zA-Z0-9]+).* in ([a-z-]+)$/aws ec2 delete-volume --volume-id \1 --region eu-west-2 --profile \2/p" action_lines.txt
 
