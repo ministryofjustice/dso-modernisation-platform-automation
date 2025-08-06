@@ -132,7 +132,6 @@ jobs:
     name: Cleanup Strategy
     needs: check-ebs
     runs-on: ubuntu-latest
-    outputs:
     steps:
       - name: Download action lines Artifact
         uses: actions/download-artifact@v4
