@@ -93,7 +93,7 @@ jobs:
           echo src/ebs_cleanup.sh -e "${{ matrix.account_name }}" -d -m ${{ github.event.inputs.age_in_months }} delete
           cleanup_output=$(src/ebs_cleanup.sh -e "${{ matrix.account_name }}" -d -m ${{ github.event.inputs.age_in_months }} delete)
           echo "${cleanup_output[@]}"
-          action_lines=$(echo "${cleanup_output[@]}" | grep -E "Dryrun - would delete volume .+ in ${{ matrix.account_name }}" || true)
+          action_lines=$(echo "${cleanup_output[@]}" | grep -E "vol-.+ months old in ${{ matrix.account_name }}, reason: " || true)
           if [[ -n $action_lines ]]; then
             echo "cleanup=1" >> $GITHUB_OUTPUT
             {
@@ -144,5 +144,5 @@ jobs:
           echo "ACTIONS: $(cat action_lines.txt)"
           echo '>'
           echo "To delete these volumes you can use src/ebs_cleanup.sh or:"
-          sed -nE "s/.*(vol-[a-zA-Z0-9]+).* in ([a-z-]+)$/aws ec2 delete-volume --volume-id \1 --region eu-west-2 --profile \2/p" action_lines.txt
+          sed -nE "s/.*(vol-[a-zA-Z0-9]+).* months old in ([a-z-]+), reason: /aws ec2 delete-volume --volume-id \1 --region eu-west-2 --profile \2/p" action_lines.txt
 

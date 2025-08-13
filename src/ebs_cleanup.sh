@@ -32,7 +32,7 @@ main() {
   check_profile
   check_action
   set_date_cmd
-  action
+  get_volumes
 }
 
 while getopts ":de:m:s:" opt; do
@@ -58,7 +58,7 @@ check_profile() {
     echo "need to log into aws"
     exit 1
   fi
-  
+  profile="--profile $environment"
 }
 
 check_action() {
@@ -109,40 +109,54 @@ set_date_cmd(){
   now=$($date_cmd +%s)
 }
 
-action() {
+do_action() {
+  created_epoch=$($date_cmd -d "$create_time" +%s)
+  age_months_dp=$(awk "BEGIN { printf \"%.1f\", ($now - $created_epoch) / 2592000 }") # 1 decimal place
+  age_months=$(awk "BEGIN { print int($age_months_dp) }")
+
+  (( age_months >= max_age_months )) || return
+
+  case $action in
+    all)
+      echo "$volume_id $state $age_months_dp months old in $environment" ;;
+    attached)
+      echo "$volume_id $age_months_dp months old in $environment" ;;
+    unattached)
+      echo "$volume_id $age_months_dp months old in $environment, reason: $reason" ;;
+    delete)
+      if [[ "$dryrun" == true ]]; then
+        echo "$volume_id $age_months_dp months old in $environment, reason: $reason"
+      else
+        echo "Deleting $volume_id $age_months_dp months old in $environment"
+        # aws ec2 delete-volume --volume-id "$volume_id" --region "$region" $profile
+      fi
+      ;;
+    esac
+}
+
+get_volumes() {
   echo $message
 
   aws_output=$(aws ec2 describe-volumes \
     --region "$region" \
-    --query "Volumes[*].{ID:VolumeId,CreateTime:CreateTime,State:State}" \
+    --query "Volumes[*].{ID:VolumeId,CreateTime:CreateTime,State:State,Tags:Tags}" \
     --output text \
     $filters $profile)
 
   # while read .... do ... <<< $aws_output - this structure because it handles variables better than piping |, e.g. if you wanted to iterate an outside variable within the loop  
   if [[ -n "$aws_output" ]]; then # because this loop would run once even without any aws_output
-    while read -r create_time volume_id state; do
-      created_epoch=$($date_cmd -d "$create_time" +%s)
-      age_months_dec=$(awk "BEGIN { printf \"%.1f\", ($now - $created_epoch) / 2592000 }") # 1 decimal place
-      age_months=$(awk "BEGIN { print int($age_months_dec) }")
-
-      if [ "$age_months" -ge "$max_age_months" ]; then
-        case $action in
-          all)
-            echo "$volume_id $state $age_months_dec months old in $environment" ;;
-          attached)
-            echo "$volume_id $age_months_dec months oldn $environment" ;;
-          unattached)
-            echo "$volume_id $age_months_dec months old in $environment" ;;
-          delete)
-            if [[ "$dryrun" == true ]]; then
-              echo "Dryrun - would delete volume $volume_id - $age_months_dec months old in $environment"
-            else
-              echo "Deleting volume $volume_id - $age_months_dec months old in $environment"
-              aws ec2 delete-volume --volume-id "$volume_id" --region "$region" $profile
-            fi
-            ;;
-        esac
-      fi
+    while read -r col1 col2 col3 col4 col5; do
+      case $col1 in
+        20[0-9][0-9]-??-??T*)
+          [[ -n "$volume_id" ]] && do_action
+          create_time="$col1"
+          volume_id="$col2"
+          state="$col3"
+          reason="?"
+        ;;
+        TAGS)
+          [[ "$col2" == "map-migrated" ]] && reason="MAP"
+        ;;
     done <<< "$aws_output"
   else
     echo $none_message
