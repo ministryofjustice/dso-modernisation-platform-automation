@@ -128,7 +128,7 @@ do_action() {
         echo "$volume_id $age_months_dp months old in $environment, reason: $reason"
       else
         echo "Deleting $volume_id $age_months_dp months old in $environment"
-        # aws ec2 delete-volume --volume-id "$volume_id" --region "$region" $profile
+        aws ec2 delete-volume --volume-id "$volume_id" --region "$region" $profile
       fi
       ;;
     esac
