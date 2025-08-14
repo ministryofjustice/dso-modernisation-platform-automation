@@ -92,6 +92,7 @@ jobs:
         run: |
           echo src/ebs_cleanup.sh -d -m ${{ github.event.inputs.age_in_months }} delete
           src/ebs_cleanup.sh -d -m ${{ github.event.inputs.age_in_months }} delete
+          echo thing
           cleanup_output=$(src/ebs_cleanup.sh -d -m ${{ github.event.inputs.age_in_months }} delete)
           echo 1
           echo "${cleanup_output[@]}"

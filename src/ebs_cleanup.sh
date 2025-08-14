@@ -141,6 +141,8 @@ get_volumes() {
         TAGS)
           [[ "$col2" == "map-migrated" ]] && reason="MAP"
         ;;
+        *)
+          echo "thing $col1 $col2"
       esac
     done <<< "$aws_output"
   else
