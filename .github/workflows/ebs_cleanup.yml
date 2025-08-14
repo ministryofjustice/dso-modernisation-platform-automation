@@ -118,6 +118,7 @@ jobs:
           echo "${{ steps.check.outputs.action_lines }}"
           echo "${{ matrix.account_name }}" >> action_lines.txt
           echo "${{ steps.check.outputs.action_lines }}" >> action_lines.txt
+          echo "" >> action_lines.txt
       
       - name: Upload action lines Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
@@ -144,5 +145,5 @@ jobs:
           echo "ACTIONS: $(cat action_lines.txt)"
           echo '>'
           echo "To delete these volumes you can use src/ebs_cleanup.sh or:"
-          sed -nE "s/.*(vol-[a-zA-Z0-9]+).* months old, reason: /aws ec2 delete-volume --volume-id \1 --region eu-west-2 --profile \2/p" action_lines.txt
+          sed -E "s/.*(vol-[a-zA-Z0-9]+).* months old, reason:.*/aws ec2 delete-volume --volume-id \1 --region eu-west-2/p" action_lines.txt
 
