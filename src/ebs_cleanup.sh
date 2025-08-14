@@ -110,8 +110,9 @@ do_action() {
       if [[ "$dryrun" == true ]]; then
         echo "$volume_id $age_months_dp months old, reason: $reason"
       else
-        echo "Deleting $volume_id $age_months_dp months old"
-        aws ec2 delete-volume --volume-id "$volume_id" --region "$region"
+        echo "Currently disabled delete function - $volume_id $age_months_dp months old"
+        #echo "Deleting $volume_id $age_months_dp months old"
+        #aws ec2 delete-volume --volume-id "$volume_id" --region "$region"
       fi
       ;;
   esac
