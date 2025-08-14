@@ -17,7 +17,6 @@ usage() {
 
 Where <opts>:
   -d                     Dryrun for delete command. Default: false
-  -e <environment>       Environment e.g. nomis-test          
   -m <months>            Exclude volumes younger than this number of months. Default: 1
 
 And:
@@ -29,7 +28,7 @@ And:
 }
 
 main() {
-  check_profile
+  get_environment
   check_action
   set_date_cmd
   get_volumes
@@ -38,7 +37,6 @@ main() {
 while getopts ":de:m:s:" opt; do
   case $opt in
     d) dryrun=true ;;
-    e) environment="$OPTARG" ;;
     m) max_age_months="$OPTARG" ;;
     s) shell_output="$OPTARG" ;;
     \?) echo "Invalid option: -$OPTARG" >&2; usage ;;
@@ -48,17 +46,12 @@ done
 shift $((OPTIND -1))
 action=$1
 
-check_profile() {
-  # could check if we are actully logged in when environment is set, choosing to fail at the apply step if not logged in so it isnt very slow.
-  if [[ -n "${environment:-}" ]]; then
-    :
-  elif env_alias=$(aws iam list-account-aliases --output text 2>/dev/null); then
-    environment=$(echo "$env_alias" | awk '{print $2}')
-  else
+get_environment() {
+  environment=$(aws iam list-account-aliases --output text)
+  if [[ -z "${environment:-}" ]]; then
     echo "need to log into aws"
     exit 1
   fi
-  profile="--profile $environment"
 }
 
 check_action() {
@@ -128,7 +121,7 @@ do_action() {
         echo "$volume_id $age_months_dp months old in $environment, reason: $reason"
       else
         echo "Deleting $volume_id $age_months_dp months old in $environment"
-        aws ec2 delete-volume --volume-id "$volume_id" --region "$region" $profile
+        aws ec2 delete-volume --volume-id "$volume_id" --region "$region"
       fi
       ;;
   esac
@@ -141,7 +134,7 @@ get_volumes() {
     --region "$region" \
     --query "Volumes[*].{ID:VolumeId,CreateTime:CreateTime,State:State,Tags:Tags}" \
     --output text \
-    $filters $profile)
+    $filters)
 
   # while read .... do ... <<< $aws_output - this structure because it handles variables better than piping |, e.g. if you wanted to iterate an outside variable within the loop  
   if [[ -n "$aws_output" ]]; then # because this loop would run once even without any aws_output
