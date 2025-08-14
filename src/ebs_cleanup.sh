@@ -131,7 +131,7 @@ do_action() {
         aws ec2 delete-volume --volume-id "$volume_id" --region "$region" $profile
       fi
       ;;
-    esac
+  esac
 }
 
 get_volumes() {
@@ -157,6 +157,7 @@ get_volumes() {
         TAGS)
           [[ "$col2" == "map-migrated" ]] && reason="MAP"
         ;;
+      esac
     done <<< "$aws_output"
   else
     echo $none_message
