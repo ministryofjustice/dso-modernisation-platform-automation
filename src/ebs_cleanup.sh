@@ -6,7 +6,6 @@ set -eo pipefail
 
 # defaults
 dryrun=false
-environment=''
 max_age_months=1
 region='eu-west-2'
 
@@ -17,7 +16,6 @@ usage() {
 
 Where <opts>:
   -d                     Dryrun for delete command. Default: false
-  -e <environment>       Environment e.g. nomis-test          
   -m <months>            Exclude volumes younger than this number of months. Default: 1
 
 And:
@@ -29,16 +27,14 @@ And:
 }
 
 main() {
-  check_profile
   check_action
   set_date_cmd
-  action
+  get_volumes
 }
 
 while getopts ":de:m:s:" opt; do
   case $opt in
     d) dryrun=true ;;
-    e) environment="$OPTARG" ;;
     m) max_age_months="$OPTARG" ;;
     s) shell_output="$OPTARG" ;;
     \?) echo "Invalid option: -$OPTARG" >&2; usage ;;
@@ -48,21 +44,8 @@ done
 shift $((OPTIND -1))
 action=$1
 
-check_profile() {
-  # could check if we are actully logged in when environment is set, choosing to fail at the apply step if not logged in so it isnt very slow.
-  if [[ -n "${environment:-}" ]]; then
-    :
-  elif env_alias=$(aws iam list-account-aliases --output text 2>/dev/null); then
-    environment=$(echo "$env_alias" | awk '{print $2}')
-  else
-    echo "need to log into aws"
-    exit 1
-  fi
-  
-}
-
 check_action() {
-  message="Scanning for $action EBS volumes older than $max_age_months months in $environment $region..."
+  message="Scanning for $action EBS volumes older than $max_age_months months in $region..."
   case $action in
     all)
       filters=''
@@ -88,7 +71,7 @@ check_action() {
     *)
       action=unattached
       filters='--filters Name=status,Values=available'
-      message="Scanning for $action EBS volumes older than $max_age_months months in $environment $region..."
+      message="Scanning for $action EBS volumes older than $max_age_months months in $region..."
       none_message="No unattached volumes found older than $max_age_months months in $region"
       ;;
   esac
@@ -109,41 +92,58 @@ set_date_cmd(){
   now=$($date_cmd +%s)
 }
 
-action() {
+do_action() {
+  created_epoch=$($date_cmd -d "$create_time" +%s)
+  age_months_dp=$(awk "BEGIN { printf \"%.1f\", ($now - $created_epoch) / 2592000 }") # 1 decimal place
+  age_months=$(awk "BEGIN { print int($age_months_dp) }")
+
+  (( age_months >= max_age_months )) || return
+
+  case $action in
+    all)
+      echo "$volume_id $state $age_months_dp months old" ;;
+    attached)
+      echo "$volume_id $age_months_dp months old" ;;
+    unattached)
+      echo "$volume_id $age_months_dp months old, reason: $reason" ;;
+    delete)
+      if [[ "$dryrun" == true ]]; then
+        echo "$volume_id $age_months_dp months old, reason: $reason"
+      else
+        echo "Currently disabled delete function - $volume_id $age_months_dp months old"
+        #echo "Deleting $volume_id $age_months_dp months old"
+        #aws ec2 delete-volume --volume-id "$volume_id" --region "$region"
+      fi
+      ;;
+  esac
+}
+
+get_volumes() {
   echo $message
 
   aws_output=$(aws ec2 describe-volumes \
     --region "$region" \
-    --query "Volumes[*].{ID:VolumeId,CreateTime:CreateTime,State:State}" \
+    --query "Volumes[*].{ID:VolumeId,CreateTime:CreateTime,State:State,Tags:Tags}" \
     --output text \
-    $filters $profile)
+    $filters)
 
   # while read .... do ... <<< $aws_output - this structure because it handles variables better than piping |, e.g. if you wanted to iterate an outside variable within the loop  
   if [[ -n "$aws_output" ]]; then # because this loop would run once even without any aws_output
-    while read -r create_time volume_id state; do
-      created_epoch=$($date_cmd -d "$create_time" +%s)
-      age_months_dec=$(awk "BEGIN { printf \"%.1f\", ($now - $created_epoch) / 2592000 }") # 1 decimal place
-      age_months=$(awk "BEGIN { print int($age_months_dec) }")
-
-      if [ "$age_months" -ge "$max_age_months" ]; then
-        case $action in
-          all)
-            echo "$volume_id $state $age_months_dec months old in $environment" ;;
-          attached)
-            echo "$volume_id $age_months_dec months oldn $environment" ;;
-          unattached)
-            echo "$volume_id $age_months_dec months old in $environment" ;;
-          delete)
-            if [[ "$dryrun" == true ]]; then
-              echo "Dryrun - would delete volume $volume_id - $age_months_dec months old in $environment"
-            else
-              echo "Deleting volume $volume_id - $age_months_dec months old in $environment"
-              aws ec2 delete-volume --volume-id "$volume_id" --region "$region" $profile
-            fi
-            ;;
-        esac
-      fi
+    while read -r col1 col2 col3; do
+      case $col1 in
+        20[0-9][0-9]-??-??T*)
+          [[ -n "$volume_id" ]] && do_action
+          create_time="$col1"
+          volume_id="$col2"
+          state="$col3"
+          reason="?"
+        ;;
+        TAGS)
+          [[ "$col2" == "map-migrated" ]] && reason="MAP"
+        ;;
+      esac
     done <<< "$aws_output"
+    [[ -n "$volume_id" ]] && do_action # print the last one
   else
     echo $none_message
   fi
