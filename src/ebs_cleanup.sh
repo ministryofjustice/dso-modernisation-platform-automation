@@ -47,7 +47,7 @@ shift $((OPTIND -1))
 action=$1
 
 get_environment() {
-  environment=$(aws iam list-account-aliases --output text)
+  environment=$(aws iam list-account-aliases --output text | awk '{print $2}')
   if [[ -z "${environment:-}" ]]; then
     echo "need to log into aws"
     exit 1
