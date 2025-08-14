@@ -129,7 +129,7 @@ get_volumes() {
 
   # while read .... do ... <<< $aws_output - this structure because it handles variables better than piping |, e.g. if you wanted to iterate an outside variable within the loop  
   if [[ -n "$aws_output" ]]; then # because this loop would run once even without any aws_output
-    while read -r col1 col2 col3 col4 col5; do
+    while read -r col1 col2 col3; do
       case $col1 in
         20[0-9][0-9]-??-??T*)
           [[ -n "$volume_id" ]] && do_action
@@ -141,10 +141,9 @@ get_volumes() {
         TAGS)
           [[ "$col2" == "map-migrated" ]] && reason="MAP"
         ;;
-        *)
-          echo "thing $col1 $col2"
       esac
     done <<< "$aws_output"
+    [[ -n "$volume_id" ]] && do_action # print the last one
   else
     echo $none_message
   fi
