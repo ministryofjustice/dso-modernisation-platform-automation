@@ -6,7 +6,6 @@ set -eo pipefail
 
 # defaults
 dryrun=false
-environment=''
 max_age_months=1
 region='eu-west-2'
 
@@ -28,7 +27,6 @@ And:
 }
 
 main() {
-  get_environment
   check_action
   set_date_cmd
   get_volumes
@@ -46,16 +44,8 @@ done
 shift $((OPTIND -1))
 action=$1
 
-get_environment() {
-  environment=$(aws iam list-account-aliases --output text | awk '{print $2}')
-  if [[ -z "${environment:-}" ]]; then
-    echo "need to log into aws"
-    exit 1
-  fi
-}
-
 check_action() {
-  message="Scanning for $action EBS volumes older than $max_age_months months in $environment $region..."
+  message="Scanning for $action EBS volumes older than $max_age_months months in $region..."
   case $action in
     all)
       filters=''
@@ -81,7 +71,7 @@ check_action() {
     *)
       action=unattached
       filters='--filters Name=status,Values=available'
-      message="Scanning for $action EBS volumes older than $max_age_months months in $environment $region..."
+      message="Scanning for $action EBS volumes older than $max_age_months months in $region..."
       none_message="No unattached volumes found older than $max_age_months months in $region"
       ;;
   esac
@@ -111,16 +101,16 @@ do_action() {
 
   case $action in
     all)
-      echo "$volume_id $state $age_months_dp months old in $environment" ;;
+      echo "$volume_id $state $age_months_dp months old" ;;
     attached)
-      echo "$volume_id $age_months_dp months old in $environment" ;;
+      echo "$volume_id $age_months_dp months old" ;;
     unattached)
-      echo "$volume_id $age_months_dp months old in $environment, reason: $reason" ;;
+      echo "$volume_id $age_months_dp months old, reason: $reason" ;;
     delete)
       if [[ "$dryrun" == true ]]; then
-        echo "$volume_id $age_months_dp months old in $environment, reason: $reason"
+        echo "$volume_id $age_months_dp months old, reason: $reason"
       else
-        echo "Deleting $volume_id $age_months_dp months old in $environment"
+        echo "Deleting $volume_id $age_months_dp months old"
         aws ec2 delete-volume --volume-id "$volume_id" --region "$region"
       fi
       ;;
