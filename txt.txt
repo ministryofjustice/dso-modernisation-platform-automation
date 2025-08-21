@@ -1,0 +1,6 @@
+Dryrun - Pretend deleting EBS volumes older than 1 months in eu-west-2...
+vol-029d707cb058a2f60 14.1 months old. Reason: Unsure. created='2024-06-24 13:17'
+vol-0943579e1f2de51e6 7.5 months old. Reason: Unsure. snapshot_description='oasys san test /dev/sda2', created='2025-01-07 11:32'
+vol-01c77b99d932dc0fd 7.5 months old. Reason: Unsure. snapshot_description='oasys san test /dev/sdc', created='2025-01-07 11:34'
+vol-05ba6c1ac9939a09b 7.5 months old. Reason: Unsure. snapshot_description='oasys san test /dev/sdb', created='2025-01-07 11:33'
+vol-0ccd82c97e41d2f45 7.5 months old. Reason: Unsure. snapshot_description='oasys san test /dev/sda1', created='2025-01-07 11:31'

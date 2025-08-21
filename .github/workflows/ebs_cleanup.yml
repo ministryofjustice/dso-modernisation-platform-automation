@@ -91,7 +91,6 @@ jobs:
         working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
         run: |
           echo src/ebs_cleanup.sh -d -m ${{ github.event.inputs.age_in_months }} delete
-          src/ebs_cleanup.sh -d -m ${{ github.event.inputs.age_in_months }} delete
           cleanup_output=$(src/ebs_cleanup.sh -d -m ${{ github.event.inputs.age_in_months }} delete)
           echo "${cleanup_output[@]}"
           action_lines=$(echo "${cleanup_output[@]}" | grep -E "vol-.+ months old. Reason: " || true)
@@ -146,5 +145,5 @@ jobs:
           echo "ACTIONS: $(cat action_lines.txt)"
           echo '>'
           echo "To delete these volumes you can use src/ebs_cleanup.sh or:"
-          sed -E "s/.*(vol-[a-zA-Z0-9]+).* months old. Reason:.*/aws ec2 delete-volume --volume-id \1 --region eu-west-2/p" action_lines.txt
+          sed -E "s/.*(vol-[a-zA-Z0-9]+).* months old. Reason:.*/aws ec2 delete-volume --volume-id \1 --region eu-west-2/" action_lines.txt
 
