@@ -211,9 +211,7 @@ get_volumes() {
       [[ "$reason" == "?" ]] && find_reason_from_ami "$snapshot_description"
       [[ "$reason" == "?" ]] && show_what_we_have $create_time
       do_action
-
     done <<< "$volume_info"
-    [[ -n "$volume_id" ]] && do_action # print the last one
   else
     echo $none_message
   fi
