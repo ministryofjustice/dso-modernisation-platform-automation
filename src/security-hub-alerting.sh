@@ -6,14 +6,15 @@ DAYS=7
 
 # Get AWS account ID and name/alias
 ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text 2>/dev/null)
-ACCOUNT_ALIAS=$(aws iam list-account-aliases --query 'AccountAliases[0]' --output text 2>/dev/null)
+# ACCOUNT_ALIAS=$(aws iam list-account-aliases --query 'AccountAliases' --output text 2>/dev/null)
+ACCOUNT_NAME=$1
 
 # Use alias if available, otherwise use account ID for display name
-if [ "$ACCOUNT_ALIAS" != "None" ] && [ ! -z "$ACCOUNT_ALIAS" ]; then
-    ACCOUNT_NAME="$ACCOUNT_ALIAS"
-else
-    ACCOUNT_NAME="$ACCOUNT_ID"
-fi
+# if [ "$ACCOUNT_ALIAS" != "None" ] && [ ! -z "$ACCOUNT_ALIAS" ]; then
+#     ACCOUNT_NAME="$ACCOUNT_ALIAS"
+# else
+#     ACCOUNT_NAME="$ACCOUNT_ID"
+# fi
 
 echo "Count of New findings in last $DAYS days:"
 echo
@@ -94,7 +95,7 @@ for i in $(seq 0 $((DAYS-1))); do
 done
 
 # Outputs
-OUTPUT_FILE="$ACCOUNT_ALIAS".txt
+OUTPUT_FILE=account-"$ACCOUNT_NAME".txt
 
 printf "%-15s %-10s %-8s %s\n" "$ACCOUNT_ID" "$total_critical" "$total_high" "$ACCOUNT_NAME"
 echo
