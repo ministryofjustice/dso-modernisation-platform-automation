@@ -183,7 +183,7 @@ jobs:
 
             echo "Consolidation complete"
             echo.
-            cat ./all-alerts.txt
+            cat all-alerts.txt
             
         - name: Upload consolidated results
           uses: actions/upload-artifact@v4
