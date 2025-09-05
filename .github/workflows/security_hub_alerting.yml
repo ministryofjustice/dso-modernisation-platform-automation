@@ -18,7 +18,7 @@ on:
           - true
           - false
   schedule:
-    - cron: "0 * * * *"
+    - cron: "* 8 * * 0-5"
 
 permissions:
   id-token: write
@@ -83,7 +83,7 @@ jobs:
         run: |
           echo "account name: ${{ matrix.account_name }}"
           account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
-          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          role_arn="arn:aws:iam::${account_id}:role/github-actions-securityhub-insights"
           echo "role arn:     ${role_arn}"
           echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
 
