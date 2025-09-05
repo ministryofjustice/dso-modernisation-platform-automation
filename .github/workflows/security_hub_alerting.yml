@@ -1,0 +1,192 @@
+---
+name: AWS Security Hub Alerting
+
+on:
+  workflow_dispatch:
+    inputs:
+      applications:
+        description: 'e.g. nomis or leave blank for all'
+        type: string
+      environments:
+        description: 'e.g. development or leave blank for all'
+        type: string
+      dryrun:
+        type: choice
+        description: Dryrun mode (leave as false unless testing)
+        default: false
+        options:
+          - true
+          - false
+  schedule:
+    - cron: "0 * * * *"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  check-strategy:
+    name: Check Strategy
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+      dryrun: "${{ steps.options.outputs.dryrun }}"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Strategy
+        id: strategy
+        run: |
+          echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            matrix=$(src/get_dso_aws_accounts.sh gha "" "")
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo '' > aws_cli_commands.sh
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+          echo "{$matrix}"
+
+      - name: Options
+        id: options
+        run: |
+          dryrun=false
+          echo "Setting options event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            dryrun="${{ github.event.inputs.dryrun }}"
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo "dryrun=${dryrun}"
+          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
+
+  check-alerts:
+    name: Check Alerts
+    runs-on: ubuntu-latest
+    needs: check-strategy
+    strategy:
+      matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
+      fail-fast: false
+    steps:
+      - name: Get Account Details
+        id: account
+        run: |
+          echo "account name: ${{ matrix.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Check Security Hub Alerts
+        id: check-alerts
+        env:
+          dryrun: ${{ needs.check-strategy.outputs.dryrun }}
+        run: |
+          exitcode=0
+          echo src/security-hub-alerting.sh $options
+          src/security-hub-alerting.sh $options 2>output.txt || exitcode=$?
+          if [[ $exitcode -ne 0 ]]; then
+            echo "failed on first attempt with exitcode=${exitcode}; retrying"
+            # we get the odd CLI timeout, retry after a random delay
+            sleep $(( 10 + RANDOM % 50 ))
+            src/security-hub-alerting.sh $options 2>output.txt || exitcode=$?
+          fi
+          failedcount=$(cat output.txt | grep "^Verbose1: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
+          ignoredcount=$(cat output.txt | grep "^Verbose2: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
+          echo "exitcode=${exitcode} failedcount=${failedcount} ignoredcount=${ignoredcount}"
+          echo "exitcode=${exitcode}" >> $GITHUB_OUTPUT
+          echo "failedcount=${failedcount}" >> $GITHUB_OUTPUT
+          echo "ignoredcount=${ignoredcount}" >> $GITHUB_OUTPUT
+
+      - name: Dryrun Check Alerts
+        if: ${{ needs.check-strategy.outputs.dryrun == 'true' }}
+        run: |
+          cat output.txt | grep "^DRYRUN: " | cut -d" " -f2-
+
+      - name: Debug Failed Check Alerts
+        if: ${{ steps.check-alerts.outputs.failedcount != 0 }}
+        run: |
+          cat output.txt | grep "^Verbose1: " | cut -d" " -f2-
+
+      - name: Debug Ignored Check Alerts
+        if: ${{ steps.check-alerts.outputs.ignoredcount != 0 }}
+        run: |
+          cat output.txt | grep "^Verbose2: " | cut -d" " -f2-
+
+      - name: Debug Error
+        if: ${{ steps.check-alerts.outputs.exitcode != 0 }}
+        env:
+          exitcode: ${{ steps.check-alerts.outputs.exitcode }}
+        run: |
+          cat output.txt | grep -v "^Verbose" | grep -v "^DRYRUN"
+          exit $exitcode
+
+      - name: Upload results for ${{ matrix.account_name }}
+        uses: actions/upload-artifact@v4
+        with:
+            name: account-${{ matrix.account_name }}
+            path: |
+                account-${{ matrix.account_name }}.txt
+            retention-days: 1
+      
+  consolidate-accounts:
+    needs: check-alerts
+    runs-on: ubuntu-latest
+    steps:
+        - name: Download all artifacts
+          uses: actions/download-artifact@v5
+        
+        - name: Consolidate alert data
+          run: |
+            echo "Consolidating alert data from all accounts"
+            
+            # Initialize our consolidated list of alerts across all processed accounts
+            {
+                echo "Count of New findings in last 7 days:"
+                echo
+                printf "%-15s %-10s %-8s %s\n" "ACCOUNT ID" "Critical" "High" "Account Name"
+                printf "%-15s %-10s %-8s %s\n" "----------" "--------" "----" "------------"
+            } >> all-alerts.txt
+            
+            # Process each account's data
+            for account_dir in account-*; do
+                ACCOUNT_NAME=$(echo $account_dir | sed 's/account-//')
+                echo "Processing data from $ACCOUNT_NAME account"
+                
+                # Add account to the master text file
+                if [ -f "$account_dir/account-$ACCOUNT_NAME.txt" ]; then
+                cat "$account_dir/account-$ACCOUNT_NAME.txt" >> all-alerts.txt
+                fi
+            done
+
+            echo "Consolidation complete"
+            
+        - name: Upload consolidated results
+          uses: actions/upload-artifact@v4
+          with:
+            name: consolidated-accounts
+            path: |
+                all-alerts.txt
+            retention-days: 30          
