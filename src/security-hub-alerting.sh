@@ -96,7 +96,7 @@ for i in $(seq 0 $((DAYS-1))); do
 done
 
 # Outputs
-OUTPUT_FILE=account-"$ACCOUNT_ALIAS".txt
+OUTPUT_FILE=account-"$ACCOUNT_NAME".txt
 
 printf "%-15s %-10s %-8s %s\n" "$ACCOUNT_ID" "$total_critical" "$total_high" "$ACCOUNT_NAME"
 echo
