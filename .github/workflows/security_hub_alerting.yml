@@ -94,22 +94,6 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
 
-      #     role_arn="arn:aws:iam::${account_id}:role/github-actions-securityhub-insights"
-      #     echo "role arn:     ${role_arn}"
-      #     echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
-
-      # - name: Configure AWS Credentials
-      #   uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
-      #   with:
-      #     role-to-assume: "${{ steps.account.outputs.role_arn }}"
-      #     role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
-      #     aws-region: eu-west-2
-        
-      #     with:
-      #     role-to-assume: "arn:aws:iam::${{ env.ACCOUNT_NUMBER }}:role/github-actions-securityhub-insights"
-      #     role-session-name: githubactionsrolesession
-      #     aws-region: ${{ env.AWS_REGION }}                    
-
       - name: Checkout Repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
         with:
@@ -121,13 +105,13 @@ jobs:
           dryrun: ${{ needs.check-strategy.outputs.dryrun }}
         run: |
           exitcode=0
-          echo src/security-hub-alerting.sh $options
-          src/security-hub-alerting.sh $options 2>output.txt || exitcode=$?
+          echo src/security-hub-alerting.sh ${{ matrix.account_name }} ${account_id} $options
+          src/security-hub-alerting.sh ${{ matrix.account_name }} ${account_id} $options 2>output.txt || exitcode=$?
           if [[ $exitcode -ne 0 ]]; then
             echo "failed on first attempt with exitcode=${exitcode}; retrying"
             # we get the odd CLI timeout, retry after a random delay
             sleep $(( 10 + RANDOM % 50 ))
-            src/security-hub-alerting.sh $options 2>output.txt || exitcode=$?
+            src/security-hub-alerting.sh ${{ matrix.account_name }} ${account_id} $options 2>output.txt || exitcode=$?
           fi
           failedcount=$(cat output.txt | grep "^Verbose1: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
           ignoredcount=$(cat output.txt | grep "^Verbose2: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
