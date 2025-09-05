@@ -105,13 +105,13 @@ jobs:
           dryrun: ${{ needs.check-strategy.outputs.dryrun }}
         run: |
           exitcode=0
-          echo src/security-hub-alerting.sh ${{ matrix.account_name }} ${account_id} $options
-          src/security-hub-alerting.sh ${{ matrix.account_name }} ${account_id} $options 2>output.txt || exitcode=$?
+          echo src/security-hub-alerting.sh ${{ matrix.account_name }} $options
+          src/security-hub-alerting.sh ${{ matrix.account_name }} $options 2>output.txt || exitcode=$?
           if [[ $exitcode -ne 0 ]]; then
             echo "failed on first attempt with exitcode=${exitcode}; retrying"
             # we get the odd CLI timeout, retry after a random delay
             sleep $(( 10 + RANDOM % 50 ))
-            src/security-hub-alerting.sh ${{ matrix.account_name }} ${account_id} $options 2>output.txt || exitcode=$?
+            src/security-hub-alerting.sh ${{ matrix.account_name }} $options 2>output.txt || exitcode=$?
           fi
           failedcount=$(cat output.txt | grep "^Verbose1: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
           ignoredcount=$(cat output.txt | grep "^Verbose2: " | cut -d" " -f2- | wc -l | tr -d [[:space:]])
