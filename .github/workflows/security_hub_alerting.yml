@@ -11,14 +11,12 @@ on:
         description: 'e.g. development or leave blank for all'
         type: string
       dryrun:
-        type: choice
-        description: Dryrun mode (leave as false unless testing)
+        type: boolean
+        description: Dryrun mode (prevents slack alerting, leave as false unless testing)
         default: false
-        options:
-          - true
-          - false
+
   schedule:
-    - cron: "* 8 * * 1-6"
+    - cron: "30 7 * * 1-5"             
 
 permissions:
   id-token: write
@@ -190,4 +188,10 @@ jobs:
             name: consolidated-accounts
             path: |
                 all-alerts.txt
-            retention-days: 30          
+            retention-days: 30
+
+        - name: evaluate results
+          if: ${{ inputs.dryrun == false }}
+          run: |
+            echo "Executing with dryrun disabled"
+
