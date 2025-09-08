@@ -15,8 +15,8 @@ on:
         description: Dryrun mode (prevents slack alerting, leave as false unless testing)
         default: 'false'
         options:
-          - true
-          - false        
+          - 'true'
+          - 'false'        
 
   schedule:
     - cron: "30 7 * * 1-5"             
@@ -60,7 +60,7 @@ jobs:
       - name: Options
         id: options
         run: |
-          dryrun=false
+          dryrun='false'
           echo "Setting options event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             dryrun="${{ github.event.inputs.dryrun }}"
@@ -78,6 +78,8 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
       fail-fast: false
+    outputs:
+      matrix: "${{ steps.strategy.outputs.matrix }}"      
     steps:
       - name: Get Account Details
         id: account
@@ -155,6 +157,8 @@ jobs:
   consolidate-accounts:
     needs: check-alerts
     runs-on: ubuntu-latest
+    outputs:
+      newalerts: "${{ steps.evaluate.outputs.newalerts }}"  
     steps:
         - name: Download all artifacts
           uses: actions/download-artifact@v5
@@ -202,7 +206,6 @@ jobs:
             sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; print "Alert:", $0 } END { if(found) exit 1; else exit 0 }' && {
                 echo "All clean - no action needed"
             } || {
-                printf "New alerts found - taking action..."
                 # Initialize our consolidated list of non-zero results across all processed accounts
                 {
                     echo "Count of New Alerts triggered in last 7 days:"
@@ -218,6 +221,7 @@ jobs:
                 else
                   echo "new-alerts-exist=false" >> $GITHUB_OUTPUT
                 fi
+                echo "newalerts=$(cat new-alerts.txt)" >> "$GITHUB_OUTPUT"
                 }
         - name: Slack notification
           if: steps.evaluate.outputs.new-alerts-exist == 'true'
@@ -225,33 +229,6 @@ jobs:
           with:
             webhook: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
             webhook-type: incoming-webhook
-            # payload-file-path:
             payload: |     
-              text: "🚨 **New AWS Security Hub Alerts Detected** 🚨\nThe following accounts have new Critical or High alerts:\n```$(cat new-alerts.txt)```\nPlease review and take action immediately."
+              text: "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ steps.evaluate.outputs.newalerts }}"```\nPlease review and take action immediately."
 
-        # - name: Write the review
-        #   uses: slackapi/slack-github-action@v2.1.1
-        #   with:
-        #     webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-        #     webhook-type: incoming-webhook
-        #     payload: |
-        #       text: "Danny Torrence left a 1 star review for your property."
-        #       blocks:
-        #         - type: "section"
-        #           text:
-        #             type: "mrkdwn"
-        #             text: "Danny Torrence left the following review for your property:"
-        #         - type: "section"
-        #           text:
-        #             type: "mrkdwn"
-        #             text: "<https://example.com|*Overlook Hotel*> :star: \n Doors had too many axe holes, guest in room 237 was far too rowdy, whole place felt stuck in the 1920s."
-        #           accessory:
-        #             type: "image"
-        #             image_url: "https://is5-ssl.mzstatic.com/image/thumb/Purple3/v4/d3/72/5c/d3725c8f-c642-5d69-1904-aa36e4297885/source/256x256bb.jpg"
-        #             alt_text: "Haunted hotel image"
-        #         - type: "section"
-        #           fields:
-        #             - type: "mrkdwn"
-        #               text: "*Average Rating*: 1.0"
-
-        #      text: "*GitHub Action build result*: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
