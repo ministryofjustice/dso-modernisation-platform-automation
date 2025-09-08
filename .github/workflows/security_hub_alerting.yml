@@ -161,7 +161,7 @@ jobs:
         
         - name: Consolidate and show results
           run: |
-            echo "Consolidating securityhub alert results from all accounts\n"
+            echo -e "Consolidating securityhub alert results from all accounts\n"
             
             # Initialize our consolidated list of results across all processed accounts
             {
@@ -182,7 +182,7 @@ jobs:
                 fi
             done
 
-            echo "Consolidation complete\n"
+            echo -e "Consolidation complete\n"
             cat ./all-alerts.txt
             
         - name: Upload consolidated results
@@ -193,10 +193,21 @@ jobs:
                 all-alerts.txt
             retention-days: 30
 
-        - name: evaluate results
+        - name: evaluate results for conditional slack notification
           if: ${{ inputs.dryrun == 'false' }}
           run: |
             echo "Executing with dryrun disabled"
             # Check and take action if non-zero alerts found
-            sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; print "Alert:", $0 } END { if(found) { print "new critical/high alerts found Taking action..."; exit 1 } else { print "No new critical/high alerts found"; exit 0 } }'
+            # sed -n '5,$p' all-alerts.txt |
+            #  awk '$2 != 0 || $3 != 0 { found=1; print "Alert:", $0 } END { if(found) { print "new critical/high alerts found Taking action..."; exit 1 } else { print "No new critical/high alerts found"; exit 0 } }'
+          
+            # One-liner with immediate condition check
+            sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; print "Alert:", $0 } END { if(found) exit 1; else exit 0 }' && {
+                echo "All clean - no action needed"
+            } || {
+                echo "Alerts found - taking action..."
+                # Your action commands here
+                # send_notification.sh
+                # log_alert.sh
+            }
 
