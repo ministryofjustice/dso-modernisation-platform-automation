@@ -1,5 +1,5 @@
 ---
-name: DFI report file copy to Delius-Mis
+name: Copy DFI report files to Delius-Mis
 
 on:
   workflow_dispatch:
