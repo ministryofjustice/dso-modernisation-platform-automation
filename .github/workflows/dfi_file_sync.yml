@@ -39,9 +39,6 @@ jobs:
     outputs:
         check_files: "${{ steps.parseinput.outputs.check_files }}"
         dfi_environment: "${{ steps.parseinput.outputs.dfi_environment }}"
-        # today: "${{ steps.parseinput.outputs.today }}"
-        # file_name: "${{ steps.parseinput.outputs.file_name }}"
-        # current_time: "${{ steps.parseinput.outputs.current_time }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
@@ -73,8 +70,9 @@ jobs:
             else
               echo "Running in transfer mode."
             fi
-  s3_sync:
-    name: Sync
+  copytodeliusmis:
+    name: Copy to Delius Mis
+    needs: setup
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -106,6 +104,11 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-source"
           aws-region: eu-west-2
 
-      - name: S3 sync from source to destination
+      - name: Check Source files
+        id: check_source
+        env: 
+          SOURCE_BUCKET: ${{ secrets.DFI_SOURCE_URI }}
         run: |
-          aws s3 sync "${{ secrets.DFI_SOURCE_URI }}" "${{ secrets.DFI_DESTINATION_URI }}" --profile "delius-mis-dev" --sse aws:kms --sse-kms-key-id "${{ secrets.DFI_DESTINATION_KEY_ID_ARN }}" --acl bucket-owner-full-control
+          aws s3 ls "s3://${SOURCE_BUCKET}"
+
+        # aws s3 sync "${{ secrets.DFI_SOURCE_URI }}" "${{ secrets.DFI_DESTINATION_URI }}" --profile "delius-mis-dev" --sse aws:kms --sse-kms-key-id "${{ secrets.DFI_DESTINATION_KEY_ID_ARN }}" --acl bucket-owner-full-control
