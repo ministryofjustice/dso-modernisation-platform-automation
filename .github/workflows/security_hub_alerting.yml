@@ -159,11 +159,11 @@ jobs:
         - name: Download all artifacts
           uses: actions/download-artifact@v5
         
-        - name: Consolidate alert data
+        - name: Consolidate and show results
           run: |
-            echo "Consolidating alert data from all accounts"
+            echo "Consolidating securityhub alert results from all accounts\n"
             
-            # Initialize our consolidated list of alerts across all processed accounts
+            # Initialize our consolidated list of results across all processed accounts
             {
                 echo "Count of New findings in last 7 days:"
                 echo
@@ -182,7 +182,7 @@ jobs:
                 fi
             done
 
-            echo "Consolidation complete"
+            echo "Consolidation complete\n"
             cat ./all-alerts.txt
             
         - name: Upload consolidated results
@@ -197,4 +197,6 @@ jobs:
           if: ${{ inputs.dryrun == 'false' }}
           run: |
             echo "Executing with dryrun disabled"
+            # Check and take action if non-zero alerts found
+            sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; print "Alert:", $0 } END { if(found) { print "new critical/high alerts found Taking action..."; exit 1 } else { print "No new critical/high alerts found"; exit 0 } }'
 
