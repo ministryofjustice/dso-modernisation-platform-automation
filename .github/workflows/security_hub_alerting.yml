@@ -196,18 +196,21 @@ jobs:
         - name: evaluate results for conditional slack notification
           if: ${{ inputs.dryrun == 'false' }}
           run: |
-            echo "Executing with dryrun disabled"
+            echo "Executing evaluation as dryrun is not enabled"
             # Check and take action if non-zero alerts found
-            # sed -n '5,$p' all-alerts.txt |
-            #  awk '$2 != 0 || $3 != 0 { found=1; print "Alert:", $0 } END { if(found) { print "new critical/high alerts found Taking action..."; exit 1 } else { print "No new critical/high alerts found"; exit 0 } }'
-          
-            # One-liner with immediate condition check
             sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; print "Alert:", $0 } END { if(found) exit 1; else exit 0 }' && {
                 echo "All clean - no action needed"
             } || {
-                echo "Alerts found - taking action..."
-                # Your action commands here
-                # send_notification.sh
-                # log_alert.sh
+                echo "New alerts found - taking action..."
+                # Initialize our consolidated list of results across all processed accounts
+                {
+                    echo "Count of New findings in last 7 days:"
+                    echo
+                    printf "%-15s %-10s %-8s %s\n" "ACCOUNT ID" "Critical" "High" "Account Name"
+                    printf "%-15s %-10s %-8s %s\n" "----------" "--------" "----" "------------"
+                } >> new-alerts.txt
+
+                sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; printf "Alert:", $0 >> new-alerts.txt}
+                cat ./new-alerts.txt
             }
 
