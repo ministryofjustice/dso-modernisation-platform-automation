@@ -11,9 +11,12 @@ on:
         description: 'e.g. development or leave blank for all'
         type: string
       dryrun:
-        type: boolean
+        type: choice
         description: Dryrun mode (prevents slack alerting, leave as false unless testing)
-        default: false
+        default: 'false'
+        options:
+          - true
+          - false        
 
   schedule:
     - cron: "30 7 * * 1-5"             
@@ -191,7 +194,7 @@ jobs:
             retention-days: 30
 
         - name: evaluate results
-          if: ${{ inputs.dryrun == false }}
+          if: ${{ inputs.dryrun == 'false' }}
           run: |
             echo "Executing with dryrun disabled"
 
