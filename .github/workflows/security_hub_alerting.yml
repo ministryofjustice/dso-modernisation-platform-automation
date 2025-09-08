@@ -194,6 +194,7 @@ jobs:
             retention-days: 30
 
         - name: evaluate results for conditional slack notification
+          id: evaluate
           if: ${{ inputs.dryrun == 'false' }}
           run: |
             echo "Executing evaluation as dryrun is not enabled"
@@ -201,10 +202,10 @@ jobs:
             sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; print "Alert:", $0 } END { if(found) exit 1; else exit 0 }' && {
                 echo "All clean - no action needed"
             } || {
-                printf "New alerts found - taking action...\n\n"
+                printf "New alerts found - taking action..."
                 # Initialize our consolidated list of non-zero results across all processed accounts
                 {
-                    echo "Count of New Alerts in last 7 days:"
+                    echo "Count of New Alerts triggered in last 7 days:"
                     echo
                     printf "%-15s %-10s %-8s %s\n" "ACCOUNT ID" "Critical" "High" "Account Name"
                     printf "%-15s %-10s %-8s %s\n" "----------" "--------" "----" "------------"
@@ -212,5 +213,26 @@ jobs:
 
                 sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0' >> new-alerts.txt
                 cat ./new-alerts.txt
-            }
-
+                if [ -f new-alerts.txt ]; then
+                  echo "new-alerts-exist=true" >> $GITHUB_OUTPUT
+                else
+                  echo "new-alerts-exist=false" >> $GITHUB_OUTPUT
+                fi
+                }
+        - name: Slack notification
+          if: steps.evaluate.outputs.new-alerts-exist == 'true'
+          uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
+          env:
+            SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
+            SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK        
+          with:
+            slack-message: |
+              🚨 **New AWS Security Hub Alerts Detected** 🚨
+              
+              The following accounts have new Critical or High alerts:
+              
+              ```
+              $(cat new-alerts.txt)
+              ```
+              
+              Please review and take action immediately.
