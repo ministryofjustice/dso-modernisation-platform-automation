@@ -223,10 +223,10 @@ jobs:
           if: steps.evaluate.outputs.new-alerts-exist == 'true'
           uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
           env:
-            SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
-            SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK        
-          with:
-            slack-message: |
+            webhook: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
+            webhook-type: incoming-webhook
+            # payload-file-path:
+            payload: |     
               🚨 **New AWS Security Hub Alerts Detected** 🚨
               
               The following accounts have new Critical or High alerts:
