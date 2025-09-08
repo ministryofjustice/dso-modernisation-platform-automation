@@ -190,11 +190,8 @@ jobs:
                 all-alerts.txt
             retention-days: 30
 
-            jobs:
-
         - name: evaluate results
           if: ${{ inputs.dryrun == false }}
           run: |
             echo "Executing with dryrun disabled"
-
 
