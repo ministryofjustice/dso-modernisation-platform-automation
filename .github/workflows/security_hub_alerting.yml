@@ -161,7 +161,7 @@ jobs:
         
         - name: Consolidate and show results
           run: |
-            printf "Consolidating securityhub alert results from all accounts\n"
+            echo "Consolidating securityhub alert results from all accounts"
             
             # Initialize our consolidated list of results across all processed accounts
             {
@@ -182,7 +182,7 @@ jobs:
                 fi
             done
 
-            printf "Consolidation complete\n"
+            echo "Consolidation complete"
             cat ./all-alerts.txt
             
         - name: Upload consolidated results
@@ -201,7 +201,7 @@ jobs:
             sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; print "Alert:", $0 } END { if(found) exit 1; else exit 0 }' && {
                 echo "All clean - no action needed"
             } || {
-                printf "New alerts found - taking action...\n"
+                printf "New alerts found - taking action...\n\n"
                 # Initialize our consolidated list of non-zero results across all processed accounts
                 {
                     echo "Count of New Alerts in last 7 days:"
@@ -210,7 +210,7 @@ jobs:
                     printf "%-15s %-10s %-8s %s\n" "----------" "--------" "----" "------------"
                 } >> new-alerts.txt
 
-                sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0' > new-alerts.txt
+                sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0' >> new-alerts.txt
                 cat ./new-alerts.txt
             }
 
