@@ -221,6 +221,8 @@ jobs:
                 fi
                 newalerts=$(< new-alerts.txt)
                 echo "newalerts is set to: $newalerts"
+                echo cat new-alerts.txt:
+                cat new-alerts.txt
                 echo "Write it to the GITHUB_ENV file to make it available to subsequent steps"
                 # echo "NEW_ALERTS=$newalerts" >> $GITHUB_ENV
                 echo "new-alerts=$newalerts" >> $GITHUB_OUTPUT
