@@ -185,9 +185,9 @@ jobs:
                 echo "cat all-alerts.txt"
                 cat all-alerts.txt
                 # Add account to the master text file
-                if [ -f "$account_file/account-$ACCOUNT_NAME.txt" ]; then
-                echo "Adding $ACCOUNT_NAME line to all-alerts.txt"
-                cat "$account_file/account-$ACCOUNT_NAME.txt" >> all-alerts.txt
+                if [ -f "$account_file" ]; then
+                echo "Adding $account_file line to all-alerts.txt"
+                cat "$account_file" >> all-alerts.txt
                 fi
             done
 
