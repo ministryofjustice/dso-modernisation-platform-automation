@@ -234,7 +234,8 @@ jobs:
         - name: Slack notification
           if: steps.evaluate.outputs.new-alerts-exist == 'true'
           run: |
-            printf "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ env.NEW_ALERTS }}```\nPlease review and take action immediately."
+            message="🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```\n${{ env.NEW_ALERTS }}\n```\nPlease review and take action immediately."
+            printf $message
 
           # uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
           # with:
@@ -242,4 +243,15 @@ jobs:
           #   webhook-type: incoming-webhook
           #   payload: |     
           #     text: "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ env.NEW_ALERTS }}```\nPlease review and take action immediately."
+
+
+        #         - name: Send severity summary to Slack
+        # if: steps.fetch-webhook-url.outputs.webhook_url != ''
+        # env:
+        #   SLACK_WEBHOOK_URL: ${{ steps.fetch-webhook-url.outputs.webhook_url }}
+        #   ACCOUNT_NAME: ${{ matrix.account.name }}
+        #   ACCOUNT_NUMBER: ${{ env.ACCOUNT_NUMBER }}
+        # run: |
+        #   MESSAGE="*Security Hub Severity Summary - $ACCOUNT_NAME ($ACCOUNT_NUMBER)*\n\`\`\`\n${{ steps.analyze-findings.outputs.output }}\n\`\`\`"
+        #   curl -X POST -H 'Content-type: application/json' --data "{\"text\": \"$MESSAGE\"}" "$SLACK_WEBHOOK_URL"
 
