@@ -180,6 +180,7 @@ jobs:
                 
                 # Add account to the master text file
                 if [ -f "$account_dir/account-$ACCOUNT_NAME.txt" ]; then
+                echo "Adding $ACCOUNT_NAME line to all-alerts.txt"
                 cat "$account_dir/account-$ACCOUNT_NAME.txt" >> all-alerts.txt
                 fi
             done
@@ -201,7 +202,7 @@ jobs:
           run: |
             echo "Executing evaluation as dryrun is not enabled"
             # Check and take action if non-zero alerts found
-            sed -n '4,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; print "Alert:", $0 } END { if(found) exit 1; else exit 0 }' && {
+            sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; print "Alert:", $0 } END { if(found) exit 1; else exit 0 }' && {
                 echo "All clean - no action needed"
             } || {
                 # Initialize our consolidated list of non-zero results across all processed accounts
@@ -212,7 +213,7 @@ jobs:
                     printf "%-15s %-10s %-8s %s\n" "----------" "--------" "----" "------------"
                 } >> new-alerts.txt
 
-                sed -n '4,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0' >> new-alerts.txt
+                sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0' >> new-alerts.txt
                 cat ./new-alerts.txt
                 if [ -f new-alerts.txt ]; then
                   echo "new-alerts-exist=true" >> $GITHUB_OUTPUT
