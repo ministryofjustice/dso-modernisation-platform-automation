@@ -220,16 +220,17 @@ jobs:
                   echo "new-alerts-exist=false" >> $GITHUB_OUTPUT
                 fi
                 newalerts=$(< new-alerts.txt)
+                # Write it to the GITHUB_ENV file to make it available to subsequent steps
+                echo "NEW_ALERTS=$newalerts" >> $GITHUB_ENV
                 }
         - name: Slack notification
           if: steps.evaluate.outputs.new-alerts-exist == 'true'
           run: |
-            echo "newalerts is set to ${{ env.newalerts }}"
+            echo "newalerts is set to ${{ env.NEW_ALERTS }}"
           # uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
           # with:
           #   webhook: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
           #   webhook-type: incoming-webhook
           #   payload: |     
-          #     text: "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ env.newalerts }}"```\nPlease review and take action immediately."
-
+          #     text: "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ env.NEW_ALERTS }}"```\nPlease review and take action immediately."
 
