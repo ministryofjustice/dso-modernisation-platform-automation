@@ -221,7 +221,7 @@ jobs:
                 else
                   echo "new-alerts-exist=false" >> $GITHUB_OUTPUT
                 fi
-                echo "newalerts=$(cat new-alerts.txt)" >> "$GITHUB_OUTPUT"
+                echo "newalerts=$(< new-alerts.txt)" >> "$GITHUB_OUTPUT"
                 }
         - name: Slack notification
           if: steps.evaluate.outputs.new-alerts-exist == 'true'
@@ -231,4 +231,3 @@ jobs:
             webhook-type: incoming-webhook
             payload: |     
               text: "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ steps.evaluate.outputs.newalerts }}"```\nPlease review and take action immediately."
-
