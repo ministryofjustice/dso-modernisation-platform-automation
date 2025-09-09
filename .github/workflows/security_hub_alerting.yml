@@ -11,9 +11,12 @@ on:
         description: 'e.g. development or leave blank for all'
         type: string
       dryrun:
-        type: boolean
+        type: choice
         description: Dryrun mode (prevents slack alerting, leave as false unless testing)
-        default: false
+        default: 'false'
+        options:
+          - 'true'
+          - 'false'        
 
   schedule:
     - cron: "30 7 * * 1-5"             
@@ -57,7 +60,7 @@ jobs:
       - name: Options
         id: options
         run: |
-          dryrun=false
+          dryrun='false'
           echo "Setting options event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             dryrun="${{ github.event.inputs.dryrun }}"
@@ -75,6 +78,7 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
       fail-fast: false
+   
     steps:
       - name: Get Account Details
         id: account
@@ -86,7 +90,7 @@ jobs:
           echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        uses: aws-actions/configure-aws-credentials@a03048d87541d1d9fcf2ecf528a4a65ba9bd7838 # v5.0.0
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
@@ -152,15 +156,16 @@ jobs:
   consolidate-accounts:
     needs: check-alerts
     runs-on: ubuntu-latest
+
     steps:
         - name: Download all artifacts
           uses: actions/download-artifact@v5
         
-        - name: Consolidate alert data
+        - name: Consolidate and show results
           run: |
-            echo "Consolidating alert data from all accounts"
+            echo "Consolidating securityhub alert results from all accounts"
             
-            # Initialize our consolidated list of alerts across all processed accounts
+            # Initialize our consolidated list of results across all processed accounts
             {
                 echo "Count of New findings in last 7 days:"
                 echo
@@ -190,8 +195,50 @@ jobs:
                 all-alerts.txt
             retention-days: 30
 
-        - name: evaluate results
-          if: ${{ inputs.dryrun == false }}
+        - name: evaluate results for conditional slack notification
+          id: evaluate
+          if: ${{ inputs.dryrun == 'false' }}
           run: |
-            echo "Executing with dryrun disabled"
+            echo "Executing evaluation as dryrun is not enabled"
+            # Check and take action if non-zero alerts found
+            sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; print "Alert:", $0 } END { if(found) exit 1; else exit 0 }' && {
+                echo "All clean - no action needed"
+            } || {
+                # Initialize our consolidated list of non-zero results across all processed accounts
+                {
+                    echo "Count of New Alerts triggered in last 7 days:"
+                    echo
+                    printf "%-15s %-10s %-8s %s\n" "ACCOUNT ID" "Critical" "High" "Account Name"
+                    printf "%-15s %-10s %-8s %s\n" "----------" "--------" "----" "------------"
+                } >> new-alerts.txt
+
+                sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0' >> new-alerts.txt
+                cat ./new-alerts.txt
+                if [ -f new-alerts.txt ]; then
+                  echo "new-alerts-exist=true" >> $GITHUB_OUTPUT
+                else
+                  echo "new-alerts-exist=false" >> $GITHUB_OUTPUT
+                fi
+                newalerts=$(< new-alerts.txt)
+                echo "newalerts bash var is set to: $newalerts"
+                echo cat new-alerts.txt:
+                cat new-alerts.txt
+                echo "Write it to the GITHUB_ENV file to make it available to subsequent steps or $GITHUB_OUTPUT for next jobs"
+                # Use a unique delimiter (e.g., EOF) to handle multiline content
+                echo "NEW_ALERTS<<EOF" >> $GITHUB_ENV
+                cat new-alerts.txt >> $GITHUB_ENV
+                echo "EOF" >> $GITHUB_ENV
+                }
+        - name: Slack notification
+          if: steps.evaluate.outputs.new-alerts-exist == 'true'
+          run: |
+            echo "newalerts GH ENV is set to ${{ env.NEW_ALERTS }}"
+            # echo "new-alerts GH Output is set to ${{ steps.evaluate.outputs.new-alerts }}"
+            # echo "new-alerts GH Output via needs is set to ${{ needs.consolidate-accounts.outputs.new-alerts }}"
+          # uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
+          # with:
+          #   webhook: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
+          #   webhook-type: incoming-webhook
+          #   payload: |     
+          #     text: "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ env.NEW_ALERTS }}"```\nPlease review and take action immediately."
 
