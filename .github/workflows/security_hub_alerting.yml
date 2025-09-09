@@ -234,7 +234,7 @@ jobs:
         - name: Slack notification
           if: steps.evaluate.outputs.new-alerts-exist == 'true'
           run: |
-            message="🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```\n${{ env.NEW_ALERTS }}\n```\nPlease review and take action immediately."
+            message="🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n\`\`\`\n${{ env.NEW_ALERTS }}\n\`\`\`\nPlease review and take action immediately."
             printf $message
 
           # uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
