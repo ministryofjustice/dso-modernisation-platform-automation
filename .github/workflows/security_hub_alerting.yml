@@ -165,7 +165,7 @@ jobs:
         
         - name: Consolidate and show results
           run: |
-            printf "Consolidating securityhub alert results from all accounts\n"
+            printf "Consolidating securityhub alert results from all accounts\n\n"
             
             # Initialize our consolidated list of results across all processed accounts
             {
@@ -190,7 +190,7 @@ jobs:
                 fi
             done
 
-            printf "Consolidation complete\n"
+            printf "Consolidation complete\n\n"
             cat ./all-alerts.txt
             
         - name: Upload consolidated results
@@ -233,13 +233,13 @@ jobs:
                 }
         - name: Slack notification
           if: steps.evaluate.outputs.new-alerts-exist == 'true'
-          # run: |
-          #   echo "newalerts GH ENV is set to ${{ env.NEW_ALERTS }}"
+          run: |
+            printf "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ env.NEW_ALERTS }}"```\nPlease review and take action immediately."
 
-          uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
-          with:
-            webhook: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
-            webhook-type: incoming-webhook
-            payload: |     
-              text: "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ env.NEW_ALERTS }}"```\nPlease review and take action immediately."
+          # uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
+          # with:
+          #   webhook: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
+          #   webhook-type: incoming-webhook
+          #   payload: |     
+          #     text: "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ env.NEW_ALERTS }}"```\nPlease review and take action immediately."
 
