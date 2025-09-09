@@ -180,7 +180,10 @@ jobs:
                 echo "ACCOUNT_NAME is set to $ACCOUNT_NAME, account_file is set to $account_file"
                 pwd
                 ls -l
-                
+                echo "cat ACCOUNT_NAME"
+                cat $ACCOUNT_NAME
+                echo "cat all-alerts.txt"
+                cat all-alerts.txt
                 # Add account to the master text file
                 if [ -f "$account_file/account-$ACCOUNT_NAME.txt" ]; then
                 echo "Adding $ACCOUNT_NAME line to all-alerts.txt"
