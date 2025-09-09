@@ -224,20 +224,17 @@ jobs:
                 echo cat new-alerts.txt:
                 cat new-alerts.txt
                 echo "Write it to the GITHUB_ENV file to make it available to subsequent steps or $GITHUB_OUTPUT for next jobs"
-                # echo "NEW_ALERTS=$newalerts" >> $GITHUB_ENV # doesn't work
-                # echo "new-alerts=$newalerts" >> $GITHUB_OUTPUT
                 # Use a unique delimiter (e.g., EOF) to handle multiline content
                 echo "NEW_ALERTS<<EOF" >> $GITHUB_ENV
                 cat new-alerts.txt >> $GITHUB_ENV
                 echo "EOF" >> $GITHUB_ENV
-                echo "newalerts GH ENV is set to in evaluate step${{ env.NEW_ALERTS }}"                
                 }
         - name: Slack notification
           if: steps.evaluate.outputs.new-alerts-exist == 'true'
           run: |
             echo "newalerts GH ENV is set to ${{ env.NEW_ALERTS }}"
-            echo "new-alerts GH Output is set to ${{ steps.evaluate.outputs.new-alerts }}"
-            echo "new-alerts GH Output via needs is set to ${{ needs.consolidate-accounts.outputs.new-alerts }}"
+            # echo "new-alerts GH Output is set to ${{ steps.evaluate.outputs.new-alerts }}"
+            # echo "new-alerts GH Output via needs is set to ${{ needs.consolidate-accounts.outputs.new-alerts }}"
           # uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
           # with:
           #   webhook: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
@@ -245,27 +242,3 @@ jobs:
           #   payload: |     
           #     text: "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ env.NEW_ALERTS }}"```\nPlease review and take action immediately."
 
-      #           - name: Set newalerts variable from file
-      #   run: |
-      #     # Read file content into a shell variable
-      #     newalerts=$(< new-alerts.txt)
-
-      #     # Write it to the GITHUB_ENV file to make it available to subsequent steps
-      #     echo "NEW_ALERTS=$newalerts" >> $GITHUB_ENV
-
-      # - name: Use the environment variable in a later step
-      #   run: echo "newalerts is set to ${{ env.NEW_ALERTS }}"
-
-      # ${{ needs.job_id.outputs.output_name }}
-
-      - name: Set multiline environment variable from file
-        run: |
-          # Use a unique delimiter (e.g., EOF) to handle multiline content
-          echo "NEW_ALERTS<<EOF" >> $GITHUB_ENV
-          cat new-alerts.txt >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
-      - name: Use the multiline environment variable
-        run: |
-          echo "--- New Alerts ---"
-          echo "${{ env.NEW_ALERTS }}"
