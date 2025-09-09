@@ -177,6 +177,10 @@ jobs:
             for account_dir in account-*; do
                 ACCOUNT_NAME=$(echo $account_dir | sed 's/account-//')
                 echo "Processing data from $ACCOUNT_NAME account"
+                pwd
+                ls -l
+                echo "account_dir is set to $account_dir, content is:"
+                ls $account_dir
                 
                 # Add account to the master text file
                 if [ -f "$account_dir/account-$ACCOUNT_NAME.txt" ]; then
