@@ -222,12 +222,15 @@ jobs:
                 newalerts=$(< new-alerts.txt)
                 echo "newalerts is set to: $newalerts"
                 echo "Write it to the GITHUB_ENV file to make it available to subsequent steps"
-                echo "NEW_ALERTS=$newalerts" >> $GITHUB_ENV
+                # echo "NEW_ALERTS=$newalerts" >> $GITHUB_ENV
+                echo "new-alerts=$newalerts" >> $GITHUB_OUTPUT
                 }
         - name: Slack notification
           if: steps.evaluate.outputs.new-alerts-exist == 'true'
           run: |
-            echo "newalerts is set to ${{ env.NEW_ALERTS }}"
+            echo "newalerts GH ENV is set to ${{ env.NEW_ALERTS }}"
+            echo "new-alerts GH Output is set to ${{ steps.evaluate.outputs.new-alerts }}"
+            echo "new-alerts GH Output via needs is set to ${{ needs.consolidate-accounts.outputs.new-alerts }}"
           # uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
           # with:
           #   webhook: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
@@ -245,4 +248,6 @@ jobs:
 
       # - name: Use the environment variable in a later step
       #   run: echo "newalerts is set to ${{ env.NEW_ALERTS }}"
+
+      # ${{ needs.job_id.outputs.output_name }}
 
