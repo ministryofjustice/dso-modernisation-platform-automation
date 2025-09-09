@@ -220,12 +220,17 @@ jobs:
                   echo "new-alerts-exist=false" >> $GITHUB_OUTPUT
                 fi
                 newalerts=$(< new-alerts.txt)
-                echo "newalerts is set to: $newalerts"
+                echo "newalerts bash var is set to: $newalerts"
                 echo cat new-alerts.txt:
                 cat new-alerts.txt
-                echo "Write it to the GITHUB_ENV file to make it available to subsequent steps"
-                # echo "NEW_ALERTS=$newalerts" >> $GITHUB_ENV
-                echo "new-alerts=$newalerts" >> $GITHUB_OUTPUT
+                echo "Write it to the GITHUB_ENV file to make it available to subsequent steps or $GITHUB_OUTPUT for next jobs"
+                # echo "NEW_ALERTS=$newalerts" >> $GITHUB_ENV # doesn't work
+                # echo "new-alerts=$newalerts" >> $GITHUB_OUTPUT
+                # Use a unique delimiter (e.g., EOF) to handle multiline content
+                echo "NEW_ALERTS<<EOF" >> $GITHUB_ENV
+                cat new-alerts.txt >> $GITHUB_ENV
+                echo "EOF" >> $GITHUB_ENV
+                echo "newalerts GH ENV is set to in evaluate step${{ env.NEW_ALERTS }}"                
                 }
         - name: Slack notification
           if: steps.evaluate.outputs.new-alerts-exist == 'true'
@@ -253,3 +258,14 @@ jobs:
 
       # ${{ needs.job_id.outputs.output_name }}
 
+      - name: Set multiline environment variable from file
+        run: |
+          # Use a unique delimiter (e.g., EOF) to handle multiline content
+          echo "NEW_ALERTS<<EOF" >> $GITHUB_ENV
+          cat new-alerts.txt >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Use the multiline environment variable
+        run: |
+          echo "--- New Alerts ---"
+          echo "${{ env.NEW_ALERTS }}"
