@@ -174,18 +174,17 @@ jobs:
             } >> all-alerts.txt
             
             # Process each account's data
-            for account_dir in account-*; do
-                ACCOUNT_NAME=$(echo $account_dir | sed 's/account-//')
-                echo "Processing data from $ACCOUNT_NAME account"
+            for account_file in account-*; do
+                ACCOUNT_NAME=$(echo $account_file | sed 's/account-//')
+                echo "Processing data from $ACCOUNT_NAME file"
+                echo "ACCOUNT_NAME is set to $ACCOUNT_NAME, account_file is set to $account_file"
                 pwd
                 ls -l
-                echo "account_dir is set to $account_dir, content is:"
-                ls $account_dir
                 
                 # Add account to the master text file
-                if [ -f "$account_dir/account-$ACCOUNT_NAME.txt" ]; then
+                if [ -f "$account_file/account-$ACCOUNT_NAME.txt" ]; then
                 echo "Adding $ACCOUNT_NAME line to all-alerts.txt"
-                cat "$account_dir/account-$ACCOUNT_NAME.txt" >> all-alerts.txt
+                cat "$account_file/account-$ACCOUNT_NAME.txt" >> all-alerts.txt
                 fi
             done
 
