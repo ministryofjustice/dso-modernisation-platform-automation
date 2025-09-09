@@ -78,8 +78,7 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
       fail-fast: false
-    outputs:
-      matrix: "${{ steps.strategy.outputs.matrix }}"      
+   
     steps:
       - name: Get Account Details
         id: account
@@ -157,8 +156,7 @@ jobs:
   consolidate-accounts:
     needs: check-alerts
     runs-on: ubuntu-latest
-    outputs:
-      newalerts: "${{ steps.evaluate.outputs.newalerts }}"  
+
     steps:
         - name: Download all artifacts
           uses: actions/download-artifact@v5
@@ -221,13 +219,17 @@ jobs:
                 else
                   echo "new-alerts-exist=false" >> $GITHUB_OUTPUT
                 fi
-                echo "newalerts=$(< new-alerts.txt)" >> "$GITHUB_OUTPUT"
+                newalerts=$(< new-alerts.txt)
                 }
         - name: Slack notification
           if: steps.evaluate.outputs.new-alerts-exist == 'true'
-          uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
-          with:
-            webhook: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
-            webhook-type: incoming-webhook
-            payload: |     
-              text: "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ steps.evaluate.outputs.newalerts }}"```\nPlease review and take action immediately."
+          run: |
+            echo "newalerts is set to ${{ env.newalerts }}"
+          # uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
+          # with:
+          #   webhook: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
+          #   webhook-type: incoming-webhook
+          #   payload: |     
+          #     text: "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ env.newalerts }}"```\nPlease review and take action immediately."
+
+
