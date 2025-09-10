@@ -6,15 +6,7 @@ DAYS=7
 
 # Get AWS account ID and name/alias
 ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text 2>/dev/null)
-# ACCOUNT_ALIAS=$(aws iam list-account-aliases --query 'AccountAliases' --output text 2>/dev/null)
 ACCOUNT_NAME=$1
-
-# Use alias if available, otherwise use account ID for display name
-# if [ "$ACCOUNT_ALIAS" != "None" ] && [ ! -z "$ACCOUNT_ALIAS" ]; then
-#     ACCOUNT_NAME="$ACCOUNT_ALIAS"
-# else
-#     ACCOUNT_NAME="$ACCOUNT_ID"
-# fi
 
 echo "Count of New findings in last $DAYS days:"
 echo
@@ -101,14 +93,6 @@ printf "%-15s %-10s %-8s %s\n" "$ACCOUNT_ID" "$total_critical" "$total_high" "$A
 echo
 echo "Report saved to: $OUTPUT_FILE"
 
-# Write formatted output to file and display results
-# {
-#     echo "Count of New findings in last $DAYS days:"
-#     echo
-#     printf "%-15s %-10s %-8s %s\n" "ACCOUNT ID" "Critical" "High" "Account Name"
-#     printf "%-15s %-10s %-8s %s\n" "----------" "--------" "----" "------------"
-#     printf "%-15s %-10s %-8s %s\n" "$ACCOUNT_ID" "$total_critical" "$total_high" "$ACCOUNT_NAME"
-# } >> "$OUTPUT_FILE"
 {
     printf "%-15s %-10s %-8s %s\n" "$ACCOUNT_ID" "$total_critical" "$total_high" "$ACCOUNT_NAME"
 } >> "$OUTPUT_FILE"
