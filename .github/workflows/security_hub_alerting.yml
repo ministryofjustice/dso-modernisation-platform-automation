@@ -61,11 +61,13 @@ jobs:
         id: options
         run: |
           dryrun='false'
-          echo "Setting options event=${GITHUB_EVENT_NAME}"
+          echo "Setting options, GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             dryrun="${{ github.event.inputs.dryrun }}"
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            echo "This is a scheduled full run with conditional slack alerting"
           else
-            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            echo "Unsupported GITHUB_EVENT_NAME (${GITHUB_EVENT_NAME})"
             exit 1
           fi
           echo "dryrun=${dryrun}"
@@ -160,6 +162,8 @@ jobs:
     steps:
         - name: Download all artifacts
           uses: actions/download-artifact@v5
+          with:
+            merge-multiple: true
         
         - name: Consolidate and show results
           run: |
@@ -174,17 +178,21 @@ jobs:
             } >> all-alerts.txt
             
             # Process each account's data
-            for account_dir in account-*; do
-                ACCOUNT_NAME=$(echo $account_dir | sed 's/account-//')
-                echo "Processing data from $ACCOUNT_NAME account"
-                
+            for account_file in account-*; do
+                # echo "account_file bash var is set to $account_file"
+                # pwd
+                # ls -l
+                # echo "cat account_file"
+                # cat $account_file
+
                 # Add account to the master text file
-                if [ -f "$account_dir/account-$ACCOUNT_NAME.txt" ]; then
-                cat "$account_dir/account-$ACCOUNT_NAME.txt" >> all-alerts.txt
+                if [ -f "$account_file" ]; then
+                echo "Adding $account_file summary line to all-alerts.txt"
+                cat "$account_file" >> all-alerts.txt
                 fi
             done
 
-            echo "Consolidation complete"
+            printf "Consolidation complete\n\n"
             cat ./all-alerts.txt
             
         - name: Upload consolidated results
@@ -201,7 +209,7 @@ jobs:
           run: |
             echo "Executing evaluation as dryrun is not enabled"
             # Check and take action if non-zero alerts found
-            sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; print "Alert:", $0 } END { if(found) exit 1; else exit 0 }' && {
+            sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; print "New Alerts Found: ", $0 } END { if(found) exit 1; else exit 0 }' && {
                 echo "All clean - no action needed"
             } || {
                 # Initialize our consolidated list of non-zero results across all processed accounts
@@ -219,26 +227,19 @@ jobs:
                 else
                   echo "new-alerts-exist=false" >> $GITHUB_OUTPUT
                 fi
-                newalerts=$(< new-alerts.txt)
-                echo "newalerts bash var is set to: $newalerts"
-                echo cat new-alerts.txt:
-                cat new-alerts.txt
-                echo "Write it to the GITHUB_ENV file to make it available to subsequent steps or $GITHUB_OUTPUT for next jobs"
-                # Use a unique delimiter (e.g., EOF) to handle multiline content
+
+                # Write new-alerts.txt to the GITHUB_ENV file to make it available to subsequent steps or $GITHUB_OUTPUT for next jobs,use a unique delimiter (e.g., EOF) to handle multiline content
                 echo "NEW_ALERTS<<EOF" >> $GITHUB_ENV
                 cat new-alerts.txt >> $GITHUB_ENV
                 echo "EOF" >> $GITHUB_ENV
                 }
+                
         - name: Slack notification
           if: steps.evaluate.outputs.new-alerts-exist == 'true'
+          env: 
+            SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
           run: |
-            echo "newalerts GH ENV is set to ${{ env.NEW_ALERTS }}"
-            # echo "new-alerts GH Output is set to ${{ steps.evaluate.outputs.new-alerts }}"
-            # echo "new-alerts GH Output via needs is set to ${{ needs.consolidate-accounts.outputs.new-alerts }}"
-          # uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a #v2.1.1
-          # with:
-          #   webhook: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
-          #   webhook-type: incoming-webhook
-          #   payload: |     
-          #     text: "🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n```${{ env.NEW_ALERTS }}"```\nPlease review and take action immediately."
+            message="🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n\`\`\`\n${{ env.NEW_ALERTS }}\n\`\`\`\nPlease review and take action immediately."
+            curl -X POST -H 'Content-type: application/json' --data "{\"text\": \"$message\"}" "$SLACK_WEBHOOK_URL"
+
 
