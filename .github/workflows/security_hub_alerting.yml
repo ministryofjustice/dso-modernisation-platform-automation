@@ -73,6 +73,11 @@ jobs:
           echo "dryrun=${dryrun}"
           echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
 
+      - name: Debug
+        run: |
+          echo "From job: ${{ needs.check-strategy.outputs.dryrun }}"
+          echo "From step: ${{ steps.options.outputs.dryrun }}"            
+
   check-alerts:
     name: Check Alerts
     runs-on: ubuntu-latest
@@ -227,9 +232,16 @@ jobs:
                 echo "EOF" >> $GITHUB_ENV
                 }
                 # needs. references other jobs, steps. references steps within the same job
-                echo "test conditional2: ${{ needs.options.outputs.dryrun }}"
-                echo "test conditional3: ${{ steps.options.outputs.dryrun }}"
-                echo "test conditional5: ${{ needs.check-strategy.outputs.dryrun }}"
+
+        - name: Debug
+          env:
+            DRYRUN: ${{ needs.check-strategy.outputs.dryrun }}
+            DAVE: 'true'
+          run: |
+            echo "From job: ${{ needs.check-strategy.outputs.dryrun }}"
+            echo "From step: ${{ steps.options.outputs.dryrun }}"  
+            echo "From env: ${{ env.DRYRUN }}" 
+            echo "From dave env: ${{ env.DAVE }}"              
                 
         - name: Slack notification
           env:
