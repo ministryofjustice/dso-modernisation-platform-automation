@@ -205,9 +205,7 @@ jobs:
 
         - name: evaluate results for conditional slack notification
           id: evaluate
-          if: ${{ inputs.dryrun == 'false' }}
           run: |
-            echo "Executing evaluation as dryrun is not enabled"
             # Check and take action if non-zero alerts found
             sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0 { found=1; print "New Alerts Found: ", $0 } END { if(found) exit 1; else exit 0 }' && {
                 echo "All clean - no action needed"
@@ -222,11 +220,6 @@ jobs:
 
                 sed -n '5,$p' all-alerts.txt | awk '$2 != 0 || $3 != 0' >> new-alerts.txt
                 cat ./new-alerts.txt
-                if [ -f new-alerts.txt ]; then
-                  echo "new-alerts-exist=true" >> $GITHUB_OUTPUT
-                else
-                  echo "new-alerts-exist=false" >> $GITHUB_OUTPUT
-                fi
 
                 # Write new-alerts.txt to the GITHUB_ENV file to make it available to subsequent steps or $GITHUB_OUTPUT for next jobs,use a unique delimiter (e.g., EOF) to handle multiline content
                 echo "NEW_ALERTS<<EOF" >> $GITHUB_ENV
@@ -235,11 +228,19 @@ jobs:
                 }
                 
         - name: Slack notification
-          if: steps.evaluate.outputs.new-alerts-exist == 'true'
-          env: 
-            SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}
+          env:
+            DRYRUN: ${{ needs.check-strategy.outputs.dryrun }}
+            SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}       
+          if: ${{ env.DRYRUN == 'false' }}
+
           run: |
-            message="🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n\`\`\`\n${{ env.NEW_ALERTS }}\n\`\`\`\nPlease review and take action immediately."
-            curl -X POST -H 'Content-type: application/json' --data "{\"text\": \"$message\"}" "$SLACK_WEBHOOK_URL"
+            if [ -f new-alerts.txt ]; then
+              message="🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n\`\`\`\n${{ env.NEW_ALERTS }}\n\`\`\`\nPlease review and take action immediately."
+              curl -X POST -H 'Content-type: application/json' --data "{\"text\": \"$message\"}" "$SLACK_WEBHOOK_URL"
+            else
+              echo "No new alerts exist, skipping slack notification" >> $GITHUB_OUTPUT
+              echo "new-alerts-exist=false" >> $GITHUB_OUTPUT              
+            fi
+
 
 
