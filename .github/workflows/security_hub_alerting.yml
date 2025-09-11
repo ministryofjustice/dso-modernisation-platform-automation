@@ -73,11 +73,6 @@ jobs:
           echo "dryrun=${dryrun}"
           echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
 
-      - name: Debug
-        run: |
-          echo "From job: ${{ needs.check-strategy.outputs.dryrun }}"
-          echo "From step: ${{ steps.options.outputs.dryrun }}"            
-
   check-alerts:
     name: Check Alerts
     runs-on: ubuntu-latest
@@ -231,31 +226,19 @@ jobs:
                 cat new-alerts.txt >> $GITHUB_ENV
                 echo "EOF" >> $GITHUB_ENV
                 }
-                # needs. references other jobs, steps. references steps within the same job
-
-        - name: Debug
-          env:
-            dryrun: ${{ needs.check-strategy.outputs.dryrun }}
-            DAVE: 'true'
-          run: |
-            echo "debug - env.dryrun = ${{ env.dryrun }}"
-
-            echo "From job: ${{ needs.check-strategy.outputs.dryrun }}"
-            echo "From step: ${{ steps.options.outputs.dryrun }}"  
-            echo "From dave env: ${{ env.DAVE }}"              
                 
         - name: Slack notification
           env:
             DRYRUN: ${{ needs.check-strategy.outputs.dryrun }}
             SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}       
-          if: ${{ needs.check-strategy.outputs.dryrun == 'false' }}
+          if: ${{ env.DRYRUN == 'false' }}
 
           run: |
             if [ -f new-alerts.txt ]; then
               message="🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n\`\`\`\n${{ env.NEW_ALERTS }}\n\`\`\`\nPlease review and take action immediately."
-              # curl -X POST -H 'Content-type: application/json' --data "{\"text\": \"$message\"}" "$SLACK_WEBHOOK_URL"
+              curl -X POST -H 'Content-type: application/json' --data "{\"text\": \"$message\"}" "$SLACK_WEBHOOK_URL"
             else
-              echo "No new alerts exist, skipping slack notification" >> $GITHUB_OUTPUT
+              echo "No new alerts exist, skipping slack notification"
               echo "new-alerts-exist=false" >> $GITHUB_OUTPUT              
             fi
 
