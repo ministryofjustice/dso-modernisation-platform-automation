@@ -235,12 +235,12 @@ jobs:
 
         - name: Debug
           env:
-            DRYRUN: ${{ needs.check-strategy.outputs.dryrun }}
+            dryrun: ${{ needs.check-strategy.outputs.dryrun }}
             DAVE: 'true'
           run: |
             echo "From job: ${{ needs.check-strategy.outputs.dryrun }}"
             echo "From step: ${{ steps.options.outputs.dryrun }}"  
-            echo "From env: ${{ env.DRYRUN }}" 
+            echo "From env: ${{ env.dryrun }}" 
             echo "From dave env: ${{ env.DAVE }}"              
                 
         - name: Slack notification
