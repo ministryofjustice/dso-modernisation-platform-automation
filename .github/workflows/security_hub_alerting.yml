@@ -228,6 +228,8 @@ jobs:
                 }
                 echo "test conditional1: ${{ steps.options.outputs.dryrun }}"
                 echo "test conditional2: ${{ needs.options.outputs.dryrun }}"
+                echo "test conditional3: ${{ needs.steps.options.outputs.dryrun }}"
+                echo "test conditional4: ${{ steps.options.outputs.dryrun }}"
                 
         - name: Slack notification
           env:
