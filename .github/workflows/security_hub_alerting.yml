@@ -226,6 +226,7 @@ jobs:
                 cat new-alerts.txt >> $GITHUB_ENV
                 echo "EOF" >> $GITHUB_ENV
                 }
+                echo "test conditional: ${{ needs.check-strategy.outputs.dryrun }}"
                 
         - name: Slack notification
           env:
