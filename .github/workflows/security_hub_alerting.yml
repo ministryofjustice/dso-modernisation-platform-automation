@@ -231,7 +231,7 @@ jobs:
           env:
             DRYRUN: ${{ needs.check-strategy.outputs.dryrun }}
             SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}       
-          if: ${{ env.DRYRUN == 'false' }}
+          if: ${{ needs.check-strategy.outputs.dryrun == 'false' }}
 
           run: |
             if [ -f new-alerts.txt ]; then
