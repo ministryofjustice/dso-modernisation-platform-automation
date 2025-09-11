@@ -236,7 +236,7 @@ jobs:
           run: |
             if [ -f new-alerts.txt ]; then
               message="🚨 *New AWS Security Hub Alerts Detected* 🚨\nThe following accounts have new Critical or High alerts:\n\`\`\`\n${{ env.NEW_ALERTS }}\n\`\`\`\nPlease review and take action immediately."
-              curl -X POST -H 'Content-type: application/json' --data "{\"text\": \"$message\"}" "$SLACK_WEBHOOK_URL"
+              # curl -X POST -H 'Content-type: application/json' --data "{\"text\": \"$message\"}" "$SLACK_WEBHOOK_URL"
             else
               echo "No new alerts exist, skipping slack notification" >> $GITHUB_OUTPUT
               echo "new-alerts-exist=false" >> $GITHUB_OUTPUT              
