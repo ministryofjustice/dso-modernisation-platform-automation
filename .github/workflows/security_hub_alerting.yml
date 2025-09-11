@@ -114,7 +114,6 @@ jobs:
           dryrun: ${{ needs.check-strategy.outputs.dryrun }}
         run: |
           exitcode=0
-          echo "debug - env.dryrun = ${{ env.dryrun }}"
           echo src/security-hub-alerting.sh ${{ matrix.account_name }} $options
           src/security-hub-alerting.sh ${{ matrix.account_name }} $options 2>output.txt || exitcode=$?
           if [[ $exitcode -ne 0 ]]; then
@@ -162,7 +161,7 @@ jobs:
             retention-days: 1
       
   consolidate-accounts:
-    needs: check-alerts
+    needs: [check-strategy, check-alerts]
     runs-on: ubuntu-latest
 
     steps:
@@ -239,9 +238,10 @@ jobs:
             dryrun: ${{ needs.check-strategy.outputs.dryrun }}
             DAVE: 'true'
           run: |
+            echo "debug - env.dryrun = ${{ env.dryrun }}"
+
             echo "From job: ${{ needs.check-strategy.outputs.dryrun }}"
             echo "From step: ${{ steps.options.outputs.dryrun }}"  
-            echo "From env: ${ env.dryrun }" 
             echo "From dave env: ${{ env.DAVE }}"              
                 
         - name: Slack notification
