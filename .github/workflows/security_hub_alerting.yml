@@ -226,16 +226,16 @@ jobs:
                 cat new-alerts.txt >> $GITHUB_ENV
                 echo "EOF" >> $GITHUB_ENV
                 }
-                echo "test conditional1: ${{ steps.options.outputs.dryrun }}"
+                # needs. references other jobs, steps. references steps within the same job
                 echo "test conditional2: ${{ needs.options.outputs.dryrun }}"
-                echo "test conditional3: ${{ needs.steps.options.outputs.dryrun }}"
-                echo "test conditional4: ${{ steps.options.outputs.dryrun }}"
+                echo "test conditional3: ${{ steps.options.outputs.dryrun }}"
+                echo "test conditional5: ${{ needs.check-strategy.outputs.dryrun }}"
                 
         - name: Slack notification
           env:
-            DRYRUN: ${{ needs.options.outputs.dryrun }}
+            DRYRUN: ${{ needs.check-strategy.outputs.dryrun }}
             SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}       
-          if: ${{ needs.options.outputs.dryrun == 'false' }}
+          if: ${{ needs.check-strategy.outputs.dryrun == 'false' }}
 
           run: |
             if [ -f new-alerts.txt ]; then
