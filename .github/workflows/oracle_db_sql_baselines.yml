@@ -39,6 +39,36 @@ on:
           - 'nomis_preproduction                     PPCNMAUD'
           - 'nomis_preproduction                     LSCNOM'
           - 'nomis_preproduction                     LSMIS'
+          - 'oasys_test                              T2BOSYS'
+          - 'oasys_test                              T2BOAUD'
+          - 'oasys_test                              T1OASYS'
+          - 'oasys_test                              T1AZBIPI'
+          - 'oasys_test                              T1ONRSYS'
+          - 'oasys_test                              T1ONRBDS'
+          - 'oasys_test                              T1ONRAUD'
+          - 'oasys_test                              T1MISTRN'
+          - 'oasys_test                              T1OASREP'
+          - 'oasys_test                              T2OASYS'
+          - 'oasys_test                              T2OASYS2'
+          - 'oasys_test                              T2ONRSYS'
+          - 'oasys_test                              T2ONRBDS'
+          - 'oasys_test                              T2ONRAUD'
+          - 'oasys_test                              T2MISTRN'
+          - 'oasys_test                              T2OASREP'
+          - 'oasys_test                              T2BIPINF'
+          - 'oasys_test                              T1BIPINF'
+          - 'oasys_preproduction                     PPBOSYS'
+          - 'oasys_preproduction                     PPBOAUD'
+          - 'oasys_preproduction                     PPBISY42'
+          - 'oasys_preproduction                     PPBIAD42'
+          - 'oasys_preproduction                     PPOASYS'
+          - 'oasys_preproduction                     PPBIPINF'
+          - 'oasys_production                        PDBOSYS'
+          - 'oasys_production                        PDBOAUD'
+          - 'oasys_production                        PDBIPINF'
+          - 'oasys_production                        PROASYS'
+          - 'oasys_production                        TROASYS'
+          - 'oasys_production                        TRBIPINF'
       SourceConfigVersion:
         description: 'Branch/tag/commit for modernisation-platform-configuration-management'
         type: string
@@ -138,7 +168,7 @@ jobs:
                       # is only ever one host in the environment.
                       TARGET_DB_HOST="*-oem-a"
                       ;;
-              nomis*|corporate_staff_rostering*)
+              nomis*|corporate_staff_rostering*|oasys*)
                       # For these applications the target host for the primary DB can be found in
                       # the Ansible configuration files
                       case "${TARGET_ENVIRONMENT}" in
@@ -147,6 +177,9 @@ jobs:
                               ;;
                          nomis*)
                               APPLICATION=nomis
+                              ;;
+                         oasys*)
+                              APPLICATION=oasys
                               ;;
                          corporate_staff_rostering*)
                               APPLICATION=corporate-staff-rostering
