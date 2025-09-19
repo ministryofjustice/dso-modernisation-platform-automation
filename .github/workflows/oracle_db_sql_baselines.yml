@@ -181,11 +181,11 @@ jobs:
              echo "The target_environment was ${{ steps.prepareinventorynames.outputs.target_environment }}"
              echo "The target_db_name was ${{ steps.prepareinventorynames.outputs.target_db_name }}"
              echo "The target_db_host was ${{ steps.prepareinventorynames.outputs.target_db_host }}"
-             if [ "${{ steps.prepareinventorynames.outputs.target_db_name }}" != "*" ]
+             if [ ! -z "${{ steps.prepareinventorynames.outputs.target_db_name }}" ]
              then
                 TARGET_DB_NAME_SWITCH="--extra-vars target_db_name=${{ steps.prepareinventorynames.outputs.target_db_name }}"
              fi
-             if [ -z "${{ steps.prepareinventorynames.outputs.target_db_host }}" ]
+             if [ ! -z "${{ steps.prepareinventorynames.outputs.target_db_host }}" ]
              then
                 TARGET_DB_HOST_LIMIT="--limit =${{ steps.prepareinventorynames.outputs.target_db_host }}"
              fi
