@@ -130,11 +130,18 @@ jobs:
                       # is only ever one host in the environment.
                       TARGET_DB_HOST="*-oem-a"
                       ;;
-              nomis*)
-                      APPLICATION=nomis
-                      # For NOMIS the target host can be found from the Ansible
-                      # configuration file.
+              nomis*|corporate_staff_rostering*)
+                      # For these applications the target host for the primary DB can be found in
+                      # the Ansible configuration files
+                      case "${TARGET_ENVIRONMENT}" in
+                         nomis*)
+                              APPLICATION=nomis
+                         corporate_staff_rostering*)
+                              APPLICATION=corporate_staff_rostering
+                      esac
                       YQ_QUERY=".db_configs.${TARGET_DB_NAME}.host_name"
+                      echo "YQ: $YQ_QUERY"
+                      echo "FILE: inventory/ansible/group_vars/environment_name_${TARGET_ENVIRONMENT}.yml"
                       TARGET_DB_HOST=$(yq ${YQ_QUERY} \
                                        inventory/ansible/group_vars/environment_name_${TARGET_ENVIRONMENT}.yml \
                                        | cut -f1 -d.)
