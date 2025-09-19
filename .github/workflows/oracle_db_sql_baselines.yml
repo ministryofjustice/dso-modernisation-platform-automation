@@ -138,7 +138,7 @@ jobs:
                               APPLICATION=nomis
                               ;;
                          corporate_staff_rostering*)
-                              APPLICATION=corporate_staff_rostering
+                              APPLICATION=corporate-staff-rostering
                               ;;
                       esac
                       YQ_QUERY=".db_configs.${TARGET_DB_NAME}.host_name"
