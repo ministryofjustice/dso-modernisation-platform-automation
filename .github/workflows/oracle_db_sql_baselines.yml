@@ -11,11 +11,11 @@ on:
         default: ''
         type: choice
         options:
-          - 'delius_core_development_dev     *'
-          - 'delius_core_test_test           *'
-          - 'delius_mis_development_dev_mis  *'
-          - 'delius_mis_development_dev_boe  *'
-          - 'delius_mis_development_dev_dsd  *'          
+          - 'delius_core_development_dev'
+          - 'delius_core_test_test'
+          - 'delius_mis_development_dev_mis'
+          - 'delius_mis_development_dev_boe'
+          - 'delius_mis_development_dev_dsd'
           - 'hmpps_oem_development           EMREP'
           - 'hmpps_oem_development           RCVCAT'
           - 'hmpps_oem_test                  EMREP'
