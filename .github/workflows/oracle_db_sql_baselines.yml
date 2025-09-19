@@ -1,0 +1,197 @@
+name: Oracle DB SQL Plan Baseline Installation
+
+on:
+  push:
+    branches:
+        - "DBA-1017"
+  workflow_dispatch:
+    inputs:
+      TargetDatabase:
+        description: 'Databases for installation of SQL Plan Baselines'
+        default: ''
+        type: choice
+        options:
+          - 'delius_core_development_dev     *'
+          - 'delius_core_test_test           *'
+          - 'delius_mis_development_dev_mis  *'
+          - 'delius_mis_development_dev_boe  *'
+          - 'delius_mis_development_dev_dsd  *'          
+          - 'hmpps_oem_development           EMREP'
+          - 'hmpps_oem_development           RCVCAT'
+          - 'hmpps_oem_test                  EMREP'
+          - 'hmpps_oem_test                  RCVCAT'
+          - 'hmpps_oem_preproduction         EMREP'
+          - 'hmpps_oem_preproduction         RCVCAT'
+          - 'hmpps_oem_production            EMREP'
+          - 'hmpps_oem_production            RCVCAT'
+          - 'nomis_preproduction             PPCNOM'
+          - 'nomis_preproduction             PPNDH'
+          - 'nomis_preproduction             PPTRDAT'
+          - 'nomis_preproduction             PPMIS'
+          - 'nomis_preproduction             PPCNMAUD'
+          - 'nomis_preproduction             LSCNOM'              
+          - 'nomis_preproduction             LSMIS'                        
+      SourceConfigVersion:
+        description: 'Branch/tag/commit for modernisation-platform-configuration-management'
+        type: string
+        default: 'main'
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+env:
+  ansible_config: operations/playbooks/ansible.cfg
+  command: roles/ansible/site.yml -e force_role=oracle-db-sql-baselines
+  inventory: inventory/ansible
+
+# Finding the Primary Host Name
+#
+# DELIUS
+#
+# environment_name_<TargetDatabaseEnv>_delius_primarydb
+# (no limit required)
+#
+# OEM
+# 
+# environment_name_<TargetDatabaseEnv>
+#
+# NOMIS
+#
+# environment_name_<TargetDatabaseEnv> but limit to the -a suffix
+# (limit based on the configuration file)
+
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ministryofjustice/hmpps-delius-operational-automation:0.80.0
+    timeout-minutes: 1440
+    continue-on-error: false
+    steps:
+
+      - name: Checkout Inventory & Roles
+        uses: actions/checkout@v5
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ansible/hosts
+            ansible/group_vars
+          path: inventory
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
+          fetch-depth: 0
+
+      - name: Fetch Required Roles & Site
+        uses: actions/checkout@v5
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ansible/roles/oracle-db-get-name
+            ansible/site.yml
+          path: roles
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
+          fetch-depth: 0
+
+      - name: Checkout helper scripts
+        uses: actions/checkout@v5
+        with:
+          path: dso-modernisation-platform-automation
+
+      - name: Prepare Inventory Name
+        id: prepareinventorynames
+        env:
+           TARGET_DATABASE: ${{ github.event.inputs.TargetDatabase }}
+        shell: bash
+        run: |
+           TARGET_ENVIRONMENT=${TARGET_DATABASE%%[[:space:]]*}
+           TARGET_DB_NAME=$(echo ${TARGET_DATABASE} | awk '{print $2}')
+           echo "target_environment=${TARGET_ENVIRONMENT}" >> $GITHUB_OUTPUT
+           echo "target_db_name=${TARGET_DB_NAME}" >> $GITHUB_OUTPUT
+           TARGET=environment_name_${TARGET_ENVIRONMENT}
+           case "${TARGET_ENVIRONMENT}" in
+              delius_core*)
+                      APPLICATION=delius-core
+                      # No target host required for DELIUS since only one primary DB in the group:
+                      # override default target
+                      TARGET=environment_name_${TARGET_ENVIRONMENT}_delius_primarydb
+                      ;;
+              delius_mis*)
+                      APPLICATION=delius-mis
+                      # No target host required for DELIUS since only one primary DB in the group:
+                      # override default target
+                      TARGET=environment_name_${TARGET_ENVIRONMENT}_primarydb
+                      ;;
+              hmpps_oem*)
+                      APPLICATION=hmpps-oem
+                      # No target host required for OEM since there
+                      # is only ever one host in the environment.
+                      TARGET_DB_HOST="*-oem-a"
+                      ;;
+              nomis*)
+                      APPLICATION=nomis
+                      # For NOMIS the target host can be found from the Ansible
+                      # configuration file.
+                      YQ_QUERY=".db_configs.${TARGET_DB_NAME}.host_name"
+                      TARGET_DB_HOST=$(yq ${YQ_QUERY} \
+                                       inventory/ansible/group_vars/environment_name_${TARGET_ENVIRONMENT}.yml \
+                                       | cut -f1 -d.)
+                      ;;
+              *)      echo "Unknown application type"
+                      ;;
+           esac
+           echo "target=${TARGET}" >> $GITHUB_OUTPUT
+           echo "target_db_host=${TARGET_DB_HOST}" >> $GITHUB_OUTPUT
+           echo "application=${APPLICATION}" >> $GITHUB_OUTPUT
+           ENVIRONMENT_TYPE=$(echo ${TARGET_ENVIRONMENT} \
+                                | sed 's/_/-/g' | awk -F${APPLICATION}- '{print $2}' \
+                                | awk -F- '{print $1}' )
+           echo "environment_type=${ENVIRONMENT_TYPE}" >> $GITHUB_OUTPUT
+           echo "account_name=${APPLICATION}-${ENVIRONMENT_TYPE}" >> $GITHUB_OUTPUT
+
+      - name: Use output
+        run: |
+             echo "The target_environment was ${{ steps.prepareinventorynames.outputs.target_environment }}"
+             echo "The target_db_name was ${{ steps.prepareinventorynames.outputs.target_db_name }}"
+             echo "The target_db_host was ${{ steps.prepareinventorynames.outputs.target_db_host }}"
+             echo "The application was ${{ steps.prepareinventorynames.outputs.application }}"
+             echo "The environment type was ${{ steps.prepareinventorynames.outputs.environment_type }}"
+             echo "The account name was ${{ steps.prepareinventorynames.outputs.account_name }}"
+
+      - name: Get Account Details
+        id: account
+        run: |
+             echo "account name: ${{ steps.prepareinventorynames.outputs.account_name }}"
+             account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.prepareinventorynames.outputs.account_name] }}"
+             role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+             echo "role arn:     ${role_arn}"
+             echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "oracle-db-sql-baselines-${{ steps.prepareinventorynames.outputs.account_name }}-${{ github.run_number }}"
+          aws-region: eu-west-2        
+
+      - name: Get Database Name
+        run: |
+             echo "The target_environment was ${{ steps.prepareinventorynames.outputs.target_environment }}"
+             echo "The target_db_name was ${{ steps.prepareinventorynames.outputs.target_db_name }}"
+             echo "The target_db_host was ${{ steps.prepareinventorynames.outputs.target_db_host }}"
+             if [ "${{ steps.prepareinventorynames.outputs.target_db_name }}" != "*" ]
+             then
+                TARGET_DB_NAME_SWITCH="--extra-vars target_db_name=${{ steps.prepareinventorynames.outputs.target_db_name }}"
+             fi
+             if [ -z "${{ steps.prepareinventorynames.outputs.target_db_host }}" ]
+             then
+                TARGET_DB_HOST_LIMIT="--limit =${{ steps.prepareinventorynames.outputs.target_db_host }}"
+             fi
+             ansible-playbook \
+                 --extra-vars "target=${{ steps.prepareinventorynames.outputs.target }}" \
+                 ${TARGET_DB_NAME_SWITCH} ${TARGET_DB_HOST_LIMIT} \
+                 --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml
+
+
