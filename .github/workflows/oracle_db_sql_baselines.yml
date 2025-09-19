@@ -187,7 +187,7 @@ jobs:
              fi
              if [ ! -z "${{ steps.prepareinventorynames.outputs.target_db_host }}" ]
              then
-                TARGET_DB_HOST_LIMIT="--limit =${{ steps.prepareinventorynames.outputs.target_db_host }}"
+                TARGET_DB_HOST_LIMIT="--limit ${{ steps.prepareinventorynames.outputs.target_db_host }}"
              fi
              ansible-playbook \
                  -i $inventory \
