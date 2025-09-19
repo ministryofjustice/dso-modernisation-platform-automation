@@ -1,36 +1,36 @@
 name: Oracle DB SQL Plan Baseline Installation
 
 on:
-  push:
-    branches:
-        - "DBA-1017"
   workflow_dispatch:
     inputs:
       TargetDatabase:
-        description: 'Databases for installation of SQL Plan Baselines'
+        description: 'Primary Databases for installation of SQL Plan Baselines'
         default: ''
         type: choice
         options:
+          - 'corporate_staff_rostering_test           T3IWFM'
+          - 'corporate_staff_rostering_preproduction  PPIWFM'
+          - 'corporate_staff_rostering_production     PIWFM'
           - 'delius_core_development_dev'
           - 'delius_core_test_test'
           - 'delius_mis_development_dev_mis'
           - 'delius_mis_development_dev_boe'
           - 'delius_mis_development_dev_dsd'
-          - 'hmpps_oem_development           EMREP'
-          - 'hmpps_oem_development           RCVCAT'
-          - 'hmpps_oem_test                  EMREP'
-          - 'hmpps_oem_test                  RCVCAT'
-          - 'hmpps_oem_preproduction         EMREP'
-          - 'hmpps_oem_preproduction         RCVCAT'
-          - 'hmpps_oem_production            EMREP'
-          - 'hmpps_oem_production            RCVCAT'
-          - 'nomis_preproduction             PPCNOM'
-          - 'nomis_preproduction             PPNDH'
-          - 'nomis_preproduction             PPTRDAT'
-          - 'nomis_preproduction             PPMIS'
-          - 'nomis_preproduction             PPCNMAUD'
-          - 'nomis_preproduction             LSCNOM'              
-          - 'nomis_preproduction             LSMIS'                        
+          - 'hmpps_oem_development                    EMREP'
+          - 'hmpps_oem_development                    RCVCAT'
+          - 'hmpps_oem_test                           EMREP'
+          - 'hmpps_oem_test                           RCVCAT'
+          - 'hmpps_oem_preproduction                  EMREP'
+          - 'hmpps_oem_preproduction                  RCVCAT'
+          - 'hmpps_oem_production                     EMREP'
+          - 'hmpps_oem_production                     RCVCAT'
+          - 'nomis_preproduction                      PPCNOM'
+          - 'nomis_preproduction                      PPNDH'
+          - 'nomis_preproduction                      PPTRDAT'
+          - 'nomis_preproduction                      PPMIS'
+          - 'nomis_preproduction                      PPCNMAUD'
+          - 'nomis_preproduction                      LSCNOM'
+          - 'nomis_preproduction                      LSMIS'
       SourceConfigVersion:
         description: 'Branch/tag/commit for modernisation-platform-configuration-management'
         type: string
