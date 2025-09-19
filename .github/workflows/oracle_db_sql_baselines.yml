@@ -136,8 +136,10 @@ jobs:
                       case "${TARGET_ENVIRONMENT}" in
                          nomis*)
                               APPLICATION=nomis
+                              ;;
                          corporate_staff_rostering*)
                               APPLICATION=corporate_staff_rostering
+                              ;;
                       esac
                       YQ_QUERY=".db_configs.${TARGET_DB_NAME}.host_name"
                       echo "YQ: $YQ_QUERY"
