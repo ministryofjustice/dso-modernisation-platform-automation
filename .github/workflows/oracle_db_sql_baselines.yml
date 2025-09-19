@@ -69,6 +69,12 @@ on:
           - 'oasys_production                        PROASYS'
           - 'oasys_production                        TROASYS'
           - 'oasys_production                        TRBIPINF'
+          - 'oasys_national_reporting_test           T2BOSYS'
+          - 'oasys_national_reporting_test           T2BOAUD'
+          - 'oasys_national_reporting_preproduction  PPBOSYS'
+          - 'oasys_national_reporting_preproduction  PPBOAUD'
+          - 'oasys_national_reporting_production     PDBOSYS'
+          - 'oasys_national_reporting_production     PDBOAUD'
       SourceConfigVersion:
         description: 'Branch/tag/commit for modernisation-platform-configuration-management'
         type: string
@@ -83,22 +89,6 @@ env:
   ansible_config: operations/playbooks/ansible.cfg
   command: roles/ansible/site.yml -e force_role=oracle-db-sql-baselines
   inventory: inventory/ansible
-
-# Finding the Primary Host Name
-#
-# DELIUS
-#
-# environment_name_<TargetDatabaseEnv>_delius_primarydb
-# (no limit required)
-#
-# OEM
-# 
-# environment_name_<TargetDatabaseEnv>
-#
-# NOMIS
-#
-# environment_name_<TargetDatabaseEnv> but limit to the -a suffix
-# (limit based on the configuration file)
 
 jobs:
   deployment:
@@ -177,6 +167,9 @@ jobs:
                               ;;
                          nomis*)
                               APPLICATION=nomis
+                              ;;
+                         oasys_national_reporting*)
+                              APPLICATION=oasys-national-reporting
                               ;;
                          oasys*)
                               APPLICATION=oasys
