@@ -3,10 +3,8 @@ description "Set up Access to Oracle Primary Databases Depending on TargetDataba
 inputs:
    TargetDatabase:
       description: "Primary Database"
-      type: string
    SourceConfigVersion:
       description: 'Branch/tag/commit for modernisation-platform-configuration-management'
-      type: string
       default: 'main'
         
 runs:
