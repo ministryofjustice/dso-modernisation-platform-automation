@@ -1,15 +1,18 @@
 
+name: "Setup Primary DB Action"
 description "Set up Access to Oracle Primary Databases Depending on TargetDatabase Selection"
+
 inputs:
    TargetDatabase:
       description: "Primary Database"
+      required: true
    SourceConfigVersion:
-      description: 'Branch/tag/commit for modernisation-platform-configuration-management'
-      default: 'main'
-        
+      description: "Branch/tag/commit for modernisation-platform-configuration-management"
+      required: false
+      default: "main"
+
 runs:
    using: composite
-
    steps:
     - name: Checkout Inventory & Roles
       uses: actions/checkout@v5
