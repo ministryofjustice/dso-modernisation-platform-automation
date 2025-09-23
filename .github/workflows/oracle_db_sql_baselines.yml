@@ -108,6 +108,12 @@ jobs:
           name: "World"
           greeting: "Hello"
 
+      - name: Test Composite Again
+        uses: ./.github/actions/say_hello
+        with:
+          name: "${{ github.event.inputs.SourceConfigVersion }}"
+          greeting: "Hello"
+
       - name: Setup Primary Database Access
         uses: ./.github/actions/setup_oracle_db_access
         with:
