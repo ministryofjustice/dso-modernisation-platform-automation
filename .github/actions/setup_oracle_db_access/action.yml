@@ -42,6 +42,8 @@ runs:
       run: |
           TARGET_ENVIRONMENT=${TARGET_DATABASE%%[[:space:]]*}
           TARGET_DB_NAME=$(echo ${TARGET_DATABASE} | awk '{print $2}')
+          echo "target_environment=${TARGET_ENVIRONMENT}"
+          echo "target_db_name=${TARGET_DB_NAME}"    
           echo "target_environment=${TARGET_ENVIRONMENT}" >> $GITHUB_OUTPUT
           echo "target_db_name=${TARGET_DB_NAME}" >> $GITHUB_OUTPUT
           TARGET=environment_name_${TARGET_ENVIRONMENT}
