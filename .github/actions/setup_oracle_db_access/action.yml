@@ -104,6 +104,7 @@ runs:
           echo "account_name=${APPLICATION}-${ENVIRONMENT_TYPE}" >> $GITHUB_OUTPUT
 
     - name: Use output
+      shell: bash
       run: |
             echo "The target_environment was ${{ steps.prepareinventorynames.outputs.target_environment }}"
             echo "The target_db_name was ${{ steps.prepareinventorynames.outputs.target_db_name }}"
@@ -114,6 +115,7 @@ runs:
 
     - name: Get Account Details
       id: account
+      shell: bash
       run: |
             echo "account name: ${{ steps.prepareinventorynames.outputs.account_name }}"
             account_id="${{ fromJSON(inputs.ModernisationPlatformEnvironmentManagement).account_ids[steps.prepareinventorynames.outputs.account_name] }}"
