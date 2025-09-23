@@ -10,6 +10,9 @@ inputs:
       description: "Branch/tag/commit for modernisation-platform-configuration-management"
       required: false
       default: "main"
+   ModernisationPlatformEnvironmentManagement:
+      description: "Secret MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT"
+      required: true
 
 runs:
    using: composite
@@ -113,7 +116,7 @@ runs:
       id: account
       run: |
             echo "account name: ${{ steps.prepareinventorynames.outputs.account_name }}"
-            account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.prepareinventorynames.outputs.account_name] }}"
+            account_id="${{ fromJSON(inputs.ModernisationPlatformEnvironmentManagement).account_ids[steps.prepareinventorynames.outputs.account_name] }}"
             role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
             echo "role arn:     ${role_arn}"
             echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT

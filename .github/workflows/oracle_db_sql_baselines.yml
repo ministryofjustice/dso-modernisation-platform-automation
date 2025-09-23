@@ -102,29 +102,12 @@ jobs:
       - name: Checkout Local Repo to get Composite Action
         uses: actions/checkout@v4
 
-      - name: Test Composite
-        uses: ./.github/actions/say_hello
-        with:
-          name: "World"
-          greeting: "Hello"
-
-      - name: Test Composite Again
-        uses: ./.github/actions/say_hello
-        with:
-          name: "${{ github.event.inputs.SourceConfigVersion }}"
-          greeting: "Hello"
-
-      - name: Test Composite Again Again
-        uses: ./.github/actions/say_hello
-        with:
-          name: "${{ github.event.inputs.TargetDatabase }}"
-          greeting: "Hello"
-
       - name: Setup Primary Database Access
         uses: ./.github/actions/setup_oracle_db_access
         with:
           TargetDatabase: "${{ github.event.inputs.TargetDatabase }}"
           SourceConfigVersion: "${{ github.event.inputs.SourceConfigVersion }}"
+          ModernisationPlatformEnvironmentManagement: "${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}"
 
       - name: Fetch Required Roles & Site
         uses: actions/checkout@v5
