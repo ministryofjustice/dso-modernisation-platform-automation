@@ -123,8 +123,8 @@ jobs:
       - name: Setup Primary Database Access
         uses: ./.github/actions/setup_oracle_db_access
         with:
-          name: "${{ github.event.inputs.TargetDatabase }}"
-          greeting: "${{ github.event.inputs.SourceConfigVersion }}"
+          TargetDatabase: "${{ github.event.inputs.TargetDatabase }}"
+          SourceConfigVersion: "${{ github.event.inputs.SourceConfigVersion }}"
 
       - name: Fetch Required Roles & Site
         uses: actions/checkout@v5
