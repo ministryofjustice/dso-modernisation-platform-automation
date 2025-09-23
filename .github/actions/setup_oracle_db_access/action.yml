@@ -3,10 +3,10 @@ name: "Setup Primary DB Action"
 description "Set up Access to Oracle Primary Databases Depending on TargetDatabase Selection"
 
 inputs:
-   TargetDatabase:
+   name:
       description: "Primary Database"
       required: true
-   SourceConfigVersion:
+   greeting:
       description: "Branch/tag/commit for modernisation-platform-configuration-management"
       required: false
       default: "main"
@@ -16,4 +16,4 @@ runs:
    steps:
       - name: Print greeting
         shell: bash
-        run: echo "${{ inputs.TargetDatabase }}, ${{ inputs.SourceConfigVersion }}"
+        run: echo "${{ inputs.name }}, ${{ inputs.greeting }}"
