@@ -102,6 +102,12 @@ jobs:
       - name: Checkout Local Repo to get Composite Action
         uses: actions/checkout@v4
 
+      - name: Test Composite
+        uses: ./.github/actions/say_hello
+        with:
+          name: "World"
+          greeting: "Hello"
+
       - name: Setup Primary Database Access
         uses: ./.github/actions/setup_oracle_db_access
         with:
