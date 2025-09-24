@@ -48,4 +48,7 @@ jobs:
       - name: Generate Primary Database List
         shell: bash
         run: |
-             src/get_oracle_workflow_options_list.sh src/DBA_APPLICATIONS.txt inventory/ansible/group_vars
+             find $env -ls
+             echo
+             echo
+             src/get_oracle_workflow_options_list.sh src/DBA_APPLICATIONS.txt $env/group_vars
