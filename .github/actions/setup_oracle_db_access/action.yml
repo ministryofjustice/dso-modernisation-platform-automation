@@ -62,13 +62,13 @@ runs:
                     APPLICATION=delius-core
                     # No target host required for DELIUS since only one primary DB in the group:
                     # override default target
-                    TARGET=environment_name_${TARGET_ENVIRONMENT}_delius_primarydb
+                    TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_delius_primarydb
                     ;;
             delius_mis*)
                     APPLICATION=delius-mis
                     # No target host required for DELIUS since only one primary DB in the group:
                     # override default target
-                    TARGET=environment_name_${TARGET_ENVIRONMENT}_primarydb
+                    TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_primarydb
                     ;;
             hmpps_oem*)
                     APPLICATION=hmpps-oem
@@ -97,8 +97,6 @@ runs:
                             ;;
                     esac
                     YQ_QUERY=".db_configs.${TARGET_DB_NAME}.host_name"
-                    echo "YQ: $YQ_QUERY"
-                    echo "FILE: inventory/ansible/group_vars/environment_name_${TARGET_ENVIRONMENT}.yml"
                     TARGET_DB_HOST=$(yq ${YQ_QUERY} \
                                       inventory/ansible/group_vars/environment_name_${TARGET_ENVIRONMENT}.yml \
                                       | cut -f1 -d.)
