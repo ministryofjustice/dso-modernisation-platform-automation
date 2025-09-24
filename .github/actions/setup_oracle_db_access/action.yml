@@ -62,7 +62,7 @@ runs:
                     APPLICATION=delius-core
                     # No target host required for DELIUS since only one primary DB in the group:
                     # override default target
-                    TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_delius_primarydb
+                    TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_primarydb
                     ;;
             delius_mis*)
                     APPLICATION=delius-mis
