@@ -18,7 +18,15 @@ outputs:
    target_environment:
        description: "AWS Environment hosting the selected Primary Database"
        value: ${{ steps.prepareinventorynames.outputs.target_environment }}
-   
+   target_db_name:
+       description: "Name of the selected Primary Database"
+       value: ${{ steps.prepareinventorynames.outputs.target_db_name }}
+   target_group:
+       description: "Name of the Ansible Group Variables file associated with the target database"
+       value: ${{ steps.prepareinventorynames.outputs.target_group }}
+   target_db_host:
+       description: "Name of EC2 host where the target database is running"
+       value: ${{ steps.prepareinventorynames.outputs.target_db_host }}
 
 runs:
    using: composite
@@ -52,7 +60,7 @@ runs:
           echo "target_db_name=${TARGET_DB_NAME}"    
           echo "target_environment=${TARGET_ENVIRONMENT}" >> $GITHUB_OUTPUT
           echo "target_db_name=${TARGET_DB_NAME}" >> $GITHUB_OUTPUT
-          TARGET=environment_name_${TARGET_ENVIRONMENT}
+          TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}
           case "${TARGET_ENVIRONMENT}" in
             delius_core*)
                     APPLICATION=delius-core
@@ -102,7 +110,7 @@ runs:
             *)      echo "Unknown application type"
                     ;;
           esac
-          echo "target=${TARGET}" >> $GITHUB_OUTPUT
+          echo "target_group=${TARGET_GROUP}" >> $GITHUB_OUTPUT
           echo "target_db_host=${TARGET_DB_HOST}" >> $GITHUB_OUTPUT
           echo "application=${APPLICATION}" >> $GITHUB_OUTPUT
           ENVIRONMENT_TYPE=$(echo ${TARGET_ENVIRONMENT} \

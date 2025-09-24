@@ -138,6 +138,6 @@ jobs:
              fi
              ansible-playbook \
                  -i $inventory \
-                 --extra-vars "target=${{ steps.setup_primary_db_access.outputs.target }}" \
+                 --extra-vars "target=${{ steps.setup_primary_db_access.outputs.target_group }}" \
                  ${TARGET_DB_NAME_SWITCH} ${TARGET_DB_HOST_LIMIT} \
                  --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml
