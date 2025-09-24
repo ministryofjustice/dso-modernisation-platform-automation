@@ -55,5 +55,7 @@ do
     (( ${#s} > MAX_LENGTH )) && MAX_LENGTH=${#s}
 done
 
+echo ">>>>>>>>CUT HERE FOR TARGET DATABASE LIST>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
 # Print all target databases in alphabetical order formatted for align together
-printf '%s\n' "${TARGET_DATABASES[@]}" | sort | awk -v MAX=${MAX_LENGTH} '{PAD=2+MAX-length($1 $2); printf("%s%*s%s\n",$1,PAD,"",$2)}' 
+printf '%s\n' "${TARGET_DATABASES[@]}" | sort | awk -v MAX=${MAX_LENGTH} '{PAD=2+MAX-length($1 $2); printf("          - '"'"'%s%*s%s'"'"'\n",$1,PAD,"",$2)}' 
+echo "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
