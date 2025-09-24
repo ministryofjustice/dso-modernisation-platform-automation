@@ -8,7 +8,10 @@ GROUP_VARS_DIRECTORY=$2
 
 if [[ ! -d ${GROUP_VARS_DIRECTORY} ]];
 then
-   echo "Ansible group_vars directory not found."
+   echo "Ansible group_vars directory not found at ${GROUP_VARS_DIRECTORY}."
+   ls -d ${GROUP_VARS_DIRECTORY}
+   echo
+   ls -l ${GROUP_VARS_DIRECTORY}
    exit 1
 fi
 
