@@ -14,6 +14,12 @@ inputs:
       description: "Secret MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT"
       required: true
 
+outputs:
+   target_environment:
+       description: "AWS Environment hosting the selected Primary Database"
+       value: ${{ steps.prepareinventorynames.target_environment }}
+   
+
 runs:
    using: composite
    steps:
