@@ -119,7 +119,6 @@ permissions:
 
 env:
   ansible_config: operations/playbooks/ansible.cfg
-  command: roles/ansible/site.yml -e force_role=oracle-db-sql-baselines
   inventory: inventory/ansible
 
 jobs:
@@ -148,7 +147,7 @@ jobs:
           repository: ministryofjustice/modernisation-platform-configuration-management
           sparse-checkout-cone-mode: false
           sparse-checkout: |
-            ansible/roles/oracle-db-get-name
+            ansible/roles/oracle-db-sql-baselines
             ansible/site.yml
           path: roles
           ref: ${{ github.event.inputs.SourceConfigVersion }}
@@ -173,4 +172,4 @@ jobs:
                  -i $inventory \
                  --extra-vars "target=${{ steps.setup_primary_db_access.outputs.target_group }}" \
                  ${TARGET_DB_NAME_SWITCH} ${TARGET_DB_HOST_LIMIT} \
-                 --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml
+                 --extra-vars force_role=oracle-db-sql-baselines roles/ansible/site.yml
