@@ -1,0 +1,51 @@
+name: Oracle DB Generate Primary List
+description: "Generate list of environment names and their associated databases"
+
+# This is a helper workflow which generates a list of environments and databases
+# which may be cut & paste into the options list for other workflows whenever
+# the set of available databases changes.   
+# This is a workaround since GHA does not currently support dynamic option lists.
+
+on:
+  push:
+    branches:
+      - "DBA-1017"
+  workflow_dispatch:
+    inputs:
+      SourceConfigVersion:
+        description: 'Branch/tag/commit for modernisation-platform-configuration-management'
+        type: string
+        default: 'main'
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+env:
+  inventory: inventory/ansible
+
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ministryofjustice/hmpps-delius-operational-automation:0.80.0
+    timeout-minutes: 1440
+    continue-on-error: false
+    steps:
+
+      - name: Checkout Inventory
+        uses: actions/checkout@v5
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ansible/group_vars
+          path: inventory
+          ref: ${{ inputs.SourceConfigVersion }}
+          fetch-depth: 0
+
+      - name: Generate Primary Database List
+        shell: bash
+        run: |
+             src/get_oracle_workflow_options_list.sh src/DBA_APPLICATIONS.txt ansible/group_vars
