@@ -103,6 +103,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Primary Database Access
+        id: setup_primary_db_access
         uses: ./.github/actions/setup_oracle_db_access
         with:
           TargetDatabase: "${{ github.event.inputs.TargetDatabase }}"
@@ -123,19 +124,19 @@ jobs:
 
       - name: Get Database Name
         run: |
-             echo "The target_environment was ${{ steps.prepareinventorynames.outputs.target_environment }}"
-             echo "The target_db_name was ${{ steps.prepareinventorynames.outputs.target_db_name }}"
-             echo "The target_db_host was ${{ steps.prepareinventorynames.outputs.target_db_host }}"
-             if [ ! -z "${{ steps.prepareinventorynames.outputs.target_db_name }}" ]
+             echo "The target_environment was ${{ steps.setup_primary_db_access.outputs.target_environment }}"
+             echo "The target_db_name was ${{ steps.setup_primary_db_access.outputs.target_db_name }}"
+             echo "The target_db_host was ${{ steps.setup_primary_db_access.outputs.target_db_host }}"
+             if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_name }}" ]
              then
-                TARGET_DB_NAME_SWITCH="--extra-vars target_db_name=${{ steps.prepareinventorynames.outputs.target_db_name }}"
+                TARGET_DB_NAME_SWITCH="--extra-vars target_db_name=${{ steps.setup_primary_db_access.outputs.target_db_name }}"
              fi
-             if [ ! -z "${{ steps.prepareinventorynames.outputs.target_db_host }}" ]
+             if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_host }}" ]
              then
-                TARGET_DB_HOST_LIMIT="--limit ${{ steps.prepareinventorynames.outputs.target_db_host }}"
+                TARGET_DB_HOST_LIMIT="--limit ${{ steps.setup_primary_db_access.outputs.target_db_host }}"
              fi
              ansible-playbook \
                  -i $inventory \
-                 --extra-vars "target=${{ steps.prepareinventorynames.outputs.target }}" \
+                 --extra-vars "target=${{ steps.setup_primary_db_access.outputs.target }}" \
                  ${TARGET_DB_NAME_SWITCH} ${TARGET_DB_HOST_LIMIT} \
                  --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml
