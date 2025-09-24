@@ -48,7 +48,4 @@ jobs:
       - name: Generate Primary Database List
         shell: bash
         run: |
-             find $inventory -ls
-             echo
-             echo
              src/get_oracle_workflow_options_list.sh src/DBA_APPLICATIONS.txt $inventory/group_vars

@@ -9,9 +9,6 @@ GROUP_VARS_DIRECTORY=$2
 if [[ ! -d ${GROUP_VARS_DIRECTORY} ]];
 then
    echo "Ansible group_vars directory not found at ${GROUP_VARS_DIRECTORY}."
-   ls -d ${GROUP_VARS_DIRECTORY}
-   echo
-   ls -l ${GROUP_VARS_DIRECTORY}
    exit 1
 fi
 
@@ -30,7 +27,7 @@ do
       fi
    else
       # For other applications find all the databases listed in the environment
-      for DATABASE in $(yq '.db_configs? | select(. != null) | keys | .[]' /root/data/modernisation-platform-configuration-management/ansible/group_vars/${GROUP_VARS_FILE})
+      for DATABASE in $(yq '.db_configs? | select(. != null) | keys | .[]' ${GROUP_VARS_DIRECTORY}/${GROUP_VARS_FILE})
       do
          # The RCVCAT database is referenced in all non-Delius environments but it is
          # only a real database in the hmpps_oem application environments so exclude it elsewhere
