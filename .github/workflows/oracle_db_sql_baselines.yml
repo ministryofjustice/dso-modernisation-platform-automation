@@ -100,7 +100,7 @@ jobs:
     steps:
 
       - name: Checkout Local Repo to get Composite Action
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Primary Database Access
         id: setup_primary_db_access
@@ -123,6 +123,7 @@ jobs:
           fetch-depth: 0
 
       - name: Get Database Name
+        id: get_db_name
         run: |
              echo "The target_environment was ${{ steps.setup_primary_db_access.outputs.target_environment }}"
              echo "The target_db_name was ${{ steps.setup_primary_db_access.outputs.target_db_name }}"
