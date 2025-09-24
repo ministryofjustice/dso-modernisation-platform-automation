@@ -56,10 +56,6 @@ runs:
       run: |
           TARGET_ENVIRONMENT=${TARGET_DATABASE%%[[:space:]]*}
           TARGET_DB_NAME=$(echo ${TARGET_DATABASE} | awk '{print $2}')
-          echo "target_environment=${TARGET_ENVIRONMENT}"
-          echo "target_db_name=${TARGET_DB_NAME}"    
-          echo "target_environment=${TARGET_ENVIRONMENT}" >> $GITHUB_OUTPUT
-          echo "target_db_name=${TARGET_DB_NAME}" >> $GITHUB_OUTPUT
           TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}
           case "${TARGET_ENVIRONMENT}" in
             delius_core*)
@@ -110,24 +106,29 @@ runs:
             *)      echo "Unknown application type"
                     ;;
           esac
-          echo "target_group=${TARGET_GROUP}" >> $GITHUB_OUTPUT
-          echo "target_db_host=${TARGET_DB_HOST}" >> $GITHUB_OUTPUT
-          echo "application=${APPLICATION}" >> $GITHUB_OUTPUT
+          # ENVIRONMENT_TYPE is one of development|test|preproduction|production
           ENVIRONMENT_TYPE=$(echo ${TARGET_ENVIRONMENT} \
                               | sed 's/_/-/g' | awk -F${APPLICATION}- '{print $2}' \
                               | awk -F- '{print $1}' )
-          echo "environment_type=${ENVIRONMENT_TYPE}" >> $GITHUB_OUTPUT
+          echo "target_environment=${TARGET_ENVIRONMENT}"        >> $GITHUB_OUTPUT
+          echo "target_db_name=${TARGET_DB_NAME}"                >> $GITHUB_OUTPUT
+          echo "target_group=${TARGET_GROUP}"                    >> $GITHUB_OUTPUT
+          echo "target_db_host=${TARGET_DB_HOST}"                >> $GITHUB_OUTPUT
+          echo "application=${APPLICATION}"                      >> $GITHUB_OUTPUT
+          echo "environment_type=${ENVIRONMENT_TYPE}"            >> $GITHUB_OUTPUT
           echo "account_name=${APPLICATION}-${ENVIRONMENT_TYPE}" >> $GITHUB_OUTPUT
 
-    - name: Use output
+    - name: Show Known Identifiers
       shell: bash
       run: |
-            echo "The target_environment was ${{ steps.prepareinventorynames.outputs.target_environment }}"
-            echo "The target_db_name was ${{ steps.prepareinventorynames.outputs.target_db_name }}"
-            echo "The target_db_host was ${{ steps.prepareinventorynames.outputs.target_db_host }}"
-            echo "The application was ${{ steps.prepareinventorynames.outputs.application }}"
-            echo "The environment type was ${{ steps.prepareinventorynames.outputs.environment_type }}"
-            echo "The account name was ${{ steps.prepareinventorynames.outputs.account_name }}"
+            echo <<-EOECHO
+               target_environment: ${{ steps.prepareinventorynames.outputs.target_environment }}
+               target_db_name    : ${{ steps.prepareinventorynames.outputs.target_db_name }}
+               target_db_host    : ${{ steps.prepareinventorynames.outputs.target_db_host }}
+               application       : ${{ steps.prepareinventorynames.outputs.application }}
+               environment_type  : ${{ steps.prepareinventorynames.outputs.environment_type }}
+               account_name      : ${{ steps.prepareinventorynames.outputs.account_name }}
+            EOECHO
 
     - name: Get Account Details
       id: account
@@ -136,7 +137,6 @@ runs:
             echo "account name: ${{ steps.prepareinventorynames.outputs.account_name }}"
             account_id="${{ fromJSON(inputs.ModernisationPlatformEnvironmentManagement).account_ids[steps.prepareinventorynames.outputs.account_name] }}"
             role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
-            echo "role arn:     ${role_arn}"
             echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
 
     - name: Configure AWS Credentials
