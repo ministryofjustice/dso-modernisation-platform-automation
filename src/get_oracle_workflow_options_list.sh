@@ -6,6 +6,12 @@ DBA_APPLICATIONS_LIST=$1
 # Path to the Ansible Group Vars files directory
 GROUP_VARS_DIRECTORY=$2
 
+if [[ ! -d ${GROUP_VARS_DIRECTORY} ]];
+then
+   echo "Ansible group_vars directory not found."
+   exit 1
+fi
+
 # Create array of all possible target primary databases
 declare -a TARGET_DATABASES
 
