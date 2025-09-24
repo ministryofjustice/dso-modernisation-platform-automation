@@ -7,9 +7,6 @@ description: "Generate list of environment names and their associated databases"
 # This is a workaround since GHA does not currently support dynamic option lists.
 
 on:
-  push:
-    branches:
-      - "DBA-1017"
   workflow_dispatch:
     inputs:
       SourceConfigVersion:
@@ -33,6 +30,9 @@ jobs:
     timeout-minutes: 1440
     continue-on-error: false
     steps:
+
+      - name: Checkout Repo
+        uses: actions/checkout@v5
 
       - name: Checkout Inventory
         uses: actions/checkout@v5
