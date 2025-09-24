@@ -153,8 +153,8 @@ jobs:
           ref: ${{ github.event.inputs.SourceConfigVersion }}
           fetch-depth: 0
 
-      - name: Get Database Name
-        id: get_db_name
+      - name: Install SQL Plan Baselines
+        id: install_sql_plan_baselines
         run: |
              # In Non-Delius environments the database name must be supplied since there is
              # potentially more than one primary database per host.   (Optional for Delius)
