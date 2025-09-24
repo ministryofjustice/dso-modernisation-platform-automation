@@ -125,13 +125,14 @@ jobs:
       - name: Get Database Name
         id: get_db_name
         run: |
-             echo "The target_environment was ${{ steps.setup_primary_db_access.outputs.target_environment }}"
-             echo "The target_db_name was ${{ steps.setup_primary_db_access.outputs.target_db_name }}"
-             echo "The target_db_host was ${{ steps.setup_primary_db_access.outputs.target_db_host }}"
+             # In Non-Delius environments the database name must be supplied since there is
+             # potentially more than one primary database per host.   (Optional for Delius)
              if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_name }}" ]
              then
                 TARGET_DB_NAME_SWITCH="--extra-vars target_db_name=${{ steps.setup_primary_db_access.outputs.target_db_name }}"
              fi
+             # In Non-Delius environments the target primary database host must be supplied since the
+             # Ansible inventory does not segregate primary and and standby hosts.  (Optional for Delius)
              if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_host }}" ]
              then
                 TARGET_DB_HOST_LIMIT="--limit ${{ steps.setup_primary_db_access.outputs.target_db_host }}"
