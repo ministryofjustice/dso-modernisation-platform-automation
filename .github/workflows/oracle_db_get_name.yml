@@ -9,9 +9,6 @@ description: "Read-only workflow to access primary databases and read their name
 # TargetDatabase options may be generated using the oracle_db_generate_primary_list.yml workflow
 
 on:
-  push:
-    branches:
-      - "DBA-1017"
   workflow_dispatch:
     inputs:
       TargetDatabase:
