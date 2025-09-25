@@ -65,7 +65,7 @@ require_yq_v4() {
     exit 2
   fi
   local v
-  v="$(yq --version 2>/dev/null || true)"
+  v="$(yq --version 2>/dev/null | awk -F'version v' '{print $2}')"
   # Expected form: "yq (https://github.com/mikefarah/yq/) version 4.x.x"
   if [[ "$v" != *"version 4."* ]]; then
     echo "ERROR: Detected '$v'. This script requires mikefarah/yq version 4.x." >&2
@@ -150,7 +150,7 @@ done
 GROUP_VARS_FILES=("${UNIQUE_FILES[@]}")
 
 ###############################################################################
-# Build TARGET_DATABASES list according to the business rules
+# Build TARGET_DATABASES list
 ###############################################################################
 declare -a TARGET_DATABASES=()
 
