@@ -59,20 +59,6 @@ Notes:
 USAGE
 }
 
-require_yq_v4() {
-  if ! command -v yq >/dev/null 2>&1; then
-    echo "ERROR: 'yq' is not installed or not in PATH. Please install mikefarah/yq v4." >&2
-    exit 2
-  fi
-  local v
-  v="$(yq --version 2>/dev/null | awk -F'version v' '{print $2}')"
-  # Expected form: "yq (https://github.com/mikefarah/yq/) version 4.x.x"
-  if [[ "$v" != *"version 4."* ]]; then
-    echo "ERROR: Detected '$v'. This script requires mikefarah/yq version 4.x." >&2
-    exit 2
-  fi
-}
-
 strip_prefix() {
   # Strip leading "environment_name_" from a filename (no path)
   local name="$1"
@@ -104,8 +90,6 @@ if [[ ! -d "$GROUP_VARS_DIRECTORY" ]]; then
   echo "ERROR: Ansible group_vars directory not found: $GROUP_VARS_DIRECTORY" >&2
   exit 1
 fi
-
-require_yq_v4
 
 ###############################################################################
 # Read applications; normalize names for filename matching
