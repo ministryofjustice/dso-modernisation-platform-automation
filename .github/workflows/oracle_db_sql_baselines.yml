@@ -5,6 +5,13 @@ name: Oracle DB SQL Plan Baseline Installation
 on:
   workflow_dispatch:
     inputs:
+      DryRun:
+        description: 'Dry Run (Report SQL Plan Baseline changes needed to match config)'
+        default: 'yes'
+        type: choice
+        options:
+          - 'yes'
+          - 'no'
       TargetDatabase:
         description: 'Primary Databases for installation of SQL Plan Baselines'
         default: ''
