@@ -125,7 +125,7 @@ permissions:
   id-token: write
 
 env:
-  ansible_config: operations/playbooks/ansible.cfg
+  ansible_config: inventory/ansible/ansible.cfg
   inventory: inventory/ansible
 
 jobs:
