@@ -1,0 +1,181 @@
+name: Oracle DB Get Name
+description: "Read-only workflow to access primary databases and read their names"
+
+# This workflow is intended for development and debug purposes only.   It allows us to
+# connect to primary databases and read their name.  This allows us to check inventory
+# and name resolution of primary databases across environments without making any changes
+# to them.
+
+# TargetDatabase options may be generated using the oracle_db_generate_primary_list.yml workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      TargetDatabase:
+        description: 'Primary Databases for Getting Name'
+        default: ''
+        type: choice
+        options:
+          - 'corporate_staff_rostering_preproduction   PPIWFM'
+          - 'corporate_staff_rostering_production       PIWFM'
+          - 'corporate_staff_rostering_test            T3IWFM'
+          - 'delius_core_development_dev_delius              '
+          - 'delius_core_preproduction_preprod_delius        '
+          - 'delius_core_preproduction_stage_delius          '
+          - 'delius_core_test_test_delius                    '
+          - 'delius_mis_development_dev_boe                  '
+          - 'delius_mis_development_dev_dsd                  '
+          - 'delius_mis_development_dev_mis                  '
+          - 'delius_mis_preproduction_preprod_boe            '
+          - 'delius_mis_preproduction_preprod_dsd            '
+          - 'delius_mis_preproduction_preprod_mis            '
+          - 'delius_mis_preproduction_stage_boe              '
+          - 'delius_mis_preproduction_stage_dsd              '
+          - 'delius_mis_preproduction_stage_mis              '
+          - 'hmpps_oem_development                      EMREP'
+          - 'hmpps_oem_development                     RCVCAT'
+          - 'hmpps_oem_preproduction                    EMREP'
+          - 'hmpps_oem_preproduction                   RCVCAT'
+          - 'hmpps_oem_production                       EMREP'
+          - 'hmpps_oem_production                      RCVCAT'
+          - 'hmpps_oem_test                             EMREP'
+          - 'hmpps_oem_test                            RCVCAT'
+          - 'nomis_combined_reporting_preproduction   PPBIAUD'
+          - 'nomis_combined_reporting_preproduction   PPBISYS'
+          - 'nomis_combined_reporting_production      PDBIAUD'
+          - 'nomis_combined_reporting_production     PDBIPAUD'
+          - 'nomis_combined_reporting_production     PDBIPSYS'
+          - 'nomis_combined_reporting_production      PDBISYS'
+          - 'nomis_combined_reporting_test            T1BIAUD'
+          - 'nomis_combined_reporting_test           T1BIPAUD'
+          - 'nomis_combined_reporting_test           T1BIPSYS'
+          - 'nomis_combined_reporting_test            T1BISYS'
+          - 'nomis_development                            dev'
+          - 'nomis_development                          qa11g'
+          - 'nomis_development                          qa11r'
+          - 'nomis_development                          qa19c'
+          - 'nomis_preproduction                       LSCNOM'
+          - 'nomis_preproduction                        LSMIS'
+          - 'nomis_preproduction                     PPCNMAUD'
+          - 'nomis_preproduction                       PPCNOM'
+          - 'nomis_preproduction                        PPMIS'
+          - 'nomis_preproduction                        PPNDH'
+          - 'nomis_preproduction                      PPTRDAT'
+          - 'nomis_production                           PCNOM'
+          - 'nomis_production                        PDCNMAUD'
+          - 'nomis_production                          PDCNOM'
+          - 'nomis_production                           PDMIS'
+          - 'nomis_production                           PDNDH'
+          - 'nomis_production                         PDTRDAT'
+          - 'nomis_test                              T1CNMAUD'
+          - 'nomis_test                                T1CNOM'
+          - 'nomis_test                                 T1MIS'
+          - 'nomis_test                                 T1NDH'
+          - 'nomis_test                               T1ORSYS'
+          - 'nomis_test                               T1TRDAT'
+          - 'nomis_test                                T2CNOM'
+          - 'nomis_test                                 T2NDH'
+          - 'nomis_test                               T2TRDAT'
+          - 'nomis_test                                T3CNOM'
+          - 'oasys_national_reporting_preproduction   PPBOAUD'
+          - 'oasys_national_reporting_preproduction   PPBOSYS'
+          - 'oasys_national_reporting_production      PDBOAUD'
+          - 'oasys_national_reporting_production      PDBOSYS'
+          - 'oasys_national_reporting_test            T2BOAUD'
+          - 'oasys_national_reporting_test            T2BOSYS'
+          - 'oasys_preproduction                     PPBIAD42'
+          - 'oasys_preproduction                     PPBIPINF'
+          - 'oasys_preproduction                     PPBISY42'
+          - 'oasys_preproduction                      PPBOAUD'
+          - 'oasys_preproduction                      PPBOSYS'
+          - 'oasys_preproduction                      PPOASYS'
+          - 'oasys_production                        PDBIPINF'
+          - 'oasys_production                         PDBOAUD'
+          - 'oasys_production                         PDBOSYS'
+          - 'oasys_production                         PROASYS'
+          - 'oasys_production                        TRBIPINF'
+          - 'oasys_production                         TROASYS'
+          - 'oasys_test                              T1AZBIPI'
+          - 'oasys_test                              T1BIPINF'
+          - 'oasys_test                              T1MISTRN'
+          - 'oasys_test                              T1OASREP'
+          - 'oasys_test                               T1OASYS'
+          - 'oasys_test                              T1ONRAUD'
+          - 'oasys_test                              T1ONRBDS'
+          - 'oasys_test                              T1ONRSYS'
+          - 'oasys_test                              T2BIPINF'
+          - 'oasys_test                               T2BOAUD'
+          - 'oasys_test                               T2BOSYS'
+          - 'oasys_test                              T2MISTRN'
+          - 'oasys_test                              T2OASREP'
+          - 'oasys_test                               T2OASYS'
+          - 'oasys_test                              T2OASYS2'
+          - 'oasys_test                              T2ONRAUD'
+          - 'oasys_test                              T2ONRBDS'
+          - 'oasys_test                              T2ONRSYS'
+      SourceConfigVersion:
+        description: 'Branch/tag/commit for modernisation-platform-configuration-management'
+        type: string
+        default: 'main'
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+env:
+  ansible_config: operations/playbooks/ansible.cfg
+  inventory: inventory/ansible
+
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ministryofjustice/hmpps-delius-operational-automation:0.80.0
+    timeout-minutes: 1440
+    continue-on-error: false
+    steps:
+
+      - name: Checkout Local Repo to get Composite Action
+        uses: actions/checkout@v5
+
+      - name: Setup Primary Database Access
+        id: setup_primary_db_access
+        uses: ./.github/actions/setup_oracle_db_access
+        with:
+          TargetDatabase: "${{ github.event.inputs.TargetDatabase }}"
+          SourceConfigVersion: "${{ github.event.inputs.SourceConfigVersion }}"
+          ModernisationPlatformEnvironmentManagement: "${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}"
+
+      - name: Fetch Required Roles & Site
+        uses: actions/checkout@v5
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ansible/roles/oracle-db-get-name
+            ansible/site.yml
+          path: roles
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
+          fetch-depth: 0
+
+      - name: Get Database Name
+        id: get_db_name
+        run: |
+             # In Non-Delius environments the database name must be supplied since there is
+             # potentially more than one primary database per host.   (Optional for Delius)
+             if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_name }}" ]
+             then
+                TARGET_DB_NAME_SWITCH="--extra-vars target_db_name=${{ steps.setup_primary_db_access.outputs.target_db_name }}"
+             fi
+             # In Non-Delius environments the target primary database host must be supplied since the
+             # Ansible inventory does not segregate primary and and standby hosts.  (Optional for Delius)
+             if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_host }}" ]
+             then
+                TARGET_DB_HOST_LIMIT="--limit ${{ steps.setup_primary_db_access.outputs.target_db_host }}"
+             fi
+             ansible-playbook \
+                 -i $inventory \
+                 --extra-vars "target=${{ steps.setup_primary_db_access.outputs.target_group }}" \
+                 ${TARGET_DB_NAME_SWITCH} ${TARGET_DB_HOST_LIMIT} \
+                 --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml
