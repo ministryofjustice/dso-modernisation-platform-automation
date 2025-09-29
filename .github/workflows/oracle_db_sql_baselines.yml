@@ -7,11 +7,11 @@ on:
     inputs:
       DryRun:
         description: 'Dry Run (Report SQL Plan Baseline changes needed to match config)'
-        default: 'yes'
+        default: 'true'
         type: choice
         options:
-          - 'yes'
-          - 'no'
+          - 'true'
+          - 'false'
       TargetDatabase:
         description: 'Primary Databases for installation of SQL Plan Baselines'
         default: ''
