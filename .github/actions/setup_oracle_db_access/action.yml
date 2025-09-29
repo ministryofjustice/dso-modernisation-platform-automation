@@ -39,6 +39,7 @@ runs:
         sparse-checkout: |
           ansible/hosts
           ansible/group_vars
+          ansible/ansible.cfg
         path: inventory
         ref: ${{ inputs.SourceConfigVersion }}
         fetch-depth: 0
