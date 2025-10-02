@@ -98,6 +98,8 @@ jobs:
         id: account
         run: |
           echo "source account name: ${source_account}"
+          echo ${{ env.source_account }}
+          echo "${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.source_account] }}"
           account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.source_account] }}"
           echo "acc id: *****${account_id: -4}"
           role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
