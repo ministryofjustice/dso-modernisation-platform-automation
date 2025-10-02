@@ -26,6 +26,7 @@ on:
 env:
   source_account_application: nomis
   source_account_environment: test
+  source_account: nomis-test
 
 permissions:
   id-token: write
@@ -96,8 +97,8 @@ jobs:
       - name: Get Account Details
         id: account
         run: |
-          echo "account name: ${{ matrix.account_name }}"
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          echo "source account name: ${source_account}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[$source_account] }}"
           echo "acc id: *****${account_id: -4}"
           role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
           echo "role arn:     ${role_arn}"
