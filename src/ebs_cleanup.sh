@@ -8,11 +8,10 @@ set -eo pipefail
 dryrun=false
 max_age_months=1
 region='eu-west-2'
-
 valid_actions=("all" "delete" "unattached" "attached")
 
 usage() {
-  echo "Usage $0: [<opts>] $(IFS='|'; echo "${valid_actions[*]}")
+  echo -e "Usage:\n $0 [<opts>] $(IFS='|'; echo "${valid_actions[*]}")
 
 Where <opts>:
   -d                     Dryrun for delete command. Default: false
