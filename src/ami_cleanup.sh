@@ -4,14 +4,27 @@
 
 set -eo pipefail
 
+# defaults
+aws_cmd_file=
+months=
+application=
+include_backup=0
+include_images_in_code=0
+include_images_on_ec2=1
+dryrun=0
+valid_actions=("used" "account" "code" "delete")
+profile=''
+aws_error_log='aws_error.log'
+
 usage() {
-  echo "Usage $0: [<opts>] used|account|code|delete
+  echo -e "Usage:\n $0 [<opts>] $(IFS='|'; echo "${valid_actions[*]}")
 
 Where <opts>:
-  -a <application>       Specify which application for images in code, e.g. nomis 
+  -a <application>       Specify which application for images e.g. nomis or core-shared-services
   -b                     Optionally include AwsBackup images
   -c                     Also include images referenced in code
   -d                     Dryrun for delete command
+  -e <environment>       Specify which environment for images e.g. production (only needed for core-shared-services)
   -m <months>            Exclude images younger than this number of months
   -s <file>              Output AWS shell commands to file
 
@@ -23,42 +36,100 @@ And:
 "
 }
 
-date_minus_month() {
-  local month
+main() {
+  parse_inputs "$@"
+  set_date_cmd
+  case $action in
+    used)
+      get_in_use_images_csv "$include_images_on_ec2" "$include_images_in_code" "$application" ;;
+    account)
+      get_account_images_csv "$months" "$include_backup" | sort -t, -k3 ;;
+    code)
+      get_code_image_names "$application" ;;
+    delete)
+      csv=$(get_images_to_delete_csv "$include_images_on_ec2" "$include_images_in_code" "$application" "$months" "$include_backup" | sort -t, -k3)
+      delete_images "$dryrun" "$aws_cmd_file" "$csv" ;;
+    *)
+      usage >&2
+      exit 1 ;;
+  esac
+  cleanup
+}
 
-  month=$1
-  shift
-  if [[ "$(uname)" == "Darwin" ]]; then
-     date -jv-"${month}"m "$@"
-  else
-     date -d "-${month} month" "$@"
+parse_inputs() {
+  while getopts "a:bcde:xm:s:" opt; do
+      case $opt in
+          a)  application=${OPTARG} ;;
+          b)  include_backup=1 ;;
+          c)  include_images_in_code=1 ;;
+          d)  dryrun=1 ;;
+          e)  environment=${OPTARG} ;;
+          x)  include_images_on_ec2=0 ;; # for testing
+          m)  months=${OPTARG} ;;
+          s)  aws_cmd_file=${OPTARG} ;;
+          :)  echo "Error: option ${OPTARG} requires an argument" ;;
+          ?)
+              echo "Invalid option: ${OPTARG}" >&2
+              echo >&2
+              usage >&2
+              exit 1
+              ;;
+      esac
+  done
+  shift $((OPTIND-1))
+
+  if [[ -n $2 ]]; then  
+    echo "Unexpected argument: $1 $2"
+    usage >&2
+    exit 1
+  fi
+
+  action=$1
+  if [[ "$application" == "core-shared-services" ]]; then 
+    if [[ -n "$environment" ]]; then 
+      profile="--profile $application-$environment"
+    else
+      echo "for core-shared-services need to specify environment"
+      exit 1
+    fi
   fi
 }
 
-date_minus_year() {
-  local year
-
-  year=$1
-  shift
+set_date_cmd(){
+  # use linux date command for reliable behaviour
   if [[ "$(uname)" == "Darwin" ]]; then
-     date -jv-"${year}"y "$@"
+    if command -v gdate >/dev/null 2>&1; then
+      date_cmd="gdate"  # macOS with coreutils installed
+    else
+      echo "exiting. First you need to run: brew install core-utils"
+      exit 1
+    fi
   else
-     date -d "-${year} year" "$@"
+    date_cmd="date" # linux
   fi
+  now=$($date_cmd +%s)
+}
+
+date_minus_month() {
+  local month=$1
+  shift
+  $date_cmd -d "-${month} month" "$@"
+}
+
+date_minus_year() {
+  local year=$1
+  shift
+  $date_cmd -d "-${year} year" "$@"
 }
 
 get_date_filter() {
   local date_filter
   local i
-  local m
-  local m1
-  local m2
-  local m3
-
-  m=$1
-  m1=$(date_minus_month "$m" "+%m")
-  m2=${m1#0}
-  m3=$((m+m2))
+  local m=$1
+  local m1=$(date_minus_month "$m" "+%m")
+  local m2=${m1#0}
+  local m3=$((m+m2))
+  
   if ((m2<12)); then
     for ((i=m;i<m3;i++)); do
       date_filter=${date_filter}$(date_minus_month "$i" "+%Y-%m-*"),
@@ -73,101 +144,109 @@ get_date_filter() {
 }
 
 get_account_images_csv() {
-  local date_filter
-  local json
-  local months
-  local include_backup
-  local this_account_id
-
-  set -eo pipefail
-  months=$1
-  include_backup=$2  
-  echo aws sts get-caller-identity --query Account --output text >&2
-  this_account_id=$(aws sts get-caller-identity --query Account --output text)
+  local months=$1
+  local include_backup=$2  
+  
   if [[ -z $months ]]; then
-    echo aws ec2 describe-images --owners "$this_account_id" >&2
-    json=$(aws ec2 describe-images --owners "$this_account_id")
+    filters=''
   else
-    date_filter=$(get_date_filter "$months")
-    echo aws ec2 describe-images --filters "Name=creation-date,Values=$date_filter" --owners "$this_account_id" >&2
-    json=$(aws ec2 describe-images --filters "Name=creation-date,Values=$date_filter" --owners "$this_account_id")
+    local date_filter=$(get_date_filter "$months")
+    filters="--filters Name=creation-date,Values=$date_filter"
   fi
+
+  local csv=$(aws ec2 describe-images $filters $profile \
+           --owners self \
+           --query 'Images[].[ImageId, OwnerId, CreationDate, Public, Name]' \
+           --output text 2> $aws_error_log | \
+           awk '{print $1","$2","$3","$4","$5}')
+  check_aws_error
+
   if [[ $include_backup == 0 ]]; then
-    jq -r ".Images[] | [.ImageId, .OwnerId, .CreationDate, .Public, .Name] | @csv" <<< "$json" | sed 's/"//g' > /dev/null
-    jq -r ".Images[] | [.ImageId, .OwnerId, .CreationDate, .Public, .Name] | @csv" <<< "$json" | sed 's/"//g' | grep -v AwsBackup || true
+    echo "$csv" | grep -v AwsBackup || true
   else
-    jq -r ".Images[] | [.ImageId, .OwnerId, .CreationDate, .Public, .Name] | @csv" <<< "$json" | sed 's/"//g'
+    echo "$csv"
   fi
+}
+
+get_usage_report_csv() {
+  local account_images=($(get_account_images_csv $months $include_backup))
+  for ami in "${account_images[@]}"; do
+    IFS=',' read -r image_id owner_id creation_date public name <<< "$ami"
+
+    report_id=$(aws ec2 create-image-usage-report $profile \
+                  --image-id $image_id \
+                  --resource-types ResourceType=ec2:Instance 'ResourceType=ec2:LaunchTemplate,ResourceTypeOptions=[{OptionName=version-depth,OptionValues=100}]' \
+                  --output text)
+    report_usage=$(aws ec2 describe-image-usage-report-entries $profile \
+                     --report-id $report_id \
+                     --output text || true)
+    [[ -n $report_usage ]] && echo $ami
+  done
 }
 
 get_ec2_instance_images_csv() {
-  local ids
-  local json
-
-  set -eo pipefail
-  echo aws ec2 describe-instances --query "Reservations[*].Instances[*].ImageId" >&2
-  ids=($(aws ec2 describe-instances --query "Reservations[*].Instances[*].ImageId" --output text))
-  echo aws ec2 describe-images --image-ids ... >&2
-  json=$(aws ec2 describe-images --image-ids "${ids[@]}")
-  jq -r ".Images[] | [.ImageId, .OwnerId, .CreationDate, .Public, .Name] | @csv" <<< "$json" | sed 's/"//g'
-}
-
-get_code_image_names() {
-  local envdir
-
-  if [[ -z $1 ]]; then
-    envdir=$(dirname "$0")/../../modernisation-platform-environments/terraform/environments
-    if [[ ! -d "$envdir" ]]; then
-      echo "Cannot find $envdir" >&2
-      exit 1
-    fi
-    grep -Eo 'ami_name[[:space:]]*=[[:space:]]*"[^"]*"' "$envdir"/*/*.tf | cut -d\" -f2 | sort -u | grep -vF '*' | sort -u || true
+  if [[ "$application" == "core-shared-services-production" ]]; then
+    get_usage_report_csv
   else
-    envdir=$(dirname "$0")/../../modernisation-platform-environments/terraform/environments/"$1"
-    if [[ ! -d "$envdir" ]]; then
-      echo "Cannot find $envdir" >&2
-      exit 1
-    fi
-    grep -Eo 'ami_name[[:space:]]*=[[:space:]]*"[^"]*"' "$envdir"/*.tf | cut -d\" -f2 | sort -u | grep -vF '*' | sort -u || true
+    local ids=($(aws ec2 describe-instances $profile \
+            --query "Reservations[*].Instances[*].ImageId" \
+            --output text 2> $aws_error_log | sort | uniq))
+    check_aws_error
+    local csv=$(aws ec2 describe-images $profile \
+            --image-ids "${ids[@]}" \
+            --query 'Images[].[ImageId, OwnerId, CreationDate, Public, Name]' \
+            --output text 2> $aws_error_log | \
+            awk '{print $1","$2","$3","$4","$5}')
+    check_aws_error
+    echo "$csv"
   fi
 }
 
-get_code_csv() {
-  local ami
-  local code
+get_code_image_names() {
+  local app=$1
+  local envdir
+  local tf_files
+  
+  if [[ "$app" == "core-shared-services-production" ]]; then 
+    envdir=$(dirname "$0")/../../modernisation-platform/terraform/environments/core-shared-services
+  else 
+    envdir=$(dirname "$0")/../../modernisation-platform-environments/terraform/environments/$app
+  fi
+  if [[ ! -d "$envdir" ]]; then
+    echo "Cannot find $envdir" >&2
+    exit 1
+  fi
+  if [[ -n $app ]]; then
+    tf_files="${envdir}/*.tf" 
+  else
+    tf_files="${envdir}/*/*.tf"
+  fi
+  grep -Eo 'ami_name[[:space:]]*=[[:space:]]*"[^"]*"' $tf_files | cut -d\" -f2 | sort -u | grep -vF '*' | sort -u || true
+}
 
-  ami=$(get_account_images_csv 0 | sort -t, -k5)
-  code=$(get_code_image_names "$1")
+get_code_csv() {
+  local ami=$(get_account_images_csv 0 | sort -t, -k5)
+  local code=$(get_code_image_names "$1")
   join -o 1.1,1.2,1.3,1.4,1.5  -t, -1 5 <(echo "$ami") <(echo "$code")
 }
 
 get_ec2_and_code_csv() {
-  local ami
-  local code
-  local amicode
-  local ec2
-
-  ami=$(get_account_images_csv 0 | sort -t, -k5)
-  code=$(get_code_image_names "$1")
-  amicode=$(join -o 1.1,1.2,1.3,1.4,1.5  -t, -1 5 <(echo "$ami") <(echo "$code") | sort)
-  ec2=$(get_ec2_instance_images_csv | sort)
+  local ami=$(get_account_images_csv 0 | sort -t, -k5)
+  local code=$(get_code_image_names "$1")
+  local amicode=$(join -o 1.1,1.2,1.3,1.4,1.5  -t, -1 5 <(echo "$ami") <(echo "$code") | sort)
+  local ec2=$(get_ec2_instance_images_csv | sort)
   comm <(echo "$amicode") <(echo "$ec2") | tr -d ' ' | tr -d '\t'
 }
 
 get_in_use_images_csv() {
-  local ec2
-  local code
-  local application
+  local ec2=$1
+  local code=$2
+  local application=$3
 
-  ec2=$1
-  code=$2
-  application=$3
-  if [[ $ec2 == 1 ]]; then
-    if [[ $code == 1 ]]; then
-      get_ec2_and_code_csv "$application"
-    else
-      get_ec2_instance_images_csv
-    fi
+  if [[ $ec2 == 1 && $code == 1 ]]; then
+    get_ec2_and_code_csv "$application"
+  elif [[ $ec2 == 1 ]]; then
+    get_ec2_instance_images_csv
   elif [[ $code == 1 ]]; then
     get_code_csv "$application"
   else
@@ -177,25 +256,19 @@ get_in_use_images_csv() {
 }
 
 get_images_to_delete_csv() {
-  local ami
-  local ec2
-
-  set -eo pipefail
-  ec2=$(get_in_use_images_csv "$1" "$2" "$3" | sort)
-  ami=$(get_account_images_csv "$4" "$5" | sort)
-  comm -23 <(echo "$ami") <(echo "$ec2")
+  local in_use_amis=$(get_in_use_images_csv "$1" "$2" "$3" | sort)
+  local account_amis=$(get_account_images_csv "$4" "$5" | sort)
+  comm -23 <(echo "$account_amis") <(echo "$in_use_amis") 
 }
 
 delete_images() {
-  local dryrun
-  local aws_cmd_file
+  local dryrun=$1
+  local aws_cmd_file=$2
   local i
   local id
   local ids
   local n
 
-  dryrun=$1
-  aws_cmd_file=$2
   shift 2
   IFS=$'\n'
   ids=($(echo "$@"))
@@ -215,78 +288,26 @@ delete_images() {
     fi
     echo "aws ec2 deregister-image --image-id ${id[0]} # ${id[2]} ${id[4]}" >&2
     if [[ -n $aws_cmd_file ]]; then
-      echo "aws ec2 deregister-image --image-id ${id[0]} # ${id[2]} ${id[4]}" >> "$aws_cmd_file"
+      echo "aws ec2 deregister-image --image-id ${id[0]} # ${id[2]} ${id[4]}" > "$aws_cmd_file"
     fi
     if [[ $dryrun == 0 ]]; then
-      aws ec2 deregister-image --image-id "${id[0]}" >&2
+      echo thing
+      #aws ec2 deregister-image --image-id "${id[0]}" >&2
     fi
   done
 }
 
-main() {
-  aws_cmd_file=
-  months=
-  application=
-  include_backup=0
-  include_images_in_code=0
-  include_images_on_ec2=1
-  dryrun=0
-  while getopts "a:bcdxm:s:" opt; do
-      case $opt in
-          a)
-              application=${OPTARG}
-              ;;
-          b)
-              include_backup=1
-              ;;
-          c)
-              include_images_in_code=1
-              ;;
-          d)
-              dryrun=1
-              ;;
-          x)
-              include_images_on_ec2=0 # for testing
-              ;;
-          m)
-              months=${OPTARG}
-              ;;
-          s)
-              aws_cmd_file=${OPTARG}
-              ;;
-          :)
-              echo "Error: option ${OPTARG} requires an argument" 
-              ;;
-          ?)
-              echo "Invalid option: ${OPTARG}" >&2
-              echo >&2
-              usage >&2
-              exit 1
-              ;;
-      esac
-  done
-
-  shift $((OPTIND-1))
-
-  if [[ -n $2 ]]; then  
-    echo "Unexpected argument: $1 $2"
-    usage >&2
+check_aws_error() {
+  if [[ -s $aws_error_log ]]; then
+    echo "AWS CLI returned an error:"
+    cat $aws_error_log
+    cleanup
     exit 1
   fi
+}
 
-  if [[ $1 == "used" ]]; then
-    get_in_use_images_csv "$include_images_on_ec2" "$include_images_in_code" "$application"
-  elif [[ $1 == "account" ]]; then
-    get_account_images_csv "$months" "$include_backup" | sort -t, -k3
-  elif [[ $1 == "code" ]]; then
-    get_code_image_names "$application"
-  elif [[ $1 == "delete" ]]; then
-    csv=$(get_images_to_delete_csv "$include_images_on_ec2" "$include_images_in_code" "$application" "$months" "$include_backup" | sort -t, -k3)
-    delete_images "$dryrun" "$aws_cmd_file" "$csv"
-  else
-    usage >&2
-    exit 1
-  fi
+cleanup() {
+  [[ -f $aws_error_log ]] && rm $aws_error_log
 }
 
 main "$@"
