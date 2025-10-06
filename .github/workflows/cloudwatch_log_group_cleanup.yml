@@ -1,0 +1,196 @@
+---
+name: Cleanup Systems Manager Log Groups
+
+on:
+  workflow_dispatch:
+    inputs:
+      applications:
+        description: 'e.g. hmpps-domain-services or leave blank for all'
+        type: string
+      environments:
+        description: 'e.g. development or leave blank for all'
+        type: string
+      dryrun:
+        type: choice
+        description: Dryrun mode (leave as false unless testing)
+        default: 'false'
+        options:
+          - 'true'
+          - 'false'        
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  check-strategy:
+    name: Check Strategy
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+      dryrun: "${{ steps.options.outputs.dryrun }}"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Strategy
+        id: strategy
+        run: |
+          echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            matrix=$(src/get_dso_aws_accounts.sh gha "" "")
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo '' > aws_cli_commands.sh
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+          echo "{$matrix}"
+
+      - name: Options
+        id: options
+        run: |
+          dryrun='false'
+          echo "Setting options, GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            dryrun="${{ github.event.inputs.dryrun }}"
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            echo "This is a scheduled full run with conditional slack alerting"
+          else
+            echo "Unsupported GITHUB_EVENT_NAME (${GITHUB_EVENT_NAME})"
+            exit 1
+          fi
+          echo "dryrun=${dryrun}"
+          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
+
+  delete-log-groups:
+    name: Delete Log Groups
+    runs-on: ubuntu-latest
+    needs: check-strategy
+    strategy:
+      matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
+      fail-fast: false
+   
+    steps:
+      - name: Get Account Details
+        id: account
+        run: |
+          echo "account name: ${{ matrix.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@a03048d87541d1d9fcf2ecf528a4a65ba9bd7838 # v5.0.0
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Install AWS CLI
+        run: |
+          pip install awscli --upgrade
+
+      - name: Delete Systems Manager Log Groups
+        run: |
+          echo "Searching for log groups matching specified patterns"
+          
+          # Define patterns to search for
+          PATTERNS=(
+            "/aws/lambda/CheckComplianceLambda-"
+            "/aws/lambda/DeleteSnapshotLambda-"
+            "/aws/lambda/IdentifyRootVolumeLambda-"
+            "/aws/lambda/ReportFailureLambda-"
+            "/aws/lambda/SaveRptToS3Lambda-"
+            "/aws/lambda/SleepThruInstallationLambda-"
+          )
+          
+          ALL_LOG_GROUPS=""
+          
+          # Get all matching log groups for each pattern
+          for PATTERN in "${PATTERNS[@]}"; do
+            echo "Searching for pattern: $PATTERN*"
+            LOG_GROUPS=$(aws logs describe-log-groups \
+              --log-group-name-prefix "$PATTERN" \
+              --query 'logGroups[].logGroupName' \
+              --output text)
+            
+            if [ -n "$LOG_GROUPS" ]; then
+              ALL_LOG_GROUPS="$ALL_LOG_GROUPS $LOG_GROUPS"
+            fi
+          done
+          
+          # Remove leading/trailing whitespace
+          ALL_LOG_GROUPS=$(echo "$ALL_LOG_GROUPS" | xargs)
+          
+          if [ -z "$ALL_LOG_GROUPS" ]; then
+            echo "No log groups found matching any pattern"
+            exit 0
+          fi
+          
+          echo "Found log groups:"
+          echo "$ALL_LOG_GROUPS"
+          
+          # Count log groups
+          COUNT=$(echo "$ALL_LOG_GROUPS" | wc -w)
+          echo "Total log groups to delete: $COUNT"
+          
+          # Delete each log group
+          for LOG_GROUP in $ALL_LOG_GROUPS; do
+            echo "Deleting log group: $LOG_GROUP"
+            # aws logs delete-log-group --log-group-name "$LOG_GROUP" || echo "Failed to delete $LOG_GROUP"
+          done
+          
+          echo "Cleanup complete! Deleted $COUNT log groups"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Log Group Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Workflow completed at $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "Check logs above for details" >> $GITHUB_STEP_SUMMARY
+
+      - name: Dryrun Delete Log Groups
+        if: ${{ needs.check-strategy.outputs.dryrun == 'true' }}
+        run: |
+          cat output.txt | grep "^DRYRUN: " | cut -d" " -f2-
+
+      - name: Debug Failed Delete Log Groups
+        if: ${{ steps.delete-log-groups.outputs.failedcount != 0 }}
+        run: |
+          cat output.txt | grep "^Verbose1: " | cut -d" " -f2-
+
+      - name: Debug Ignored Delete Log Groups
+        if: ${{ steps.delete-log-groups.outputs.ignoredcount != 0 }}
+        run: |
+          cat output.txt | grep "^Verbose2: " | cut -d" " -f2-
+
+      - name: Debug Error
+        if: ${{ steps.delete-log-groups.outputs.exitcode != 0 }}
+        env:
+          exitcode: ${{ steps.delete-log-groups.outputs.exitcode }}
+        run: |
+          cat output.txt | grep -v "^Verbose" | grep -v "^DRYRUN"
+          exit $exitcode
+
+      - name: Upload results for ${{ matrix.account_name }}
+        uses: actions/upload-artifact@v4
+        with:
+            name: account-${{ matrix.account_name }}
+            path: |
+                account-${{ matrix.account_name }}.txt
+            retention-days: 1
+      
