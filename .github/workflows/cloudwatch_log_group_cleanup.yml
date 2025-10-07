@@ -116,6 +116,7 @@ jobs:
             "/aws/lambda/ReportFailureLambda-"
             "/aws/lambda/SaveRptToS3Lambda-"
             "/aws/lambda/SleepThruInstallationLambda-"
+            "/aws/lambda/RestoreFromSnapshotLambda-"
           )
           
           ALL_LOG_GROUPS=""
