@@ -11,6 +11,7 @@ on:
       environments:
         description: 'e.g. development or leave blank for all'
         type: string
+        default: 'production'
       ami_cleanup_sh_args:
         description: 'Command line options to ami_cleanup.sh script, -c=exclude amis referenced in code, -m <N>=exclude amis younger than <n> months'
         type: string
@@ -27,6 +28,7 @@ env:
   source_account_application: nomis
   source_account_environment: test
   source_account: nomis-test
+  account: core-shared-services-production
 
 permissions:
   id-token: write
@@ -97,9 +99,15 @@ jobs:
       - name: Get Account Details
         id: account
         run: |
-          echo "source account name: ${source_account}"
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.source_account] }}"
-          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          # echo "source account name: ${source_account}"
+          # account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.source_account] }}"
+          # role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          # echo "role arn:     ${role_arn}"
+          # echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+          echo "account name: ${account}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['core-shared-services-production'] }}"
+          role_arn="arn:aws:iam::${account_id}:role/member-shared-services"
           echo "role arn:     ${role_arn}"
           echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
 
@@ -131,8 +139,8 @@ jobs:
           environment="${account_name##*-}"
           [[ -s "commands.sh" ]] && rm -f "commands.sh"
           touch "commands.sh"
-          echo src/ami_cleanup.sh -a "$application" -e "$environment" -s "commands.sh" -d ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }} delete
-          src/ami_cleanup.sh -a "$application" -e "$environment" -s "commands.sh" -d ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }} delete
+          echo src/ami_cleanup.sh -a "$application" -s "commands.sh" -d ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }} delete
+          src/ami_cleanup.sh -a "$application" -s "commands.sh" -d ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }} delete
           if [[ -s "commands.sh" ]]; then
             echo "cleanup=1" >> $GITHUB_OUTPUT
           else

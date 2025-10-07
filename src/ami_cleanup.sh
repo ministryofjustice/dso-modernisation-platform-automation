@@ -24,7 +24,6 @@ Where <opts>:
   -b                     Optionally include AwsBackup images
   -c                     Also include images referenced in code
   -d                     Dryrun for delete command
-  -e <environment>       Specify which environment for images e.g. production (only needed for core-shared-services)
   -m <months>            Exclude images younger than this number of months
   -s <file>              Output AWS shell commands to file
 
@@ -57,13 +56,12 @@ main() {
 }
 
 parse_inputs() {
-  while getopts "a:bcde:xm:s:" opt; do
+  while getopts "a:bcdxm:s:" opt; do
       case $opt in
           a)  application=${OPTARG} ;;
           b)  include_backup=1 ;;
           c)  include_images_in_code=1 ;;
           d)  dryrun=1 ;;
-          e)  environment=${OPTARG} ;;
           x)  include_images_on_ec2=0 ;; # for testing
           m)  months=${OPTARG} ;;
           s)  aws_cmd_file=${OPTARG} ;;
@@ -86,12 +84,7 @@ parse_inputs() {
 
   action=$1
   if [[ "$application" == "core-shared-services" ]]; then 
-    if [[ -n "$environment" ]]; then 
-      profile="--profile $application-$environment"
-    else
-      echo "for core-shared-services need to specify environment"
-      exit 1
-    fi
+    profile="--profile $application-production"
   fi
 }
 
