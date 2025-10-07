@@ -89,6 +89,7 @@ jobs:
         run: |
           echo "account name: ${{ matrix.account_name }}"
           account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          echo "acc id: *****${account_id: -4}"          
           role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
           echo "role arn:     ${role_arn}"
           echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
