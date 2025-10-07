@@ -178,7 +178,7 @@ get_usage_report_csv() {
 }
 
 get_ec2_instance_images_csv() {
-  if [[ "$application" == "core-shared-services-production" ]]; then
+  if [[ "$application" == "core-shared-services" ]]; then
     get_usage_report_csv
   else
     local ids=($(aws ec2 describe-instances $profile \
@@ -200,7 +200,7 @@ get_code_image_names() {
   local envdir
   local tf_files
   
-  if [[ "$app" == "core-shared-services-production" ]]; then 
+  if [[ "$app" == "core-shared-services" ]]; then 
     envdir=$(dirname "$0")/../../modernisation-platform/terraform/environments/core-shared-services
   else 
     envdir=$(dirname "$0")/../../modernisation-platform-environments/terraform/environments/$app

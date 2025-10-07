@@ -111,21 +111,6 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
 
-      - name: Get Account Details css
-        id: account2
-        run: |
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['core-shared-services-production'] }}"
-          role_arn2="arn:aws:iam::${account_id}:role/member-shared-services"
-          echo "role arn2:     ${role_arn2}"
-          echo "role_arn2=${role_arn2}" >> $GITHUB_OUTPUT      
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
-        with:
-          role-to-assume: "${{ steps.account2.outputs.role_arn2 }}"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-2"
-          aws-region: eu-west-2
-
       - name: Checkout Repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
         with:
@@ -137,6 +122,20 @@ jobs:
         with:
           repository: ministryofjustice/modernisation-platform-environments
           path: modernisation-platform-environments
+
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          repository: ministryofjustice/dso-useful-stuff
+          path: dso-useful-stuff
+
+      - name: 
+        id: 
+        run: |
+          ls ~
+          mkdir ~/.aws
+          cp dso-useful-stuff/aws-cli/.aws/config ~/.aws/
+          aws ec2 describe-instances --profile core-shared-services-production --query "Reservations[*].Instances[*].ImageId" --output text
 
       - name: Check AMIs
         id: check
