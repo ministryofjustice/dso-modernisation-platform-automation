@@ -28,7 +28,6 @@ env:
   source_account_application: nomis
   source_account_environment: test
   source_account: nomis-test
-  account: core-shared-services-production
 
 permissions:
   id-token: write
@@ -99,23 +98,32 @@ jobs:
       - name: Get Account Details
         id: account
         run: |
-          # echo "source account name: ${source_account}"
-          # account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.source_account] }}"
-          # role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
-          # echo "role arn:     ${role_arn}"
-          # echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
-
-          echo "account name: ${account}"
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['core-shared-services-production'] }}"
-          role_arn="arn:aws:iam::${account_id}:role/member-shared-services"
+          echo "source account name: ${source_account}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.source_account] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
           echo "role arn:     ${role_arn}"
-          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT      
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Get Account Details css
+        id: account2
+        run: |
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids['core-shared-services-production'] }}"
+          role_arn2="arn:aws:iam::${account_id}:role/member-shared-services"
+          echo "role arn2:     ${role_arn2}"
+          echo "role_arn2=${role_arn2}" >> $GITHUB_OUTPUT      
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account2.outputs.role_arn2 }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-2"
           aws-region: eu-west-2
 
       - name: Checkout Repository
