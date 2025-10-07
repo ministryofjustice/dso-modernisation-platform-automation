@@ -111,11 +111,11 @@ jobs:
           # Define patterns to search for
           PATTERNS=(
             "/aws/lambda/CheckComplianceLambda-"
-            "/aws/lambda/DeleteSnapshotLambda-"
-            "/aws/lambda/IdentifyRootVolumeLambda-"
-            "/aws/lambda/ReportFailureLambda-"
-            "/aws/lambda/SaveRptToS3Lambda-"
-            "/aws/lambda/SleepThruInstallationLambda-"
+            # "/aws/lambda/DeleteSnapshotLambda-"
+            # "/aws/lambda/IdentifyRootVolumeLambda-"
+            # "/aws/lambda/ReportFailureLambda-"
+            # "/aws/lambda/SaveRptToS3Lambda-"
+            # "/aws/lambda/SleepThruInstallationLambda-"
           )
           
           ALL_LOG_GROUPS=""
@@ -151,7 +151,7 @@ jobs:
           # Delete each log group
           for LOG_GROUP in $ALL_LOG_GROUPS; do
             echo "Deleting log group: $LOG_GROUP"
-            # aws logs delete-log-group --log-group-name "$LOG_GROUP" || echo "Failed to delete $LOG_GROUP"
+            aws logs delete-log-group --log-group-name "$LOG_GROUP" || echo "Failed to delete $LOG_GROUP"
           done
           
           echo "Cleanup complete! Deleted $COUNT log groups"
