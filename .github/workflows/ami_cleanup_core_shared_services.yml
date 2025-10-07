@@ -128,7 +128,7 @@ jobs:
         run: |
           account_name="${{ matrix.account_name }}"
           application="${account_name%-*}"
-          environment="${acc_name##*-}"
+          environment="${account_name##*-}"
           [[ -s "commands.sh" ]] && rm -f "commands.sh"
           touch "commands.sh"
           echo src/ami_cleanup.sh -a "$application" -e "$environment" -s "commands.sh" -d ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }} delete
