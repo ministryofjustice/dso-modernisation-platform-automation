@@ -98,10 +98,7 @@ jobs:
         id: account
         run: |
           echo "source account name: ${source_account}"
-          echo ${{ env.source_account }}
-          echo "${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.source_account] }}"
           account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.source_account] }}"
-          echo "acc id: *****${account_id: -4}"
           role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
           echo "role arn:     ${role_arn}"
           echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
@@ -113,54 +110,54 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
 
-  #     - name: Checkout Repository
-  #       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
-  #       with:
-  #         ref: ${{ github.ref }}
-  #         path: dso-modernisation-platform-automation
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          ref: ${{ github.ref }}
+          path: dso-modernisation-platform-automation
 
-  #     - name: Checkout Repository
-  #       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
-  #       with:
-  #         repository: ministryofjustice/modernisation-platform-environments
-  #         path: modernisation-platform-environments
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          repository: ministryofjustice/modernisation-platform-environments
+          path: modernisation-platform-environments
 
-  #     - name: Check AMIs
-  #       id: check
-  #       working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
-  #       run: |
-  #         account_name="${{ matrix.account_name }}"
-  #         application="${account_name%-*}"
-  #         environment="${acc_name##*-}"
-  #         [[ -s "commands.sh" ]] && rm -f "commands.sh"
-  #         touch "commands.sh"
-  #         echo src/ami_cleanup.sh -a "$application" -e "$environment" -s "commands.sh" -d ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }} delete
-  #         src/ami_cleanup.sh -a "$application" -e "$environment" -s "commands.sh" -d ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }} delete
-  #         if [[ -s "commands.sh" ]]; then
-  #           echo "cleanup=1" >> $GITHUB_OUTPUT
-  #         else
-  #           echo "cleanup=0" >> $GITHUB_OUTPUT
-  #         fi
+      - name: Check AMIs
+        id: check
+        working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
+        run: |
+          account_name="${{ matrix.account_name }}"
+          application="${account_name%-*}"
+          environment="${acc_name##*-}"
+          [[ -s "commands.sh" ]] && rm -f "commands.sh"
+          touch "commands.sh"
+          echo src/ami_cleanup.sh -a "$application" -e "$environment" -s "commands.sh" -d ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }} delete
+          src/ami_cleanup.sh -a "$application" -e "$environment" -s "commands.sh" -d ${{ needs.check-strategy.outputs.ami_cleanup_sh_args }} delete
+          if [[ -s "commands.sh" ]]; then
+            echo "cleanup=1" >> $GITHUB_OUTPUT
+          else
+            echo "cleanup=0" >> $GITHUB_OUTPUT
+          fi
 
-  #     - name: Download aws_cli_commands.sh Artifact
-  #       if: ${{ steps.check.outputs.cleanup == 1 }}
-  #       uses: actions/download-artifact@v5
-  #       with:
-  #         name: "aws_cli_commands.sh"
-  #         path: dso-modernisation-platform-automation
+      - name: Download aws_cli_commands.sh Artifact
+        if: ${{ steps.check.outputs.cleanup == 1 }}
+        uses: actions/download-artifact@v5
+        with:
+          name: "aws_cli_commands.sh"
+          path: dso-modernisation-platform-automation
 
-  #     - name: Append aws cli commands
-  #       if: ${{ steps.check.outputs.cleanup == 1 }}
-  #       working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
-  #       run: |
-  #         output() {
-  #           echo "export AWS_DEFAULT_PROFILE=${{ matrix.account_name }}"
-  #           cat ./commands.sh
-  #           echo "unset AWS_DEFAULT_PROFILE"
-  #           echo ""
-  #         }
-  #         output
-  #         output >> aws_cli_commands.sh
+      - name: Append aws cli commands
+        if: ${{ steps.check.outputs.cleanup == 1 }}
+        working-directory: ${{ github.workspace }}/dso-modernisation-platform-automation
+        run: |
+          output() {
+            echo "export AWS_DEFAULT_PROFILE=${{ matrix.account_name }}"
+            cat ./commands.sh
+            echo "unset AWS_DEFAULT_PROFILE"
+            echo ""
+          }
+          output
+          output >> aws_cli_commands.sh
 
   #     - name: Upload aws_cli_commands.sh Artifact
   #       if: ${{ steps.check.outputs.cleanup == 1 }}
