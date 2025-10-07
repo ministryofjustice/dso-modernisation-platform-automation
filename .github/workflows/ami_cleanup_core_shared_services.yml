@@ -129,8 +129,7 @@ jobs:
           repository: ministryofjustice/dso-useful-stuff
           path: dso-useful-stuff
 
-      - name: 
-        id: 
+      - name: test
         run: |
           ls ~
           mkdir ~/.aws
