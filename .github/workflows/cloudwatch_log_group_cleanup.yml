@@ -111,11 +111,11 @@ jobs:
           # Define patterns to search for
           PATTERNS=(
             "/aws/lambda/CheckComplianceLambda-"
-            # "/aws/lambda/DeleteSnapshotLambda-"
-            # "/aws/lambda/IdentifyRootVolumeLambda-"
-            # "/aws/lambda/ReportFailureLambda-"
-            # "/aws/lambda/SaveRptToS3Lambda-"
-            # "/aws/lambda/SleepThruInstallationLambda-"
+            "/aws/lambda/DeleteSnapshotLambda-"
+            "/aws/lambda/IdentifyRootVolumeLambda-"
+            "/aws/lambda/ReportFailureLambda-"
+            "/aws/lambda/SaveRptToS3Lambda-"
+            "/aws/lambda/SleepThruInstallationLambda-"
           )
           
           ALL_LOG_GROUPS=""
