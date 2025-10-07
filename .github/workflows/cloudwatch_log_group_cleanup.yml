@@ -7,6 +7,7 @@ on:
       applications:
         description: 'e.g. hmpps-domain-services or leave blank for all'
         type: string
+        default: 'core-shared-services'        
       environments:
         description: 'e.g. development or leave blank for all'
         type: string
@@ -16,7 +17,11 @@ on:
         default: 'false'
         options:
           - 'true'
-          - 'false'        
+          - 'false'  
+          
+env:
+  source_account_application: nomis
+  source_account_environment: test          
 
 permissions:
   id-token: write
