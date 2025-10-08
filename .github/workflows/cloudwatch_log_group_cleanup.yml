@@ -42,8 +42,6 @@ jobs:
           echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            matrix=$(src/get_dso_aws_accounts.sh gha "" "")
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -61,8 +59,6 @@ jobs:
           echo "Setting options, GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             dryrun="${{ github.event.inputs.dryrun }}"
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            echo "This is a scheduled full run with conditional slack alerting"
           else
             echo "Unsupported GITHUB_EVENT_NAME (${GITHUB_EVENT_NAME})"
             exit 1
@@ -116,6 +112,7 @@ jobs:
             "/aws/lambda/ReportFailureLambda-"
             "/aws/lambda/SaveRptToS3Lambda-"
             "/aws/lambda/SleepThruInstallationLambda-"
+            "/aws/lambda/RestoreFromSnapshotLambda-"
           )
           
           ALL_LOG_GROUPS=""
@@ -148,49 +145,17 @@ jobs:
           COUNT=$(echo "$ALL_LOG_GROUPS" | wc -w)
           echo "Total log groups to delete: $COUNT"
           
-          # Delete each log group
-          for LOG_GROUP in $ALL_LOG_GROUPS; do
-            echo "Deleting log group: $LOG_GROUP"
-            # aws logs delete-log-group --log-group-name "$LOG_GROUP" || echo "Failed to delete $LOG_GROUP"
-          done
-          
-          echo "Cleanup complete! Deleted $COUNT log groups"
+          if [[ "${{ needs.check-strategy.outputs.dryrun }}" != 'true' ]]; then
+            # Delete each log group
+            for LOG_GROUP in $ALL_LOG_GROUPS; do
+              echo "Deleting log group: $LOG_GROUP"
+              aws logs delete-log-group --log-group-name "$LOG_GROUP" || echo "Failed to delete $LOG_GROUP"
+            done
 
-      - name: Summary
-        if: always()
-        run: |
-          echo "## Log Group Cleanup Summary" >> $GITHUB_STEP_SUMMARY
-          echo "Workflow completed at $(date)" >> $GITHUB_STEP_SUMMARY
-          echo "Check logs above for details" >> $GITHUB_STEP_SUMMARY
+            echo "Cleanup complete! Deleted $COUNT log groups"
+          else
+            echo "This is a test run, deletion command skipped"
+            exit 1
+          fi          
 
-      - name: Dryrun Delete Log Groups
-        if: ${{ needs.check-strategy.outputs.dryrun == 'true' }}
-        run: |
-          cat output.txt | grep "^DRYRUN: " | cut -d" " -f2-
-
-      - name: Debug Failed Delete Log Groups
-        if: ${{ steps.delete-log-groups.outputs.failedcount != 0 }}
-        run: |
-          cat output.txt | grep "^Verbose1: " | cut -d" " -f2-
-
-      - name: Debug Ignored Delete Log Groups
-        if: ${{ steps.delete-log-groups.outputs.ignoredcount != 0 }}
-        run: |
-          cat output.txt | grep "^Verbose2: " | cut -d" " -f2-
-
-      - name: Debug Error
-        if: ${{ steps.delete-log-groups.outputs.exitcode != 0 }}
-        env:
-          exitcode: ${{ steps.delete-log-groups.outputs.exitcode }}
-        run: |
-          cat output.txt | grep -v "^Verbose" | grep -v "^DRYRUN"
-          exit $exitcode
-
-      - name: Upload results for ${{ matrix.account_name }}
-        uses: actions/upload-artifact@v4
-        with:
-            name: account-${{ matrix.account_name }}
-            path: |
-                account-${{ matrix.account_name }}.txt
-            retention-days: 1
-      
+     
