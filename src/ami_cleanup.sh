@@ -24,6 +24,7 @@ Where <opts>:
   -b                     Optionally include AwsBackup images
   -c                     Also include images referenced in code
   -d                     Dryrun for delete command
+  -e <environment>       Specify which environment for images e.g. production (only needed for core-shared-services)
   -m <months>            Exclude images younger than this number of months
   -s <file>              Output AWS shell commands to file
 
