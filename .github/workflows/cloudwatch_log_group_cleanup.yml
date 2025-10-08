@@ -7,7 +7,6 @@ on:
       applications:
         description: 'e.g. hmpps-domain-services or leave blank for all'
         type: string
-        default: 'core-shared-services'        
       environments:
         description: 'e.g. development or leave blank for all'
         type: string
@@ -17,11 +16,7 @@ on:
         default: 'false'
         options:
           - 'true'
-          - 'false'  
-          
-env:
-  source_account_application: nomis
-  source_account_environment: test          
+          - 'false'        
 
 permissions:
   id-token: write
@@ -47,8 +42,6 @@ jobs:
           echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            matrix=$(src/get_dso_aws_accounts.sh gha "" "")
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -66,8 +59,6 @@ jobs:
           echo "Setting options, GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             dryrun="${{ github.event.inputs.dryrun }}"
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            echo "This is a scheduled full run with conditional slack alerting"
           else
             echo "Unsupported GITHUB_EVENT_NAME (${GITHUB_EVENT_NAME})"
             exit 1
@@ -89,7 +80,6 @@ jobs:
         run: |
           echo "account name: ${{ matrix.account_name }}"
           account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
-          echo "acc id: *****${account_id: -4}"          
           role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
           echo "role arn:     ${role_arn}"
           echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
@@ -163,41 +153,4 @@ jobs:
           
           echo "Cleanup complete! Deleted $COUNT log groups"
 
-      - name: Summary
-        if: always()
-        run: |
-          echo "## Log Group Cleanup Summary" >> $GITHUB_STEP_SUMMARY
-          echo "Workflow completed at $(date)" >> $GITHUB_STEP_SUMMARY
-          echo "Check logs above for details" >> $GITHUB_STEP_SUMMARY
-
-      - name: Dryrun Delete Log Groups
-        if: ${{ needs.check-strategy.outputs.dryrun == 'true' }}
-        run: |
-          cat output.txt | grep "^DRYRUN: " | cut -d" " -f2-
-
-      - name: Debug Failed Delete Log Groups
-        if: ${{ steps.delete-log-groups.outputs.failedcount != 0 }}
-        run: |
-          cat output.txt | grep "^Verbose1: " | cut -d" " -f2-
-
-      - name: Debug Ignored Delete Log Groups
-        if: ${{ steps.delete-log-groups.outputs.ignoredcount != 0 }}
-        run: |
-          cat output.txt | grep "^Verbose2: " | cut -d" " -f2-
-
-      - name: Debug Error
-        if: ${{ steps.delete-log-groups.outputs.exitcode != 0 }}
-        env:
-          exitcode: ${{ steps.delete-log-groups.outputs.exitcode }}
-        run: |
-          cat output.txt | grep -v "^Verbose" | grep -v "^DRYRUN"
-          exit $exitcode
-
-      - name: Upload results for ${{ matrix.account_name }}
-        uses: actions/upload-artifact@v4
-        with:
-            name: account-${{ matrix.account_name }}
-            path: |
-                account-${{ matrix.account_name }}.txt
-            retention-days: 1
-      
+     
