@@ -145,20 +145,7 @@ jobs:
           COUNT=$(echo "$ALL_LOG_GROUPS" | wc -w)
           echo "Total log groups to delete: $COUNT"
           
-          # Delete each log group
-          for LOG_GROUP in $ALL_LOG_GROUPS; do
-            echo "Deleting log group: $LOG_GROUP"
-            aws logs delete-log-group --log-group-name "$LOG_GROUP" || echo "Failed to delete $LOG_GROUP"
-          done
-          
-          echo "Cleanup complete! Deleted $COUNT log groups"
-
-          # env:
-          #   DRYRUN: ${{ needs.check-strategy.outputs.dryrun }}
-          #   SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_DSO_ALERTS_PIPELINE }}       
-          # if: ${{ env.DRYRUN == 'false' }}  
-
-          if [[ "${{ needs.check-strategy.outputs.dryrun }}" == 'true' ]]; then
+          if [[ "${{ needs.check-strategy.outputs.dryrun }}" != 'true' ]]; then
             # Delete each log group
             for LOG_GROUP in $ALL_LOG_GROUPS; do
               echo "Deleting log group: $LOG_GROUP"
