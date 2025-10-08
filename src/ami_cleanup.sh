@@ -20,7 +20,7 @@ usage() {
   echo -e "Usage:\n $0 [<opts>] $(IFS='|'; echo "${valid_actions[*]}")
 
 Where <opts>:
-  -a <application>       Specify which application for images e.g. nomis or core-shared-services
+  -a <application>       Specify which application for images e.g. nomis or core-shared-services. Needed for core-shared-services or when looking in code (-c)
   -b                     Optionally include AwsBackup images
   -c                     Also include images referenced in code
   -d                     Dryrun for delete command
@@ -32,6 +32,16 @@ And:
   account                List all images in the current account
   code                   List all image names referenced in code
   delete                 Delete unused images
+
+e.g.
+  export AWS_DEFAULT_PROFILE=nomis-test
+  $0 -a core-shared-services -d -m 2 -s amis_del.txt delete   # dryrun, see which AMIs are not used and are older than 2 months in core-shared-services
+  or
+  export AWS_DEFAULT_PROFILE=nomis-test
+  $0 -a nomis -c used                                         # in nomis-test list AMIs in use by ec2s or in code
+  or
+  export AWS_DEFAULT_PROFILE=oasys-preproduction
+  $0 account                                                  # in oasys-preproduction list all AMIs in the account
 "
 }
 
