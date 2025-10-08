@@ -20,7 +20,7 @@ usage() {
   echo -e "Usage:\n $0 [<opts>] $(IFS='|'; echo "${valid_actions[*]}")
 
 Where <opts>:
-  -a <application>       Specify which application for images e.g. nomis or core-shared-services
+  -a <application>       Specify which application for images e.g. nomis or core-shared-services. Needed for core-shared-services or when looking in code (-c)
   -b                     Optionally include AwsBackup images
   -c                     Also include images referenced in code
   -d                     Dryrun for delete command
@@ -33,6 +33,16 @@ And:
   account                List all images in the current account
   code                   List all image names referenced in code
   delete                 Delete unused images
+
+e.g.
+  export AWS_DEFAULT_PROFILE=nomis-test
+  $0 -a core-shared-services -d -m 2 -s amis_del.txt delete   # dryrun, see which AMIs are not used and are older than 2 months in core-shared-services
+  or
+  export AWS_DEFAULT_PROFILE=nomis-test
+  $0 -a nomis -c used                                         # in nomis-test list AMIs in use by ec2s or in code
+  or
+  export AWS_DEFAULT_PROFILE=oasys-preproduction
+  $0 account                                                  # in oasys-preproduction list all AMIs in the account
 "
 }
 
@@ -57,13 +67,12 @@ main() {
 }
 
 parse_inputs() {
-  while getopts "a:bcde:xm:s:" opt; do
+  while getopts "a:bcdxm:s:" opt; do
       case $opt in
           a)  application=${OPTARG} ;;
           b)  include_backup=1 ;;
           c)  include_images_in_code=1 ;;
           d)  dryrun=1 ;;
-          e)  environment=${OPTARG} ;;
           x)  include_images_on_ec2=0 ;; # for testing
           m)  months=${OPTARG} ;;
           s)  aws_cmd_file=${OPTARG} ;;
@@ -86,12 +95,7 @@ parse_inputs() {
 
   action=$1
   if [[ "$application" == "core-shared-services" ]]; then 
-    if [[ -n "$environment" ]]; then 
-      profile="--profile $application-$environment"
-    else
-      echo "for core-shared-services need to specify environment"
-      exit 1
-    fi
+    profile="--profile $application-production"
   fi
 }
 
@@ -185,7 +189,7 @@ get_usage_report_csv() {
 }
 
 get_ec2_instance_images_csv() {
-  if [[ "$application" == "core-shared-services-production" ]]; then
+  if [[ "$application" == "core-shared-services" ]]; then
     get_usage_report_csv
   else
     local ids=($(aws ec2 describe-instances $profile \
@@ -207,7 +211,7 @@ get_code_image_names() {
   local envdir
   local tf_files
   
-  if [[ "$app" == "core-shared-services-production" ]]; then 
+  if [[ "$app" == "core-shared-services" ]]; then 
     envdir=$(dirname "$0")/../../modernisation-platform/terraform/environments/core-shared-services
   else 
     envdir=$(dirname "$0")/../../modernisation-platform-environments/terraform/environments/$app
