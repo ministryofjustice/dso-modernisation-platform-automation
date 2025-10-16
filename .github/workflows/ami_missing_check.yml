@@ -105,7 +105,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           echo "${{ matrix.account_name }}" >> ec2_missing_ami_list.txt
-          ec2s_missing_amis=("${{ steps.check.outputs.ec2s_missing_amis[@] }}")
+          ec2s_missing_amis=("${{ steps.check.outputs.ec2s_missing_amis }}")
           echo "${ec2s_missing_amis[@]}"
           for line in "${ec2s_missing_amis[@]}"; do
             ec2_id=echo $line   | cut -d',' -f1
