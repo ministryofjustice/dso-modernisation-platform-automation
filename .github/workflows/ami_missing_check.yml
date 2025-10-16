@@ -113,8 +113,8 @@ jobs:
             ec2_id=$(echo $line   | cut -d',' -f1)
             ec2_name=$(echo $line | cut -d',' -f2)
             ami_id=$(echo $line   | cut -d',' -f3)
-            echo "$ec2_id $ec2_name is using a missing or deregistered AMI - $ami"
-            echo "$ec2_id $ec2_name is using a missing or deregistered AMI - $ami" >> ec2_missing_ami_list.txt
+            echo "$ec2_id $ec2_name is using a missing or deregistered AMI - $ami_id"
+            echo "$ec2_id $ec2_name is using a missing or deregistered AMI - $ami_id" >> ec2_missing_ami_list.txt
           done
           echo "" >> ec2_missing_ami_list.txt
 
@@ -128,8 +128,8 @@ jobs:
           overwrite: true
 
 
-  cleanup-strategy:
-    name: Cleanup Strategy
+  list-ec2s-without-ami:
+    name: List EC2s without AMIs
     needs: check-amis
     runs-on: ubuntu-latest
     steps:
