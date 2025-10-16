@@ -38,10 +38,18 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
+          echo '' > ec2_missing_ami_list.txt
           echo 'matrix<<EOF' >> $GITHUB_OUTPUT
           echo "${matrix}" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
           echo "{$matrix}"
+      
+      - name: Upload aws cli commands artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "ec2_missing_ami_list.txt"
+          path: ec2_missing_ami_list.txt
+          overwrite: true
 
   check-amis:
     name: Check AMIs
@@ -70,11 +78,65 @@ jobs:
       - name: Check AMIs
         id: check
         run: |
+          missing=false
+          ec2s_missing_amis=''
           for i in $(aws ec2 describe-instances --query "Reservations[].Instances[].InstanceId" --output text); do
             instance_info=$(aws ec2 describe-instances --instance-ids $i --query "Reservations[0].Instances[0].[ImageId,Tags[?Key=='Name'].Value|[0]]" --output text)
             ami=$(echo $instance_info | awk '{print $1}')
-            name=$(echo $instance_info | awk '{print $2}')
+            ec2_name=$(echo $instance_info | awk '{print $2}')
             if ! aws ec2 describe-images --image-ids $ami --query "Images[0].ImageId" --output text 2>/dev/null | grep -q "$ami"; then
-             echo "$i ${name:-<no name>} is using a missing or deregistered AMI ($ami)"
+              missing=true
+              ec2s_missing_amis=($ec2s_missing_amis $i,${ec2_name:-<no name>},$ami)
             fi
           done
+          if [ "$missing" = "true" ]; then
+            echo "missing=1" >> $GITHUB_OUTPUT
+            echo "ec2s_missing_amis=\"$ec2s_missing_amis\"" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download ec2_missing_ami_list.txt Artifact
+        if: ${{ steps.check.outputs.missing == 1 }}
+        uses: actions/download-artifact@v5
+        with:
+          name: "ec2_missing_ami_list.txt"
+
+      - name: Append lines to file
+        if: ${{ steps.check.outputs.missing == 1 }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          echo "${{ matrix.account_name }}" >> ec2_missing_ami_list.txt
+          ec2s_missing_amis=("${{ steps.check.outputs.ec2s_missing_amis }}")
+          echo "${ec2s_missing_amis[@]}"
+          for line in "${ec2s_missing_amis[@]}"; do
+            ec2_id=echo $line   | cut -d',' -f1
+            ec2_name=echo $line | cut -d',' -f2
+            ami_id=echo $line   | cut -d',' -f3
+            echo "$ec2_id $ec2_name is using a missing or deregistered AMI - $ami"
+            echo "$ec2_id $ec2_name is using a missing or deregistered AMI - $ami" >> ec2_missing_ami_list.txt
+          done
+          echo "" >> ec2_missing_ami_list.txt
+
+      
+      - name: Upload action lines Artifact
+        if: ${{ steps.check.outputs.missing == 1 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: "ec2_missing_ami_list.txt"
+          path: ec2_missing_ami_list.txt
+          overwrite: true
+
+
+  cleanup-strategy:
+    name: Cleanup Strategy
+    needs: check-amis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Expiry Artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: "ec2_missing_ami_list.txt"
+      
+      - name: Print list
+        run: |
+          cat ec2_missing_ami_list.txt
+      
