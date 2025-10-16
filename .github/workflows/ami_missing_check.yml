@@ -1,0 +1,80 @@
+---
+name: AMI Missing check
+
+on:
+  workflow_dispatch:
+    inputs:
+      applications:
+        description: 'e.g. nomis or leave blank for all'
+        type: string
+      environments:
+        description: 'e.g. development or leave blank for all'
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  check-strategy:
+    name: Check Strategy
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: "${{ steps.strategy.outputs.matrix }}"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Strategy
+        id: strategy
+        run: |
+          echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo 'matrix<<EOF' >> $GITHUB_OUTPUT
+          echo "${matrix}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+          echo "{$matrix}"
+
+  check-amis:
+    name: Check AMIs
+    runs-on: ubuntu-latest
+    needs: check-strategy
+    strategy:
+      matrix: ${{ fromJson(needs.check-strategy.outputs.matrix) }}
+      max-parallel: 1
+    steps:
+      - name: Get Account Details
+        id: account
+        run: |
+          echo "account name: ${{ matrix.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          aws-region: eu-west-2
+
+      - name: Check AMIs
+        id: check
+        run: |
+          for i in $(aws ec2 describe-instances --query "Reservations[].Instances[].InstanceId" --output text); do
+            instance_info=$(aws ec2 describe-instances --instance-ids $i --query "Reservations[0].Instances[0].[ImageId,Tags[?Key=='Name'].Value|[0]]" --output text)
+            ami=$(echo $instance_info | awk '{print $1}')
+            name=$(echo $instance_info | awk '{print $2}')
+            if ! aws ec2 describe-images --image-ids $ami --query "Images[0].ImageId" --output text 2>/dev/null | grep -q "$ami"; then
+             echo "$i ${name:-<no name>} is using a missing or deregistered AMI ($ami)"
+            fi
+          done
