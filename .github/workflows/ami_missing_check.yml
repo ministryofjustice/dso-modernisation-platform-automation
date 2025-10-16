@@ -75,7 +75,7 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
           aws-region: eu-west-2
 
-      - name: Check AMIs
+      - name: Check EC2 AMIs
         id: check
         run: |
           missing=false
@@ -86,12 +86,12 @@ jobs:
             ec2_name=$(echo $instance_info | awk '{print $2}')
             if ! aws ec2 describe-images --image-ids $ami --query "Images[0].ImageId" --output text 2>/dev/null | grep -q "$ami"; then
               missing=true
-              ec2s_missing_amis=($ec2s_missing_amis $i,${ec2_name:-<no name>},$ami)
+              ec2s_missing_amis=("${ec2s_missing_amis[@]}" $i,${ec2_name:-<no name>},$ami)
             fi
           done
           if [ "$missing" = "true" ]; then
             echo "missing=1" >> $GITHUB_OUTPUT
-            echo "ec2s_missing_amis=\"$ec2s_missing_amis\"" >> $GITHUB_OUTPUT
+            echo "ec2s_missing_amis=\"${ec2s_missing_amis[@]}\"" >> $GITHUB_OUTPUT
           fi
 
       - name: Download ec2_missing_ami_list.txt Artifact
@@ -105,7 +105,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           echo "${{ matrix.account_name }}" >> ec2_missing_ami_list.txt
-          ec2s_missing_amis=("${{ steps.check.outputs.ec2s_missing_amis }}")
+          ec2s_missing_amis=("${{ steps.check.outputs.ec2s_missing_amis[@] }}")
           echo "${ec2s_missing_amis[@]}"
           for line in "${ec2s_missing_amis[@]}"; do
             ec2_id=echo $line   | cut -d',' -f1
