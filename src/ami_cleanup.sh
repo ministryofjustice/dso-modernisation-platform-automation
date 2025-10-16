@@ -176,15 +176,26 @@ get_usage_report_csv() {
   local account_images=($(get_account_images_csv $months $include_backup))
   for ami in "${account_images[@]}"; do
     IFS=',' read -r image_id owner_id creation_date public name <<< "$ami"
-
     report_id=$(aws ec2 create-image-usage-report $profile \
                   --image-id $image_id \
                   --resource-types ResourceType=ec2:Instance 'ResourceType=ec2:LaunchTemplate,ResourceTypeOptions=[{OptionName=version-depth,OptionValues=100}]' \
-                  --output text)
-    report_usage=$(aws ec2 describe-image-usage-report-entries $profile \
-                     --report-id $report_id \
-                     --output text || true)
-    [[ -n $report_usage ]] && echo $ami
+                  --output text 2>/dev/null || true)
+    # on failure, assume in use
+    if [[ -z "$report_id" ]]; then
+      echo $ami
+      continue
+    fi
+    report_usage=$(
+      set +e
+      aws ec2 describe-image-usage-report-entries $profile \
+        --report-id "$report_id" \
+        --output text 2>&1
+      echo "__EXITCODE__$?"
+    )
+    status=$(echo "$report_usage" | awk -F'__EXITCODE__' '{print $2}')
+    report_usage=$(echo "$report_usage" | sed 's/__EXITCODE__.*//')
+    [[ $status -ne 0 ]]      && echo $ami && continue # aws command failed, assume used
+    [[ -n "$report_usage" ]] && echo $ami && continue # command succeed and has data
   done
 }
 
