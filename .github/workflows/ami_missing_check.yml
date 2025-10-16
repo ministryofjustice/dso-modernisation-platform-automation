@@ -108,11 +108,11 @@ jobs:
           ec2s_missing_amis=${{ steps.check.outputs.ec2s_missing_amis }}
           read -a ec2s_missing_amis_array <<< "$ec2s_missing_amis"
 
-          echo "${ec2s_missing_amis_array[@]}"
-          for line in "${ec2s_missing_amis_array[@]}"; do
-            ec2_id=echo $line   | cut -d',' -f1
-            ec2_name=echo $line | cut -d',' -f2
-            ami_id=echo $line   | cut -d',' -f3
+          echo "$ec2s_missing_amis_array[@]"
+          for line in "$ec2s_missing_amis_array[@]"; do
+            ec2_id=$(echo $line   | cut -d',' -f1)
+            ec2_name=$(echo $line | cut -d',' -f2)
+            ami_id=$(echo $line   | cut -d',' -f3)
             echo "$ec2_id $ec2_name is using a missing or deregistered AMI - $ami"
             echo "$ec2_id $ec2_name is using a missing or deregistered AMI - $ami" >> ec2_missing_ami_list.txt
           done
