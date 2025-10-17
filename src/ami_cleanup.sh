@@ -185,15 +185,22 @@ get_usage_report_csv() {
       echo $ami
       continue
     fi
-    report_usage=$(
-      set +e
-      aws ec2 describe-image-usage-report-entries $profile \
-        --report-id "$report_id" \
-        --output text 2>&1
-      echo "__EXITCODE__$?"
-    )
-    status=$(echo "$report_usage" | awk -F'__EXITCODE__' '{print $2}')
-    report_usage=$(echo "$report_usage" | sed 's/__EXITCODE__.*//')
+    
+    report_usage=""
+    for attempt in {1..3}; do
+      report_usage=$(
+        set +e
+        aws ec2 describe-image-usage-report-entries $profile \
+          --report-id "$report_id" \
+          --output text 2>&1
+        echo "__EXITCODE__$?"
+      )
+      status=$(echo "$report_usage" | awk -F'__EXITCODE__' '{print $2}')
+      report_usage=$(echo "$report_usage" | sed 's/__EXITCODE__.*//')
+      [[ -n "$report_usage" ]] && break
+      sleep 30
+    done
+      
     [[ $status -ne 0 ]]      && echo $ami && continue # aws command failed, assume used
     [[ -n "$report_usage" ]] && echo $ami && continue # command succeed and has data
   done
@@ -303,7 +310,7 @@ delete_images() {
     fi
     echo "aws ec2 deregister-image --image-id ${id[0]} # ${id[2]} ${id[4]}" >&2
     if [[ -n $aws_cmd_file ]]; then
-      echo "aws ec2 deregister-image --image-id ${id[0]} # ${id[2]} ${id[4]}" > "$aws_cmd_file"
+      echo "aws ec2 deregister-image --image-id ${id[0]} # ${id[2]} ${id[4]}" >> "$aws_cmd_file"
     fi
     if [[ $dryrun == 0 ]]; then
       echo thing
