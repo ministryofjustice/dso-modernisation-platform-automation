@@ -22,7 +22,6 @@ on:
         options: 
           - "preprod-nomis-db-1-a"
           - "preprod-nomis-db-2-a"
-          - "lsast-nomis-db-1-a"
       target_db_name:
         description: 'Target database name'
         required: true
@@ -30,18 +29,14 @@ on:
         options: 
           - "PPCNOM"
           - "PPMIS"
-          - "LSCNOM"
-          - "LSMIS"
 
   # Each scheduled job requires a unique time
   schedule:
     - cron: '00 07 * * 0' # preprod-nomis-db-1-a PPCNOM
     - cron: '00 10 * * 0' # preprod-nomis-db-2-a PPMIS
-    - cron: '00 11 * * 0' # lsast-nomis-db-1-a LSCNOM
-    - cron: '00 14 * * 0' # lsast-nomis-db-1-a LSMIS 
 
 env:
-  ALLOWED_PARAMS: "preprod-nomis-db-1-a:CNOMP:PPCNOM preprod-nomis-db-2-a:MISP:PPMIS lsast-nomis-db-1-a:CNOMP:LSCNOM lsast-nomis-db-1-a:MISP:LSMIS"
+  ALLOWED_PARAMS: "preprod-nomis-db-1-a:CNOMP:PPCNOM preprod-nomis-db-2-a:MISP:PPMIS"
 
 jobs:
   parse_input:
@@ -79,14 +74,6 @@ jobs:
               target_db_hostname="preprod-nomis-db-2-a"
               source_db_name="MISP"
               target_db_name="PPMIS"
-            elif [[ "${cron_time}" == '00 11 * * 0' ]]; then
-              target_db_hostname="lsast-nomis-db-1-a"
-              source_db_name="CNOMP"
-              target_db_name="LSCNOM"
-            elif [[ "${cron_time}" == '00 14 * * 0' ]]; then
-              target_db_hostname="lsast-nomis-db-1-a"
-              source_db_name="MISP"
-              target_db_name="LSMIS"
             else
               echo "Github Event ${GITHUB_EVENT_NAME} unsupported"
               exit 1
