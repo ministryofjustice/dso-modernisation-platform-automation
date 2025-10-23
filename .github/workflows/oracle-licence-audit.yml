@@ -250,7 +250,7 @@ jobs:
               TARGET=""
               ;;
             nomis-*)
-              TARGET="server_type_nomis_web,server_type_nomis_web12,server_type_nomis_web19"
+              TARGET="server_type_nomis_web,server_type_nomis_web12,server_type_nomis_web19,server_type_nomis_xtag"
               ;;
             oasys-national*)
               # No weblogic, so skip
