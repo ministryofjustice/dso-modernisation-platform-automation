@@ -35,6 +35,14 @@ on:
           - 'test'
           - 'preproduction'
           - 'production'
+      auditLevel:
+        description: 'e.g. just audit databases, weblogic (e.g. Forms/BI Publisher) or leave blank to run for all'
+        default: ''
+        type: choice
+        options:
+          - ''
+          - 'databases'
+          - 'weblogic'
       SourceCodeVersion:
         description: 'Branch/tag/commit for hmpps-delius-operational-automation'
         type: string
@@ -124,6 +132,7 @@ jobs:
 
       - name: Determine Database Targets
         id: databasetargets
+        if: ${{ github.event.inputs.auditLevel == '' || github.event.inputs.auditLevel == 'databases' }}
         shell: bash
         run: |
           ENV="${{ matrix.account_name }}"
@@ -149,7 +158,8 @@ jobs:
               TARGET="server_type_csr_db"
               ;;
             oasys-national*)
-              TARGET="server_type_ncr_db"
+              # No database in onr, so skip
+              TARGET=""
               ;;
             oasys-*)
               TARGET="server_type_oasys_db"
@@ -223,7 +233,102 @@ jobs:
           $command \
             -i $inventory \
             --limit '${{ steps.valid_databasetargets.outputs.targets }}' \
-            --tags '${{ github.event.inputs.operation }}'
+            --tags '${{ github.event.inputs.operation }}' --tags 'databases'
+
+      - name: Determine weblogic Targets
+        id: weblogic_targets
+        if: ${{ github.event.inputs.auditLevel == '' || github.event.inputs.auditLevel == 'weblogic' }}
+        shell: bash
+        run: |
+          ENV="${{ matrix.account_name }}"
+          case "$ENV" in
+            delius-*)
+              TARGET="server_type_delius_core_db"
+              ;;
+            nomis-combined-reporting-*)
+              # No weblogic, so skip
+              TARGET=""
+              ;;
+            nomis-*)
+              TARGET="server_type_nomis_web"
+              ;;
+            oasys-national*)
+              # No weblogic, so skip
+              TARGET=""
+              ;;
+            oasys-*)
+              TARGET="server_type_oasys_bip"
+              ;;
+            *)
+              # no TARGET → will be empty
+              TARGET=""
+              ;;
+          esac
+          echo "targets=$TARGET" >> $GITHUB_OUTPUT
+
+      - name: Get Account Details
+        id: account_web
+        if: steps.weblogic_targets.outputs.targets != ''
+        shell: bash
+        run: |
+          echo "account name: ${{ matrix.account_name }}"
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
+          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+          echo "role arn:     ${role_arn}"
+          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        if: steps.weblogic_targets.outputs.targets != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: "${{ steps.account_web.outputs.role_arn }}"
+          role-session-name: "oracle-licence-audit-${{ matrix.account_name }}-${{ github.run_number }}"
+          aws-region: eu-west-2
+          output-credentials: true
+          
+      - name: Validate Ansible Inventory Target
+        if: steps.weblogic_targets.outputs.targets != ''
+        id: valid_weblogic_targets
+        shell: bash
+        run: |
+          export ANSIBLE_CONFIG=$ansible_config
+          targets_str="${{ steps.weblogic_targets.outputs.targets }}"
+          INV_GRAPH=$(ansible-inventory -i "$inventory" --graph) || INV_GRAPH=""
+          # Prepare an array to hold valid groups
+          VALID_GROUPS=()
+
+          # Split on commas and test each one
+          for group in ${targets_str//,/ }; do
+            if echo "$INV_GRAPH" | grep -qw "$group"; then
+              echo "Group '$group' found in inventory"
+              VALID_GROUPS+=("$group")
+            else
+              echo "Group '$group' not found in inventory"
+            fi
+          done
+
+          # Join the VALID_GROUPS array back into a comma-separated string
+          if [ ${#VALID_GROUPS[@]} -gt 0 ]; then
+            # Temporarily set IFS to comma for the join
+            IFS=',' read -r -a _ <<< "${VALID_GROUPS[*]}"
+            JOINED="${VALID_GROUPS[*]}"
+            IFS=$'\n'   # restore IFS if you need the default
+          else
+            JOINED=""
+          fi
+
+          # Export for GitHub Actions
+          echo "targets=$JOINED" >> "$GITHUB_OUTPUT"
+
+      - name: Run Oracle Licence Audit
+        if: steps.valid_weblogic_targets.outputs.targets != ''
+        shell: bash
+        run: |
+          export ANSIBLE_CONFIG=$ansible_config
+          $command \
+            -i $inventory \
+            --limit '${{ steps.valid_weblogic_targets.outputs.targets }}' \
+            --tags '${{ github.event.inputs.operation }}' --tags 'weblogic'
 
   # The summary task only needs to run once on one environment, so we're using hmpps-oem-development
   # as the target environment. This is because it needs access to the S3 bucket where the audit
