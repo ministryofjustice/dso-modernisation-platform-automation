@@ -122,7 +122,7 @@ jobs:
 
       - name: Download aws_cli_commands.sh Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: "aws_cli_commands.sh"
           path: dso-modernisation-platform-automation
@@ -157,7 +157,7 @@ jobs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
     steps:
       - name: Download Expiry Artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: "aws_cli_commands.sh"
 
@@ -218,7 +218,7 @@ jobs:
           aws-region: eu-west-2
 
       - name: Download Expiry Artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: "aws_cli_commands.sh"
 

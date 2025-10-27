@@ -107,7 +107,7 @@ jobs:
 
       - name: Download action lines Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: "action_lines.txt"
 
@@ -135,7 +135,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download action lines Artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: "action_lines.txt"
       

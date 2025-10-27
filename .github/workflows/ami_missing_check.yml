@@ -96,7 +96,7 @@ jobs:
 
       - name: Download ec2_missing_ami_list.txt Artifact
         if: ${{ steps.check.outputs.missing == 1 }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: "ec2_missing_ami_list.txt"
 
@@ -134,7 +134,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Expiry Artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: "ec2_missing_ami_list.txt"
       
