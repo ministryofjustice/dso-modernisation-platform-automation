@@ -1,0 +1,178 @@
+---
+name: ONR Environment Stop
+
+on:
+  workflow_dispatch:
+    inputs:
+      onr_environment:
+        type: choice
+        description: Which oasys national reporting environment to stop
+        default: t2
+        options:
+          - t2
+          - pp
+          - pd
+      stop_or_shutdown:
+        type: choice
+        description: Choose stop to leave the EC2s running, or shutdown to powerdown EC2s
+        default: shutdown
+        options:
+          - stop
+          - shutdown
+      pipeline_stages:
+        type: string
+        description: Limit which stages of the stop process to run, 0-8 or all
+        default: all
+      pipeline_stage3_wait_secs:
+        type: number
+        description: How many seconds to wait in stage 3 after disabling of services
+        default: 600
+      dryrun:
+        type: choice
+        description: Dryrun mode (leave as false unless testing)
+        default: false
+        options:
+          - true
+          - false
+      verbose:
+        type: choice
+        description: Enable verbose output
+        default: false
+        options:
+          - true
+          - false
+
+  schedule:
+    # runs at 7pm local time. 2 entries to deal with BST/GMT
+    - cron: "05 18 * * 1-5"
+    - cron: "05 19 * * 1-5"
+
+permissions:
+  id-token: write
+  contents: read
+
+run-name: "ONR Environent Stop (${{ inputs.onr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+      gha_environment: "${{ steps.parseinput.outputs.gha_environment }}"
+      matrix: "${{ steps.parseinput.outputs.matrix }}"
+      onr_environments: "${{ steps.parseinput.outputs.onr_environments }}"
+      script_flags: "${{ steps.parseinput.outputs.script_flags }}"
+      pipeline_stages: "${{ steps.parseinput.outputs.pipeline_stages }}"
+      stop_or_shutdown: "${{ steps.parseinput.outputs.stop_or_shutdown }}"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Parse Workflow Inputs
+        id: parseinput
+        run: |
+          get_strategy_matrix() {
+            echo '{"include":['
+            (
+              for onr_environment in $@; do
+                echo '{"onr_environment": "'$onr_environment'"},'
+              done
+            ) | sed '$s/,$//'
+            echo ']}'
+          }
+          gha_environment="oasys-national-reporting"
+          onr_environments=
+          script_flags=
+          pipeline_stages=all
+          stop_or_shutdown=shutdown
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
+            onr_environments="${{ github.event.inputs.onr_environment }}"
+            stop_or_shutdown="${{ github.event.inputs.stop_or_shutdown }}"
+            script_flags="$script_flags -3 ${{ github.event.inputs.pipeline_stage3_wait_secs }}"
+            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+              script_flags="$script_flags -d"
+              gha_environment="oasys-national-reporting-dryrun"
+            fi
+            if [[ "${{ github.event.inputs.verbose }}" == "true" ]]; then
+              script_flags="$script_flags -v"
+            fi
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            cron_time="${{ github.event.schedule }}"
+            is_bst=1
+            gha_environment="oasys-national-reporting-schedule"
+            if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
+              is_bst=0
+            fi
+            if [[ "${cron_time}" == '05 18 * * 1-5' ]]; then
+              if ((is_bst == 1)); then
+                onr_environments="t2 pp" # space separated list
+              fi
+            elif [[ "${cron_time}" == '05 19 * * 1-5' ]]; then
+              if ((is_bst == 0)); then
+                onr_environments="t2 pp" # space separated list
+              fi
+            else
+              echo "Unsupported schedule cron ${cron_time}"
+              exit 1
+            fi
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo "onr_environments=${onr_environments} gha_environment=${gha_environment} script_flags=${script_flags} pipeline_stages=${pipeline_stages} stop_or_shutdown=${stop_or_shutdown}"
+          echo "gha_environment=${gha_environment}" >> $GITHUB_OUTPUT
+          echo "matrix=$(get_strategy_matrix $onr_environments | jq -c)" >> $GITHUB_OUTPUT
+          echo "onr_environments=${onr_environments}" >> $GITHUB_OUTPUT
+          echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT
+          echo "pipeline_stages=${pipeline_stages}" >> $GITHUB_OUTPUT
+          echo "stop_or_shutdown=${stop_or_shutdown}" >> $GITHUB_OUTPUT
+
+  stop:
+    environment: "${{ needs.setup.outputs.gha_environment }}-${{ matrix.onr_environment }}"
+    name: Stop
+    needs: setup
+    if: ${{ needs.setup.outputs.onr_environments != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Get Account Name
+        env:
+          onr_environment: "${{ matrix.onr_environment }}"
+        id: account_name
+        run: |
+          account_name=$(src/oasys-national-reporting/onr_control.sh -e "$onr_environment" env aws-account)
+          echo "account_name=${account_name}"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+
+      - name: Get Account Id
+        id: account_id
+        run: |
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.account_name.outputs.account_name] }}"
+          echo "account_id=${account_id}"
+          echo "account_id=${account_id}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.onr_environment }}-1"
+          aws-region: eu-west-2
+
+      - name: Stop
+        env:
+          onr_environment: "${{ matrix.onr_environment }}"
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
+          stop_or_shutdown: "${{ needs.setup.outputs.stop_or_shutdown }}"
+          pipeline_stages: "${{ needs.setup.outputs.pipeline_stages }}"
+        run: |
+          src/oasys-national-reporting/onr_control.sh -e "$onr_environment" $script_flags pipeline "$stop_or_shutdown" "$pipeline_stages"
