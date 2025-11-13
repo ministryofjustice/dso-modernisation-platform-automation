@@ -92,11 +92,11 @@ jobs:
             fi
             if [[ "${cron_time}" == '45 5 * * 1-5' || "${cron_time}" == '50 6 * * 1-5' ]]; then
               if ((is_bst == 1)); then
-                ncr_environments="t1 pp" # space separated list
+                ncr_environments="pp" # space separated list
               fi
             elif [[ "${cron_time}" == '45 6 * * 1-5' || "${cron_time}" == '50 7 * * 1-5' ]]; then
               if ((is_bst == 0)); then
-                ncr_environments="t1 pp" # space separated list
+                ncr_environments="pp" # space separated list
               fi
             else
               echo "Unsupported schedule cron ${cron_time}"
