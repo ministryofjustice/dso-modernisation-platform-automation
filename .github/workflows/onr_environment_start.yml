@@ -31,13 +31,13 @@ on:
           - true
           - false
 
-# schedule:
-# # runs at 06:45 local time, 2 entries to deal with BST/GMT
-# # second cron at 07:50 is a failsafe, in case something went wrong with the first run
-# - cron: "45 5 * * 1-5"
-# - cron: "45 6 * * 1-5"
-# - cron: "50 6 * * 1-5"
-# - cron: "50 7 * * 1-5"
+  schedule:
+    # runs at 06:45 local time, 2 entries to deal with BST/GMT
+    # second cron at 07:50 is a failsafe, in case something went wrong with the first run
+    - cron: "45 5 * * 1-5"
+    - cron: "45 6 * * 1-5"
+    - cron: "50 6 * * 1-5"
+    - cron: "50 7 * * 1-5"
 
 permissions:
   id-token: write
@@ -92,11 +92,11 @@ jobs:
             fi
             if [[ "${cron_time}" == '45 5 * * 1-5' || "${cron_time}" == '50 6 * * 1-5' ]]; then
               if ((is_bst == 1)); then
-                onr_environments="t2 pp" # space separated list
+                onr_environments="pp" # space separated list
               fi
             elif [[ "${cron_time}" == '45 6 * * 1-5' || "${cron_time}" == '50 7 * * 1-5' ]]; then
               if ((is_bst == 0)); then
-                onr_environments="t2 pp" # space separated list
+                onr_environments="pp" # space separated list
               fi
             else
               echo "Unsupported schedule cron ${cron_time}"

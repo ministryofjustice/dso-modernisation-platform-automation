@@ -42,10 +42,10 @@ on:
           - true
           - false
 
-# schedule:
-#   # runs at 7pm local time. 2 entries to deal with BST/GMT
-#   - cron: "05 18 * * 1-5"
-#   - cron: "05 19 * * 1-5"
+  schedule:
+    # runs at 7pm local time. 2 entries to deal with BST/GMT
+    - cron: "05 18 * * 1-5"
+    - cron: "05 19 * * 1-5"
 
 permissions:
   id-token: write
