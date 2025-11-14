@@ -78,7 +78,7 @@ jobs:
           echo 'EOF' >> $GITHUB_OUTPUT
 
       - name: Upload Expiry Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: "expiry"
           path: expiry.txt
@@ -153,7 +153,7 @@ jobs:
 
       - name: Upload Expiry Artifact if Update Required
         if: ${{ steps.certexpiry.outputs.requires_update == 1 }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: "expiry"
           path: expiry.txt
