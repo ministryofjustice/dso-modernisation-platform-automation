@@ -20,6 +20,11 @@ on:
           - true
           - false
 
+  schedule:
+    # runs at 22:05 local time. 2 entries to deal with BST/GMT
+    - cron: "05 21 * * 1-5"
+    - cron: "05 22 * * 1-5"
+
 permissions:
   id-token: write
   contents: read
@@ -39,3 +44,109 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
         with:
           ref: ${{ github.ref }}
+
+      - name: Parse Workflow Inputs
+        id: parseinput
+        run: |
+          get_strategy_matrix() {
+            echo '{"include":['
+            (
+              for jumpserver in $@; do
+                echo '{"jumpserver": "'$jumpserver'"},'
+              done
+            ) | sed '$s/,$//'
+            echo ']}'
+          }
+          jumpservers=
+          script_flags=
+          dryrun=0
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            jumpservers="${{ github.event.inputs.jumpserver }}"
+            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+              script_flags="$script_flags -d"
+              dryrun=1
+            fi
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            cron_time="${{ github.event.schedule }}"
+            is_bst=1
+            if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
+              is_bst=0
+            fi
+            if [[ "${cron_time}" == '05 21 * * 1-5' ]]; then
+              if ((is_bst == 1)); then
+                jumpservers="t1-jump2022-1 pp-jump2022-1"
+              fi
+            elif [[ "${cron_time}" == '05 22 * * 1-5' ]]; then
+              if ((is_bst == 0)); then
+                jumpservers="t1-jump2022-1 pp-jump2022-1"
+              fi
+            else
+              echo "Unsupported schedule cron ${cron_time}"
+              exit 1
+            fi
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo "jumpservers=${jumpservers} script_flags=${script_flags} dryrun=${dryrun}"
+          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
+          echo "matrix=$(get_strategy_matrix $jumpservers | jq -c)" >> $GITHUB_OUTPUT
+          echo "jumpservers=${jumpservers}" >> $GITHUB_OUTPUT
+          echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT
+
+  stop:
+    name: Stop
+    needs: setup
+    if: ${{ needs.setup.outputs.jumpservers != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Get Account Name
+        env:
+          jumpserver: "${{ matrix.jumpserver }}"
+        id: account_name
+        run: |
+          account_name=$(src/jumpserver/jumpserver_control.sh -z "$jumpserver")
+          echo "account_name=${account_name}"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+
+      - name: Get Account Id
+        id: account_id
+        run: |
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.account_name.outputs.account_name] }}"
+          echo "account_id=${account_id}"
+          echo "account_id=${account_id}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.nomis_environment }}-1"
+          aws-region: eu-west-2
+
+      - name: Get Instance State
+        id: stopped_count
+        env:
+          jumpserver: "${{ matrix.jumpserver }}"
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
+        run: |
+          state=$(src/jumpserver/jumpserver_control.sh $script_flags "$jumpserver")
+          echo "$state"
+          stopped_count=$(echo "$state" | grep stopped | wc -l)
+          echo "stopped_count=${stopped_count}"
+          echo "stopped_count=${stopped_count}" >> $GITHUB_OUTPUT
+
+      - name: Set Instance State
+        env:
+          jumpserver: "${{ matrix.jumpserver }}"
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
+        if: steps.active_asg_stats.outputs.stopped_count == '0'
+        run: |
+          src/jumpserver/jumpserver_control.sh $script_flags -0 "$jumpserver"
