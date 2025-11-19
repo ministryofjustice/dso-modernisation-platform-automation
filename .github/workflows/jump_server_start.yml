@@ -10,7 +10,6 @@ on:
         default: t1-jump2022-1
         options:
           - t1-jump2022-1
-          - t1-donotuse-1
           - pp-jump2022-1
           - pd-jump2022-1
       dryrun:
