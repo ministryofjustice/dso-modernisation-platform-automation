@@ -151,6 +151,6 @@ jobs:
         env:
           jumpserver: "${{ matrix.jumpserver }}"
           script_flags: "${{ needs.setup.outputs.script_flags }}"
-        if: steps.active_asg_stats.outputs.running_count == '0'
+        if: steps.running_count.outputs.running_count == '0'
         run: |
           src/jumpserver/jumpserver_control.sh $script_flags -1 "$jumpserver"
