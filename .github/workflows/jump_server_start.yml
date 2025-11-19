@@ -143,7 +143,7 @@ jobs:
         run: |
           state=$(src/jumpserver/jumpserver_control.sh $script_flags "$jumpserver")
           echo "$state"
-          running_count=$(echo "state" | grep running | wc -l)
+          running_count=$(echo "$state" | grep running | wc -l)
           echo "running_count=${running_count}"
           echo "running_count=${running_count}" >> $GITHUB_OUTPUT
 
