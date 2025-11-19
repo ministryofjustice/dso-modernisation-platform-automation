@@ -20,6 +20,8 @@ get_account_name() {
   jumpserver=$1
   if [[ $jumpserver =~ "t1-jump" ]]; then
     account_name="hmpps-domain-services-test"
+  elif [[ $jumpserver =~ "t1-donotuse" ]]; then
+    account_name="hmpps-domain-services-test"
   elif [[ $jumpserver =~ "pp-jump" ]]; then
     account_name="hmpps-domain-services-preproduction"
   elif [[ $jumpserver =~ "pd-jump" ]]; then
