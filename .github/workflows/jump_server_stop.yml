@@ -6,12 +6,12 @@ on:
     inputs:
       jumpserver:
         type: choice
-        description: Which JumpServer to stop
-        default: t1-jump2022-1
+        description: Which environment to start
+        default: test
         options:
-          - t1-jump2022-1
-          - pp-jump2022-1
-          - pd-jump2022-1
+          - test
+          - preproduction
+          - production
       dryrun:
         type: choice
         description: Dryrun mode (leave as false unless testing)
@@ -19,6 +19,11 @@ on:
         options:
           - true
           - false
+
+  schedule:
+    # runs at 22:05 local time. 2 entries to deal with BST/GMT
+    - cron: "05 21 * * 1-5"
+    - cron: "05 22 * * 1-5"
 
 permissions:
   id-token: write
@@ -31,11 +36,132 @@ jobs:
     name: Setup
     runs-on: ubuntu-latest
     outputs:
+      gha_environment: "${{ steps.parseinput.outputs.gha_environment }}"
       dryrun: "${{ steps.parseinput.outputs.dryrun }}"
       matrix: "${{ steps.parseinput.outputs.matrix }}"
-      jumpserver: "${{ steps.parseinput.outputs.jumpserver }}"
+      jumpservers: "${{ steps.parseinput.outputs.jumpservers }}"
+      script_flags: "${{ steps.parseinput.outputs.script_flags }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
         with:
           ref: ${{ github.ref }}
+
+      - name: Parse Workflow Inputs
+        id: parseinput
+        run: |
+          get_strategy_matrix() {
+            echo '{"include":['
+            (
+              for jumpserver in $@; do
+                echo '{"jumpserver": "'$jumpserver'"},'
+              done
+            ) | sed '$s/,$//'
+            echo ']}'
+          }
+          gha_environment="hmpps-domain-services"
+          jumpservers=
+          script_flags=
+          dryrun=0
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            jumpservers="${{ github.event.inputs.jumpserver }}"
+            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+              script_flags="$script_flags -d"
+              dryrun=1
+            fi
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            cron_time="${{ github.event.schedule }}"
+            is_bst=1
+            if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
+              is_bst=0
+            fi
+            if [[ "${cron_time}" == '05 21 * * 1-5' ]]; then
+              if ((is_bst == 1)); then
+                jumpservers="test preproduction"
+              fi
+            elif [[ "${cron_time}" == '05 22 * * 1-5' ]]; then
+              if ((is_bst == 0)); then
+                jumpservers="test preproduction"
+              fi
+            else
+              echo "Unsupported schedule cron ${cron_time}"
+              exit 1
+            fi
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo "jumpservers=${jumpservers} gha_environment=${gha_environment} script_flags=${script_flags} dryrun=${dryrun}"
+          echo "gha_environment=${gha_environment}" >> $GITHUB_OUTPUT
+          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
+          echo "matrix=$(get_strategy_matrix $jumpservers | jq -c)" >> $GITHUB_OUTPUT
+          echo "jumpservers=${jumpservers}" >> $GITHUB_OUTPUT
+          echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT
+
+  stop:
+    environment: "${{ needs.setup.outputs.gha_environment }}-${{ matrix.jumpserver }}"
+    name: Stop
+    needs: setup
+    if: ${{ needs.setup.outputs.jumpservers != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Get Account Name
+        env:
+          jumpserver: "${{ matrix.jumpserver }}"
+        id: account_name
+        run: |
+          account_name=$(src/jumpserver/jumpserver_control.sh -z "$jumpserver")
+          echo "account_name=${account_name}"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+
+      - name: Get Account Id
+        id: account_id
+        run: |
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.account_name.outputs.account_name] }}"
+          echo "account_id=${account_id}"
+          echo "account_id=${account_id}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.nomis_environment }}-1"
+          aws-region: eu-west-2
+
+      - name: Get Current State
+        id: current_state
+        env:
+          jumpserver: "${{ matrix.jumpserver }}"
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
+        run: |
+          ec2_state=$(src/jumpserver/jumpserver_control.sh $script_flags -p display "$jumpserver")
+          echo "$ec2_state"
+          maintenance_mode=$(src/jumpserver/jumpserver_control.sh $script_flags -m "$jumpserver")
+          not_stopped_count=$(echo "$ec2_state" | grep -v terminated | grep -v stopped | wc -l)
+          echo "not_stopped_count=${not_stopped_count} maintenance_mode=${maintenance_mode}"
+          echo "not_stopped_count=${not_stopped_count}" >> $GITHUB_OUTPUT
+          echo "maintenance_mode=${maintenance_mode}" >> $GITHUB_OUTPUT
+
+      - name: Enable Maintenance Mode
+        env:
+          jumpserver: "${{ matrix.jumpserver }}"
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
+        if: steps.current_state.outputs.maintenance_mode == 'disabled'
+        run: |
+          src/jumpserver/jumpserver_control.sh -1 $script_flags "$jumpserver"
+
+      - name: Set Instance State
+        env:
+          jumpserver: "${{ matrix.jumpserver }}"
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
+        if: steps.current_state.outputs.not_stopped_count != '0'
+        run: |
+          src/jumpserver/jumpserver_control.sh $script_flags -p off "$jumpserver"
