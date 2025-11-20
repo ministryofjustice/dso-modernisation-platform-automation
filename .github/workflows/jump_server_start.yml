@@ -10,7 +10,6 @@ on:
         default: test
         options:
           - test
-          - test2
           - preproduction
           - production
       dryrun:
