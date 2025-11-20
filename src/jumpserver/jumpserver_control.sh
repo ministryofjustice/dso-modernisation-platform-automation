@@ -198,6 +198,7 @@ get_instance_state_by_tag() {
 }
 
 power() {
+  local exitcode
   local opt
   local tagvalue
   local id_and_states
@@ -254,7 +255,7 @@ power() {
         return 1
       fi
     done
-    echo "$name: Timed out waiting for instance to start" >&2
+    echo "Timed out waiting for instance to start" >&2
     return 1
   elif [[ $opt == "off" ]]; then
     n=$WAIT_RETRIES
@@ -294,10 +295,10 @@ power() {
         return 1
       fi
     done
-    echo "$name: Timed out waiting for instance to stop" >&2
+    echo "Timed out waiting for instance to stop" >&2
     return 1
   else
-    echo "$name: INTERNAL ERROR: unsupported power() option '$opt'" >&2
+    echo "INTERNAL ERROR: unsupported power() option '$opt'" >&2
     return 1
   fi
 }
@@ -360,17 +361,17 @@ main() {
 
   if (( maintenance_mode_disable == 1 )); then
     if ! disable_maintenance_mode "$1"; then
-      exit 1
+      return 1
     fi
   fi
   if (( maintenance_mode_enable == 1 )); then
     if ! enable_maintenance_mode "$1"; then
-      exit 1
+      return 1
     fi
   fi
   if (( maintenance_mode_get == 1 )); then
     if ! get_maintenance_mode "$1"; then
-      exit 1
+      return 1
     fi
   fi
   if (( account_name == 1 )); then
@@ -379,7 +380,7 @@ main() {
       return 1
     fi
     if ! get_account_name "$1"; then
-      exitcode=1
+      return 1
     fi
   fi
   if [[ -n $power_opt ]]; then
@@ -387,13 +388,14 @@ main() {
       usage >&2
       return 1
     fi
+    exitcode=0
     for hostname; do
         if ! power "$power_opt" "$hostname"; then
           exitcode=1
         fi
     done
+    return $exitcode
   fi
-  return $exitcode
 }
 
 main "$@"
