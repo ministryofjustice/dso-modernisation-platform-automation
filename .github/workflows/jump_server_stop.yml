@@ -143,7 +143,7 @@ jobs:
           echo "$ec2_state"
           lb_state=$(src/jumpserver/jumpserver_control.sh $script_flags -m "$jumpserver")
           not_stopped_count=$(echo "$ec2_state" | grep -v terminated | grep -v stopped | wc -l)
-          echo "not_stopped_count=${not_stopped_count} lb_state=$(lb_state)"
+          echo "not_stopped_count=${not_stopped_count} lb_state=${lb_state}"
           echo "not_stopped_count=${not_stopped_count}" >> $GITHUB_OUTPUT
           echo "lb_state=${lb_state}" >> $GITHUB_OUTPUT
 
@@ -151,7 +151,7 @@ jobs:
         env:
           jumpserver: "${{ matrix.jumpserver }}"
           script_flags: "${{ needs.setup.outputs.script_flags }}"
-        if: steps.current_state.outputs.maintenance_mode == 'enabled'
+        if: steps.current_state.outputs.maintenance_mode == 'disabled'
         run: |
           src/jumpserver/jumpserver_control.sh -1 $script_flags "$jumpserver"
 
