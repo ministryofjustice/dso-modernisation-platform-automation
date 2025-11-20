@@ -6,12 +6,12 @@ on:
     inputs:
       jumpserver:
         type: choice
-        description: Which JumpServer to start
-        default: t1-jump2022-1
+        description: Which environment to start
+        default: test
         options:
-          - t1-jump2022-1
-          - pp-jump2022-1
-          - pd-jump2022-1
+          - test
+          - preproduction
+          - production
       dryrun:
         type: choice
         description: Dryrun mode (leave as false unless testing)
@@ -21,11 +21,11 @@ on:
           - false
 
   schedule:
-    # runs at 06:30 and 08:30 local time. 2 entries to deal with BST/GMT
-    - cron: "30 5 * * 1-5"
-    - cron: "30 6 * * 1-5"
-    - cron: "30 7 * * 1-5"
-    - cron: "30 8 * * 1-5"
+    # runs at 06:50 and 08:50 local time. 2 entries to deal with BST/GMT
+    - cron: "55 5 * * 1-5"
+    - cron: "55 6 * * 1-5"
+    - cron: "55 7 * * 1-5"
+    - cron: "55 8 * * 1-5"
 
 permissions:
   id-token: write
@@ -75,13 +75,13 @@ jobs:
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
             fi
-            if [[ "${cron_time}" == '30 5 * * 1-5' || "${cron_time}" == '30 7 * * 1-5' ]]; then
+            if [[ "${cron_time}" == '55 5 * * 1-5' || "${cron_time}" == '55 7 * * 1-5' ]]; then
               if ((is_bst == 1)); then
-                jumpservers="t1-jump2022-1 pp-jump2022-1"
+                jumpservers="test preproduction"
               fi
-            elif [[ "${cron_time}" == '30 6 * * 1-5' || "${cron_time}" == '30 8 * * 1-5' ]]; then
+            elif [[ "${cron_time}" == '55 6 * * 1-5' || "${cron_time}" == '55 8 * * 1-5' ]]; then
               if ((is_bst == 0)); then
-                jumpservers="t1-jump2022-1 pp-jump2022-1"
+                jumpservers="test preproduction"
               fi
             else
               echo "Unsupported schedule cron ${cron_time}"
@@ -134,22 +134,32 @@ jobs:
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.nomis_environment }}-1"
           aws-region: eu-west-2
 
-      - name: Get Instance State
-        id: running_count
+      - name: Get Current State
+        id: current_state
         env:
           jumpserver: "${{ matrix.jumpserver }}"
           script_flags: "${{ needs.setup.outputs.script_flags }}"
         run: |
-          state=$(src/jumpserver/jumpserver_control.sh $script_flags "$jumpserver")
-          echo "$state"
-          running_count=$(echo "$state" | grep running | wc -l)
-          echo "running_count=${running_count}"
-          echo "running_count=${running_count}" >> $GITHUB_OUTPUT
+          ec2_state=$(src/jumpserver/jumpserver_control.sh $script_flags -p display "$jumpserver")
+          echo "$ec2_state"
+          lb_state=$(src/jumpserver/jumpserver_control.sh $script_flags -m "$jumpserver")
+          not_running_count=$(echo "$ec2_state" | grep -v terminated | grep -v running | wc -l)
+          echo "not_running_count=${not_running_count} lb_state=$(lb_state)"
+          echo "not_running_count=${not_running_count}" >> $GITHUB_OUTPUT
+          echo "lb_state=${lb_state}" >> $GITHUB_OUTPUT
+
+      - name: Disable Maintenance Mode
+        env:
+          jumpserver: "${{ matrix.jumpserver }}"
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
+        if: steps.current_state.outputs.maintenance_mode == 'enabled'
+        run: |
+          src/jumpserver/jumpserver_control.sh -0 $script_flags "$jumpserver"
 
       - name: Set Instance State
         env:
           jumpserver: "${{ matrix.jumpserver }}"
           script_flags: "${{ needs.setup.outputs.script_flags }}"
-        if: steps.running_count.outputs.running_count == '0'
+        if: steps.current_state.outputs.not_running_count != '0'
         run: |
-          src/jumpserver/jumpserver_control.sh $script_flags -1 "$jumpserver"
+          src/jumpserver/jumpserver_control.sh $script_flags -p on "$jumpserver"
