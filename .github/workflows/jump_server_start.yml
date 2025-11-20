@@ -143,11 +143,11 @@ jobs:
         run: |
           ec2_state=$(src/jumpserver/jumpserver_control.sh $script_flags -p display "$jumpserver")
           echo "$ec2_state"
-          lb_state=$(src/jumpserver/jumpserver_control.sh $script_flags -m "$jumpserver")
+          maintenance_mode=$(src/jumpserver/jumpserver_control.sh $script_flags -m "$jumpserver")
           not_running_count=$(echo "$ec2_state" | grep -v terminated | grep -v running | wc -l)
-          echo "not_running_count=${not_running_count} lb_state=${lb_state}"
+          echo "not_running_count=${not_running_count} maintenance_mode=${maintenance_mode}"
           echo "not_running_count=${not_running_count}" >> $GITHUB_OUTPUT
-          echo "lb_state=${lb_state}" >> $GITHUB_OUTPUT
+          echo "maintenance_mode=${maintenance_mode}" >> $GITHUB_OUTPUT
 
       - name: Disable Maintenance Mode
         env:
