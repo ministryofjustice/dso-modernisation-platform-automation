@@ -37,7 +37,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       gha_environment: "${{ steps.parseinput.outputs.gha_environment }}"
-      dryrun: "${{ steps.parseinput.outputs.dryrun }}"
       matrix: "${{ steps.parseinput.outputs.matrix }}"
       jumpservers: "${{ steps.parseinput.outputs.jumpservers }}"
       script_flags: "${{ steps.parseinput.outputs.script_flags }}"
@@ -62,16 +61,16 @@ jobs:
           gha_environment="hmpps-domain-services"
           jumpservers=
           script_flags=
-          dryrun=0
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             jumpservers="${{ github.event.inputs.jumpserver }}"
             if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
               script_flags="$script_flags -d"
-              dryrun=1
+              gha_environment="hmpps-domain-services-dryrun"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             cron_time="${{ github.event.schedule }}"
             is_bst=1
+            gha_environment="hmpps-domain-services-schedule"
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
             fi
@@ -91,9 +90,8 @@ jobs:
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
           fi
-          echo "jumpservers=${jumpservers} gha_environment=${gha_environment} script_flags=${script_flags} dryrun=${dryrun}"
+          echo "jumpservers=${jumpservers} gha_environment=${gha_environment} script_flags=${script_flags}"
           echo "gha_environment=${gha_environment}" >> $GITHUB_OUTPUT
-          echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
           echo "matrix=$(get_strategy_matrix $jumpservers | jq -c)" >> $GITHUB_OUTPUT
           echo "jumpservers=${jumpservers}" >> $GITHUB_OUTPUT
           echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT

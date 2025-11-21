@@ -21,11 +21,11 @@ on:
           - false
 
   schedule:
-    # runs at 06:50 and 08:50 local time. 2 entries to deal with BST/GMT
-    - cron: "55 5 * * 1-5"
-    - cron: "55 6 * * 1-5"
-    - cron: "55 7 * * 1-5"
-    - cron: "55 8 * * 1-5"
+    # runs at 06:45 and 08:45 local time as a backup. 2 entries to deal with BST/GMT
+    - cron: "45 5 * * 1-5"
+    - cron: "45 6 * * 1-5"
+    - cron: "45 7 * * 1-5"
+    - cron: "45 8 * * 1-5"
 
 permissions:
   id-token: write
@@ -75,11 +75,11 @@ jobs:
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
             fi
-            if [[ "${cron_time}" == '55 5 * * 1-5' || "${cron_time}" == '55 7 * * 1-5' ]]; then
+            if [[ "${cron_time}" == '45 5 * * 1-5' || "${cron_time}" == '45 7 * * 1-5' ]]; then
               if ((is_bst == 1)); then
                 jumpservers="test preproduction"
               fi
-            elif [[ "${cron_time}" == '55 6 * * 1-5' || "${cron_time}" == '55 8 * * 1-5' ]]; then
+            elif [[ "${cron_time}" == '45 6 * * 1-5' || "${cron_time}" == '45 8 * * 1-5' ]]; then
               if ((is_bst == 0)); then
                 jumpservers="test preproduction"
               fi
