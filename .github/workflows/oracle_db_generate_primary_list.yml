@@ -32,10 +32,10 @@ jobs:
     steps:
 
       - name: Checkout Repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6.0.0
 
       - name: Checkout Inventory
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6.0.0
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           sparse-checkout-cone-mode: false
