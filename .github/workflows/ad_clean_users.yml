@@ -28,7 +28,6 @@
     
     jobs:
       run-script-with-dry-run:
-        # needs: check-strategy
         runs-on: ubuntu-latest
         permissions:
           id-token: write
@@ -86,7 +85,8 @@
               "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1",
               "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1",
               ]' \
-              --output text \
+              --output-s3-bucket-name '"$S3_BUCKET"' \
+              --output-s3-key-prefix "aduserscript" \
               --comment "run-ad_clean_users.ps1"
 
         - name: Manual review message
