@@ -86,7 +86,7 @@
               "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1",
               ]' \
               --output text \
-              --comment "run-ad_clean_users.ps1"
+              --comment "run-ad_clean_users.ps1" \
               --query 'Command.CommandId')
 
               echo "Command ID: $COMMAND_ID"
