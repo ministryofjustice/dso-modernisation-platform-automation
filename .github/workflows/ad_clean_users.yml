@@ -24,7 +24,7 @@
       id-token: write
       contents: read
 
-    run-name: "AD User Account Cleanup (${{ inputs.target_domain }})"
+    run-name: "AD User Account Cleanup (${{ inputs.target_domain }}) (${{ inputs.dry_run }})"
     
     jobs:
       run-script-with-dry-run:
@@ -77,7 +77,7 @@
         - name: Copy and run the Pwsh script for AD User Management
           id: run-ad-clean-users
           run: |
-            aws s3 cp src/ad_clean_users.ps1 "s3://$S3_BUCKET/aduserscript/ad_clean_computers.ps1"
+            aws s3 cp src/ad_clean_users.ps1 "s3://$S3_BUCKET/aduserscript/ad_clean_users.ps1"
 
             aws ssm send-command \
               --document-name "AWS-RunPowerShellScript" \
@@ -161,7 +161,7 @@
         - name: Copy and run the Pwsh script for AD User Management Live
           id: run-ad-clean-users-live
           run: |
-            aws s3 cp src/ad_clean_users.ps1 "s3://$S3_BUCKET/aduserscript/ad_clean_computers.ps1"
+            aws s3 cp src/ad_clean_users.ps1 "s3://$S3_BUCKET/aduserscript/ad_clean_users.ps1"
 
             aws ssm send-command \
               --document-name "AWS-RunPowerShellScript" \
