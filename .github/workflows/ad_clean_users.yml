@@ -78,16 +78,44 @@
           run: |
             aws s3 cp src/ad_clean_users.ps1 "s3://$S3_BUCKET/aduserscript/ad_clean_users.ps1"
 
-            aws ssm send-command \
+            COMMAND_ID=$(aws ssm send-command \
               --document-name "AWS-RunPowerShellScript" \
               --instance-ids "$ADMIN_INSTANCE_ID" \
               --parameters 'commands=[
               "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1",
               "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1",
               ]' \
-              --output-s3-bucket-name "$S3_BUCKET" \
-              --output-s3-key-prefix "aduserscript" \
+              --output text \
               --comment "run-ad_clean_users.ps1"
+              --query 'Command.CommandId')
+
+              echo "Command ID: $COMMAND_ID"
+              echo "command_id=$COMMAND_ID" >> $GITHUB_OUTPUT
+
+              # Wait for completion
+              aws ssm wait command-executed \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$ADMIN_INSTANCE_ID"
+
+        - name: Download Logs from S3
+          run: |
+            mkdir -p ssm-output
+            
+            # Download SSM command output from S3
+            aws s3 cp \
+              s3://$S3_BUCKET/aduserscript/${{ github.run_number }}/ \
+              ssm-output/ \
+              --recursive
+            
+            # Download actual script log files from EC2 (via another SSM command or S3 sync)
+      
+        - name: Upload as Artifact
+          uses: actions/upload-artifact@v4
+          if: always()
+          with:
+            name: aduserscript-logs-${{ github.run_number }}
+            path: ssm-output/
+            retention-days: 30      
 
         - name: Manual review message
           run: |
