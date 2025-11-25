@@ -1,0 +1,192 @@
+---
+    name: AD User Account Cleanup
+    
+    on:
+      workflow_dispatch:
+        inputs:
+          target_domain:
+            type: choice
+            description: Which domain to run against
+            default: DEVTEST
+            options:
+              - DEVTEST
+              - PROD     
+          dry_run:
+            description: 'Dry Run Mode'
+            required: true
+            default: 'true'
+            type: choice
+            options:
+              - 'true'
+              - 'false'
+    
+    permissions:
+      id-token: write
+      contents: read
+
+    run-name: "AD User Account Cleanup (${{ inputs.target_domain }})"
+    
+    jobs:
+      run-script-with-dry-run:
+        # needs: check-strategy
+        runs-on: ubuntu-latest
+        permissions:
+          id-token: write
+          contents: read
+        
+        steps:
+
+        - name: Set environment variables from secrets
+          run: |
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_SECRET_ARN }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_SECRET_ARN }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}"
+            case "${{ github.event.inputs.target_domain }}" in
+              DEVTEST)
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "MODPLATFORM_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_SECRET_ARN }}" >> $GITHUB_ENV
+                echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}" >> $GITHUB_ENV                
+              ;;
+              PROD)
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "MODPLATFORM_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_SECRET_ARN }}" >> $GITHUB_ENV                
+                echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}" >> $GITHUB_ENV
+              ;;
+            esac
+  
+        - name: Checkout Repository
+          uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+          with:
+            ref: ${{ github.ref }}
+
+        - name: Configure AWS credentials for Admin account
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            role-to-assume: >- 
+              arn:aws:iam::${{ github.event.inputs.target_domain == 'PROD' && secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_ACCOUNT_ID || secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
+            aws-region: "eu-west-2"
+
+        - name: Refresh the aws secret
+          id: refresh-secret
+          run: |
+            aws secretsmanager put-secret-value --secret-id $MODPLATFORM_SECRET_ARN --secret-string "${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}"
+           
+        - name: Copy and run the Pwsh script for AD User Management
+          id: run-ad-clean-users
+          run: |
+            aws s3 cp src/ad_clean_users.ps1 "s3://$S3_BUCKET/aduserscript/ad_clean_computers.ps1"
+
+            aws ssm send-command \
+              --document-name "AWS-RunPowerShellScript" \
+              --instance-ids "$ADMIN_INSTANCE_ID" \
+              --parameters 'commands=[
+              "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1",
+              "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1 -Wait",
+              ]' \
+              --output text \
+              --comment "run-ad_clean_users.ps1"
+
+        - name: Manual review message
+          run: |
+            echo "⚠️  WARNING - USER ACCOUNTS TO BE DELETED:"
+            echo ""
+            echo "Please review the effected accounts before approving deletion."             
+
+      # Manual approval stage
+      approval-gate:
+        runs-on: ubuntu-latest
+        needs: run-script-with-dry-run
+        environment: generic-dso-manual-approval  # Generic approval environment
+
+        steps:
+          - name: Approval checkpoint
+            run: |
+              echo "✅ Deletion approved for (${{ inputs.target_domain }}) domain"
+
+      delete-verified-inactive-users:
+        needs: [run-script-with-dry-run, approval-gate]
+        runs-on: ubuntu-latest
+        permissions:
+          id-token: write
+          contents: read
+        
+        steps:
+
+        - name: Set environment variables from secrets
+          id: set_vars
+          run: |
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT_SECRET_ARN }}"
+            echo "::add-mask::${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}"
+            case "${{ github.event.inputs.target_domain }}" in
+              DEVTEST)
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "AD_SERVICE_ACCOUNT=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
+                echo "AD_SERVICE_ACCOUNT_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_AD_SERVICE_ACCOUNT_SECRET_ARN }}" >> $GITHUB_ENV
+                echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_S3_BUCKET }}" >> $GITHUB_ENV
+              ;;
+              PROD)
+                echo "ADMIN_INSTANCE_ID=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_INSTANCE_ID }}" >> $GITHUB_ENV
+                echo "AD_SERVICE_ACCOUNT=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
+                echo "AD_SERVICE_ACCOUNT_SECRET_ARN=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_AD_SERVICE_ACCOUNT_SECRET_ARN }}" >> $GITHUB_ENV
+                echo "S3_BUCKET=${{ secrets.AD_COMPUTER_MANAGEMENT_PROD_S3_BUCKET }}" >> $GITHUB_ENV
+              ;;
+            esac
+
+            echo "CURRENT_DATE=$(date +"%d-%m-%y")" >> $GITHUB_ENV
+
+        - name: Checkout Repository
+          uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+          with:
+            ref: ${{ github.ref }}
+
+        - name: Configure AWS credentials for Admin account
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            role-to-assume: >- 
+              arn:aws:iam::${{ github.event.inputs.target_domain == 'PROD' && secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_ACCOUNT_ID || secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
+            aws-region: "eu-west-2"
+
+        - name: Refresh the ad aws secret
+          id: refresh-ad-secret
+          run: |
+            aws secretsmanager put-secret-value --secret-id $AD_SERVICE_ACCOUNT_SECRET_ARN --secret-string $AD_SERVICE_ACCOUNT
+           
+        - name: Copy and run the Pwsh script for AD User Management Live
+          id: run-ad-clean-users-live
+          run: |
+            aws s3 cp src/ad_clean_users.ps1 "s3://$S3_BUCKET/aduserscript/ad_clean_computers.ps1"
+
+            aws ssm send-command \
+              --document-name "AWS-RunPowerShellScript" \
+              --instance-ids "$ADMIN_INSTANCE_ID" \
+              --parameters 'commands=[
+              "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1",
+              "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1 -DryRun ${{ github.event.inputs.dry_run || true }} -Wait",
+              ]' \
+              --output text \
+              --comment "run-ad_clean_users.ps1"
+
+        - name: Find final files
+          id: find_final_files
+          run: |
+            FILES=$(ls *$CURRENT_DATE*.log 2>/dev/null || true)
+            echo "$FILES"
+            echo "files<<EOF" >> $GITHUB_OUTPUT
+            echo "$FILES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            
+        - name: Upload final results
+          if: steps.find_final_files.outputs.files != ''
+          uses: actions/upload-artifact@v4
+          with:
+            name: final-results
+            path: ${{ steps.find_final_files.outputs.files }}
+            retention-days: 30
+            
