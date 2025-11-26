@@ -92,30 +92,65 @@
               echo "Command ID: $COMMAND_ID"
               echo "command_id=$COMMAND_ID" >> $GITHUB_OUTPUT
 
-              # Wait for completion
-              aws ssm wait command-executed \
-              --command-id "$COMMAND_ID" \
-              --instance-id "$ADMIN_INSTANCE_ID"
+              # # Wait for completion, executes on the runner
+              # aws ssm wait command-executed \
+              # --command-id "$COMMAND_ID" \
+              # --instance-id "$ADMIN_INSTANCE_ID"
 
-        - name: Download Logs from S3
+              # Wait for completion with timing
+              echo "Waiting for ssm command to complete..."
+              START_TIME=$(date +%s)
+              
+              aws ssm wait command-executed \
+                --command-id "$COMMAND_ID" \
+                --instance-id "$ADMIN_INSTANCE_ID"
+              
+              END_TIME=$(date +%s)
+              DURATION=$((END_TIME - START_TIME))
+              
+              echo "✓ Command completed in ${DURATION} seconds"
+              
+              # Get final status
+              STATUS=$(aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "$ADMIN_INSTANCE_ID" \
+                --query 'Status' \
+                --output text)
+              
+              echo "Final status: $STATUS"
+
+        - name: Fetch SSM Command Output
           run: |
             mkdir -p ssm-output
             
-            # Download SSM command output from S3
-            aws s3 cp \
-              s3://$S3_BUCKET/aduserscript/${{ github.run_number }}/ \
-              ssm-output/ \
-              --recursive
+            COMMAND_ID="${{ steps.run-ad-clean-users.outputs.command_id }}"
             
-            # Download actual script log files from EC2 (via another SSM command or S3 sync)
-      
+            # Get the command invocation details
+            aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$ADMIN_INSTANCE_ID" \
+              --output json > ssm-output/invocation.json
+            
+            # Extract stdout and stderr to separate files
+            aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$ADMIN_INSTANCE_ID" \
+              --query 'StandardOutputContent' \
+              --output text > ssm-output/stdout.txt
+            
+            aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$ADMIN_INSTANCE_ID" \
+              --query 'StandardErrorContent' \
+              --output text > ssm-output/stderr.txt
+
         - name: Upload as Artifact
           uses: actions/upload-artifact@v4
           if: always()
           with:
-            name: aduserscript-logs-${{ github.run_number }}
+            name: aduserscript-logs-run-${{ github.run_number }}
             path: ssm-output/
-            retention-days: 30      
+            retention-days: 30
 
         - name: Manual review message
           run: |
