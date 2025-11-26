@@ -35,8 +35,8 @@ $env:AWS_SESSION_TOKEN = $Tmp_AWS_SESSION_TOKEN
 
 Write-Output "Creating PSCredentials Object"
 $SecretValue = "$SecretValueRaw" | ConvertFrom-Json
-$securePassword = ConvertTo-SecureString $SecretValue.svc_rds -AsPlainText -Force
-$credentials = New-Object System.Management.Automation.PSCredential("HMPP\svc_rds", $securePassword)
+$securePassword = ConvertTo-SecureString $SecretValue.svc_planetfm_gfsl -AsPlainText -Force
+$credentials = New-Object System.Management.Automation.PSCredential("HMPP\svc_planetfm_gfsl", $securePassword)
 
 Write-Output "Retrieving SecretsManager GFSL secret"
 $SecretId = "/GFSL/planetfm-data-extract"
