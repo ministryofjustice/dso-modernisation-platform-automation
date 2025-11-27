@@ -238,6 +238,7 @@
         - name: Copy and run the Pwsh script for AD User Management
           id: run-ad-clean-users-approved
           run: |
+              $DRYRUN = '${{ inputs.dry_run }}' -eq 'true'
               case "${{ github.event.inputs.target_domain }}" in
               DEVTEST)
                 aws s3 cp src/ad_clean_users.ps1 "s3://$S3_BUCKET/aduserscript/ad_clean_users.ps1"
@@ -246,7 +247,7 @@
                   --document-name "AWS-RunPowerShellScript" \
                   --instance-ids "$ADMIN_INSTANCE_ID" \
                   --parameters 'commands=[
-                  "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1 -DryRun ${{ github.event.inputs.dry_run || true }}",
+                  "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1 -DryRun $DRYRUN",
                   "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1",
                   ]' \
                   --output text \
@@ -265,7 +266,7 @@
                   --instance-ids "$ADMIN_INSTANCE_ID" \
                   --parameters 'commands=[
                   "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1",
-                  "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1 -UserOU 'OU=RBAC' -ServiceAccountsOUPaths 'OU=SERVICE_ACCOUNTS' -DryRun ${{ github.event.inputs.dry_run || true }}",
+                  "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1 -UserOU 'OU=RBAC' -ServiceAccountsOUPaths 'OU=SERVICE_ACCOUNTS' -DryRun $DRYRUN",
                   ]' \
                   --output text \
                   --comment "run-ad_clean_users.ps1" \

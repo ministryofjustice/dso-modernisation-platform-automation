@@ -117,7 +117,7 @@ function Test-ExcludedOU {
         # Check if the user's DN contains the excluded path
         # This will match the OU and all nested sub-OUs
         if ($UserDN -like "*,$excludedPath") {
-            Write-Host "  [EXCLUDED] Matched: $UserDN" -ForegroundColor DarkGray
+            # Write-Host "  [EXCLUDED] Matched: $UserDN" -ForegroundColor DarkGray
             return $true
         }
     }
