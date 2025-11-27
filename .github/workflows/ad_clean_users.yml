@@ -13,8 +13,8 @@
               - PROD     
           dry_run:
             description: 'Dry Run Mode'
-            required: true
-            default: true
+            required: True
+            default: True
             type: boolean
     
     permissions:
