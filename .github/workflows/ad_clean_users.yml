@@ -265,7 +265,7 @@
                   --instance-ids "$ADMIN_INSTANCE_ID" \
                   --parameters 'commands=[
                   "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1",
-                  "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1 -UserOU 'OU=RBAC' -ServiceAccountsOUPaths 'OU=SERVICE_ACCOUNTS' -DryRun ${{ inputs.dry_run }}",
+                  "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1 -DryRun ${{ inputs.dry_run }} -UserOU 'OU=RBAC' -ServiceAccountsOUPaths 'OU=SERVICE_ACCOUNTS'",
                   ]' \
                   --output text \
                   --comment "run-ad_clean_users.ps1" \
