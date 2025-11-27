@@ -13,9 +13,12 @@
               - PROD     
           dry_run:
             description: 'Dry Run Mode'
-            required: True
-            default: True
-            type: boolean
+            required: true
+            default: 'True'
+            type: choice
+            options:
+              - 'True'
+              - 'False'
     
     permissions:
       id-token: write
