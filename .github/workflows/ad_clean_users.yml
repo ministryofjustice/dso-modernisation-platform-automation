@@ -14,11 +14,8 @@
           dry_run:
             description: 'Dry Run Mode'
             required: true
-            default: 'true'
-            type: choice
-            options:
-              - 'true'
-              - 'false'
+            default: true
+            type: boolean
     
     permissions:
       id-token: write
@@ -246,7 +243,7 @@
                   --document-name "AWS-RunPowerShellScript" \
                   --instance-ids "$ADMIN_INSTANCE_ID" \
                   --parameters 'commands=[
-                  "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1 -DryRun $${{ inputs.dry_run == 'true' }}",
+                  "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1 -DryRun $${{ inputs.dry_run }}",
                   "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1",
                   ]' \
                   --output text \
@@ -265,7 +262,7 @@
                   --instance-ids "$ADMIN_INSTANCE_ID" \
                   --parameters 'commands=[
                   "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1",
-                  "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1 -UserOU 'OU=RBAC' -ServiceAccountsOUPaths 'OU=SERVICE_ACCOUNTS' -DryRun $${{ inputs.dry_run == 'true' }}",
+                  "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1 -UserOU 'OU=RBAC' -ServiceAccountsOUPaths 'OU=SERVICE_ACCOUNTS' -DryRun $${{ inputs.dry_run }}",
                   ]' \
                   --output text \
                   --comment "run-ad_clean_users.ps1" \
