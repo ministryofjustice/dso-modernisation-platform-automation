@@ -118,6 +118,8 @@
         - name: Check the job status and create the artifact to review
           id: check-status-and-create-artifact
           run: |
+              COMMAND_ID="${{ steps.run-ad-clean-users.outputs.command_id }}"
+              
               # Wait for completion with timing
               echo "Waiting for ssm job to complete..."
               START_TIME=$(date +%s)
