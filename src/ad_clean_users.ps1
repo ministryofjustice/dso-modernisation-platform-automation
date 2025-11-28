@@ -96,6 +96,7 @@ $deletedCount = 0
 $errorCount = 0
 
 # Get the secret value
+import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
 $hostname = (Get-ComputerInfo).CsName
 $adSecretValue = Get-SECSecretValue -SecretId "/$($hostname.ToLower())/dso-ad-computer-cleanup" -Region "eu-west-2"
 $adSecretValue = $adSecretValue.SecretString | ConvertFrom-Json
