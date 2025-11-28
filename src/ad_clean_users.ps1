@@ -65,7 +65,6 @@ param(
 # ============================================================================
 
 $DryRunBool = [System.Convert]::ToBoolean($DryRun)
-Write-Host "dryrun is set to $DryRun, and DryRunBool is set to $DryRunBool"
 
 # Get domain DN and build full paths
 $domainDN = (Get-ADDomain).DistinguishedName
