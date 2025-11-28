@@ -167,7 +167,7 @@
           uses: actions/upload-artifact@v5
           if: always()
           with:
-            name: aduserscript-approval-logs-run-${{ github.run_number }}
+            name: aduserscript-logs-approval-run-${{ github.run_number }}
             path: ssm-output/
             retention-days: 3
 
@@ -246,7 +246,7 @@
                   --document-name "AWS-RunPowerShellScript" \
                   --instance-ids "$ADMIN_INSTANCE_ID" \
                   --parameters 'commands=[
-                  "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1 -DryRun $${{ inputs.dry_run }}",
+                  "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1 -DryRun ${{ inputs.dry_run }}",
                   "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1",
                   ]' \
                   --output text \
@@ -265,7 +265,7 @@
                   --instance-ids "$ADMIN_INSTANCE_ID" \
                   --parameters 'commands=[
                   "aws s3 cp \"s3://'"$S3_BUCKET"'/aduserscript/ad_clean_users.ps1\" ad_clean_users.ps1",
-                  "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1 -UserOU 'OU=RBAC' -ServiceAccountsOUPaths 'OU=SERVICE_ACCOUNTS' -DryRun $${{ inputs.dry_run }} 2>&1",
+                  "pwsh.exe -ExecutionPolicy Bypass -File ad_clean_users.ps1 -UserOU 'OU=RBAC' -ServiceAccountsOUPaths 'OU=SERVICE_ACCOUNTS' -DryRun ${{ inputs.dry_run }}",
                   ]' \
                   --output text \
                   --comment "run-ad_clean_users.ps1" \

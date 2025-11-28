@@ -10,7 +10,7 @@
     structure while excluding designated service account paths.
 
 .PARAMETER DryRun
-    Set to $true to report only without making changes, $false to execute changes. Default: $true
+    This is a string value to handle a bug in AWS SSM!  Set to "True" to report only without making changes, "False" to execute changes. Default: "True"
 
 .PARAMETER DisableDays
     Number of days of inactivity before disabling an account. Default: 180
@@ -42,7 +42,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$false)]
-    [bool]$DryRun = $true,
+    [string]$DryRun = "True",
     
     [Parameter(Mandatory=$false)]
     [int]$DisableDays = 180,
@@ -63,6 +63,8 @@ param(
 # ============================================================================
 # SCRIPT INITIALIZATION
 # ============================================================================
+
+$DryRunBool = [System.Convert]::ToBoolean($DryRun)
 
 # Get domain DN and build full paths
 $domainDN = (Get-ADDomain).DistinguishedName
@@ -131,7 +133,7 @@ function Test-ExcludedOU {
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "AD User Account Management Script" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Execution Mode: $(if ($DryRun) { 'DRY-RUN (No changes will be made)' } else { 'LIVE (Changes will be applied)' })" -ForegroundColor $(if ($DryRun) { 'Yellow' } else { 'Red' })
+Write-Host "Execution Mode: $(if ($DryRunBool) { 'DRY-RUN (No changes will be made)' } else { 'LIVE (Changes will be applied)' })" -ForegroundColor $(if ($DryRunBool) { 'Yellow' } else { 'Red' })
 Write-Host "Disable Threshold: $DisableDays days (Last logon before $($disableThreshold.ToString('yyyy-MM-dd')))" -ForegroundColor White
 Write-Host "Delete Threshold: $DeleteDays days (Last logon before $($deleteThreshold.ToString('yyyy-MM-dd')))" -ForegroundColor White
 Write-Host "User OU: $userOUFull" -ForegroundColor White
@@ -143,12 +145,12 @@ Write-Host "========================================`n" -ForegroundColor Cyan
 
 # Initialize logs
 Write-Log -Message "=== AD User Management Script Started ===" -LogPath $disableLogPath
-Write-Log -Message "Mode: $(if ($DryRun) { 'DRY-RUN' } else { 'LIVE' })" -LogPath $disableLogPath
+Write-Log -Message "Mode: $(if ($DryRunBool) { 'DRY-RUN' } else { 'LIVE' })" -LogPath $disableLogPath
 Write-Log -Message "Disable Threshold: $DisableDays days" -LogPath $disableLogPath
 Write-Log -Message "Delete Threshold: $DeleteDays days" -LogPath $disableLogPath
 
 Write-Log -Message "=== AD User Management Script Started ===" -LogPath $deleteLogPath
-Write-Log -Message "Mode: $(if ($DryRun) { 'DRY-RUN' } else { 'LIVE' })" -LogPath $deleteLogPath
+Write-Log -Message "Mode: $(if ($DryRunBool) { 'DRY-RUN' } else { 'LIVE' })" -LogPath $deleteLogPath
 Write-Log -Message "Disable Threshold: $DisableDays days" -LogPath $deleteLogPath
 Write-Log -Message "Delete Threshold: $DeleteDays days" -LogPath $deleteLogPath
 
@@ -185,7 +187,7 @@ try {
         $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | OU: $($user.DistinguishedName)"
         
         try {
-            if ($DryRun) {
+            if ($DryRunBool) {
                 Write-Log -Message "[DRY-RUN] Would DELETE: $logMessage" -LogPath $deleteLogPath
             } else {
                 Remove-ADUser -Identity $user -Confirm:$false -ErrorAction Stop
@@ -217,7 +219,7 @@ try {
         $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | OU: $($user.DistinguishedName)"
         
         try {
-            if ($DryRun) {
+            if ($DryRunBool) {
                 Write-Log -Message "[DRY-RUN] Would DISABLE: $logMessage" -LogPath $disableLogPath
             } else {
                 Disable-ADAccount -Identity $user -ErrorAction Stop
@@ -247,7 +249,7 @@ catch {
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "EXECUTION SUMMARY" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Mode: $(if ($DryRun) { 'DRY-RUN' } else { 'LIVE' })" -ForegroundColor $(if ($DryRun) { 'Yellow' } else { 'Red' })
+Write-Host "Mode: $(if ($DryRunBool) { 'DRY-RUN' } else { 'LIVE' })" -ForegroundColor $(if ($DryRunBool) { 'Yellow' } else { 'Red' })
 Write-Host "Total Accounts Scanned: $totalUsers" -ForegroundColor White
 Write-Host "Excluded Accounts: $excludedCount" -ForegroundColor White
 if ($excludedPaths.Count -gt 0) {
@@ -256,8 +258,8 @@ if ($excludedPaths.Count -gt 0) {
         Write-Host "  - $path" -ForegroundColor Yellow
     }
 }
-Write-Host "Accounts $(if ($DryRun) { 'to be ' } else { '' })Disabled: $disabledCount" -ForegroundColor $(if ($disabledCount -gt 0) { 'Yellow' } else { 'Green' })
-Write-Host "Accounts $(if ($DryRun) { 'to be ' } else { '' })Deleted: $deletedCount" -ForegroundColor $(if ($deletedCount -gt 0) { 'Red' } else { 'Green' })
+Write-Host "Accounts $(if ($DryRunBool) { 'to be ' } else { '' })Disabled: $disabledCount" -ForegroundColor $(if ($disabledCount -gt 0) { 'Yellow' } else { 'Green' })
+Write-Host "Accounts $(if ($DryRunBool) { 'to be ' } else { '' })Deleted: $deletedCount" -ForegroundColor $(if ($deletedCount -gt 0) { 'Red' } else { 'Green' })
 Write-Host "Errors Encountered: $errorCount" -ForegroundColor $(if ($errorCount -gt 0) { 'Red' } else { 'Green' })
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "`nLog Files:" -ForegroundColor Cyan
@@ -268,18 +270,18 @@ Write-Host "========================================`n" -ForegroundColor Cyan
 # Write summary to logs
 $summaryMessage = @"
 === EXECUTION SUMMARY ===
-Mode: $(if ($DryRun) { 'DRY-RUN' } else { 'LIVE' })
+Mode: $(if ($DryRunBool) { 'DRY-RUN' } else { 'LIVE' })
 Total Accounts Scanned: $totalUsers
 Excluded Accounts: $excludedCount
-Accounts $(if ($DryRun) { 'to be ' } else { '' })Disabled: $disabledCount
-Accounts $(if ($DryRun) { 'to be ' } else { '' })Deleted: $deletedCount
+Accounts $(if ($DryRunBool) { 'to be ' } else { '' })Disabled: $disabledCount
+Accounts $(if ($DryRunBool) { 'to be ' } else { '' })Deleted: $deletedCount
 Errors Encountered: $errorCount
 "@
 
 Write-Log -Message $summaryMessage -LogPath $disableLogPath
 Write-Log -Message $summaryMessage -LogPath $deleteLogPath
 
-if ($DryRun) {
+if ($DryRunBool) {
     Write-Host "NOTE: This was a dry-run. No changes were made to AD accounts." -ForegroundColor Yellow
     Write-Host "Set -DryRun `$false to execute changes.`n" -ForegroundColor Yellow
 }
