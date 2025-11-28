@@ -148,7 +148,7 @@ jobs:
           exit $exitcode
 
       - name: Upload results for ${{ matrix.account_name }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
             name: account-${{ matrix.account_name }}
             path: |
@@ -196,7 +196,7 @@ jobs:
             cat ./all-alerts.txt
             
         - name: Upload consolidated results
-          uses: actions/upload-artifact@v4
+          uses: actions/upload-artifact@v5
           with:
             name: consolidated-accounts
             path: |
