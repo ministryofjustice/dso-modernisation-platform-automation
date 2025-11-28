@@ -95,6 +95,17 @@ $disabledCount = 0
 $deletedCount = 0
 $errorCount = 0
 
+# Get the secret value
+$hostname = (Get-ComputerInfo).CsName
+$adSecretValue = Get-SECSecretValue -SecretId "/$($hostname.ToLower())/dso-ad-computer-cleanup" -Region "eu-west-2"
+$adSecretValue = $adSecretValue.SecretString | ConvertFrom-Json
+$username = $adSecretValue.username
+$password = $adSecretValue.password
+$domainname = $adSecretValue.domainname
+$password = ConvertTo-SecureString -String $password -AsPlainText -Force
+
+$adcred = New-Object System.Management.Automation.PSCredential ($username, $Password)
+
 # ============================================================================
 # FUNCTIONS
 # ============================================================================
@@ -190,7 +201,7 @@ try {
             if ($DryRunBool) {
                 Write-Log -Message "[DRY-RUN] Would DELETE: $logMessage" -LogPath $deleteLogPath
             } else {
-                Remove-ADUser -Identity $user -Confirm:$false -ErrorAction Stop
+                Remove-ADUser -Identity $user -Confirm:$false -ErrorAction Stop  -Credential $adcred
                 Write-Log -Message "[DELETED] $logMessage" -LogPath $deleteLogPath
             }
             $deletedCount++
@@ -222,7 +233,7 @@ try {
             if ($DryRunBool) {
                 Write-Log -Message "[DRY-RUN] Would DISABLE: $logMessage" -LogPath $disableLogPath
             } else {
-                Disable-ADAccount -Identity $user -ErrorAction Stop
+                Disable-ADAccount -Identity $user -ErrorAction Stop -Credential $adcred
                 Write-Log -Message "[DISABLED] $logMessage" -LogPath $disableLogPath
             }
             $disabledCount++
