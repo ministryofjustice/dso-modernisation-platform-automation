@@ -65,6 +65,7 @@ param(
 # ============================================================================
 
 $DryRunBool = [System.Convert]::ToBoolean($DryRun)
+Write-Host "dryrun is set to $DryRun, and DryRunBool is set to $DryRunBool"
 
 # Get domain DN and build full paths
 $domainDN = (Get-ADDomain).DistinguishedName
@@ -283,7 +284,7 @@ Write-Log -Message $summaryMessage -LogPath $deleteLogPath
 
 if ($DryRunBool) {
     Write-Host "NOTE: This was a dry-run. No changes were made to AD accounts." -ForegroundColor Yellow
-    Write-Host "Set -DryRun `$false to execute changes.`n" -ForegroundColor Yellow
+    Write-Host "Set -DryRun False to execute changes.`n" -ForegroundColor Yellow
 }
 
 # Return exit code based on errors
