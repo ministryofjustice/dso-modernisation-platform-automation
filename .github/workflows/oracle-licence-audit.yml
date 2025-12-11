@@ -184,7 +184,7 @@ jobs:
 
       - name: Configure AWS Credentials
         if: steps.databasetargets.outputs.targets != ''
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "oracle-licence-audit-${{ matrix.account_name }}-${{ github.run_number }}"
@@ -391,7 +391,7 @@ jobs:
           echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "oracle-licence-audit-${{ env.environment_name }}-${{ github.run_number }}"
