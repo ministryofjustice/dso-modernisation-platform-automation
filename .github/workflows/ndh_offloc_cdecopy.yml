@@ -16,8 +16,8 @@ on:
           - dr
       script_flags:
         type: string
-        description: "Flags to pass to ndh-cdecopy script: a=Azure m=Mercury s=s3"
-        default: "-ams"
+        description: "Flags to pass to ndh-cdecopy script: a=Azure s=s3"
+        default: "-as"
       dryrun:
         type: choice
         description: Dryrun mode (leave as false unless testing)
@@ -76,7 +76,7 @@ jobs:
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             cron_time="${{ github.event.schedule }}"
-            script_flags="-ams"
+            script_flags="-as"
             is_bst=1
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
