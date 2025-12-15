@@ -45,7 +45,7 @@ jobs:
           echo "{$matrix}"
       
       - name: Upload aws cli commands artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: "ec2_missing_ami_list.txt"
           path: ec2_missing_ami_list.txt
@@ -121,7 +121,7 @@ jobs:
       
       - name: Upload action lines Artifact
         if: ${{ steps.check.outputs.missing == 1 }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: "ec2_missing_ami_list.txt"
           path: ec2_missing_ami_list.txt
