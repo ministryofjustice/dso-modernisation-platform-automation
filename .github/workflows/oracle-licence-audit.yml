@@ -279,7 +279,7 @@ jobs:
 
       - name: Configure AWS Credentials
         if: steps.weblogic_targets.outputs.targets != ''
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: "${{ steps.account_web.outputs.role_arn }}"
           role-session-name: "oracle-licence-audit-${{ matrix.account_name }}-${{ github.run_number }}"
