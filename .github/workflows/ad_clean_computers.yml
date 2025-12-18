@@ -131,7 +131,7 @@
         runs-on: ubuntu-latest
         steps:
            - name: Download all artifacts
-             uses: actions/download-artifact@v5
+             uses: actions/download-artifact@v7
             
            - name: Consolidate hostname data
              run: |
@@ -209,7 +209,7 @@
             aws secretsmanager put-secret-value --secret-id $MODPLATFORM_SECRET_ARN --secret-string "${{ secrets.DSO_MODERNISATION_PLATFORM_AUTOMATION }}"
            
         - name: Download consolidated hostname data
-          uses: actions/download-artifact@v5
+          uses: actions/download-artifact@v7
           with:
             name: consolidated-ec2-hostnames
 
@@ -329,7 +329,7 @@
             aws secretsmanager put-secret-value --secret-id $AD_SERVICE_ACCOUNT_SECRET_ARN --secret-string $AD_SERVICE_ACCOUNT
            
         - name: Download all_logs.zip
-          uses: actions/download-artifact@v5
+          uses: actions/download-artifact@v7
           with:
             name: all_logs.zip
 
