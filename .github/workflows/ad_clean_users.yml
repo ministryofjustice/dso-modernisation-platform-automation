@@ -164,7 +164,7 @@
               #   --output text > ssm-output/stderr.txt
 
         - name: Upload review Artifact
-          uses: actions/upload-artifact@v5
+          uses: actions/upload-artifact@v6
           if: always()
           with:
             name: aduserscript-logs-approval-run-${{ github.run_number }}
@@ -314,7 +314,7 @@
                 --output text > ssm-output/stdout.txt
               
         - name: Upload Final Artifact
-          uses: actions/upload-artifact@v5
+          uses: actions/upload-artifact@v6
           if: always()
           with:
             name: aduserscript-logs-approved-run-${{ github.run_number }}

@@ -119,7 +119,7 @@
                 # cat "instances-${{ matrix.account_name }}.json"                
 
           - name: Upload results for ${{ matrix.account_name }}
-            uses: actions/upload-artifact@v4
+            uses: actions/upload-artifact@v6
             with:
                 name: ec2-hostnames-${{ matrix.account_name }}
                 path: |
@@ -154,7 +154,7 @@
                 echo "Consolidation complete"
                 
            - name: Upload consolidated results
-             uses: actions/upload-artifact@v4
+             uses: actions/upload-artifact@v6
              with:
                 name: consolidated-ec2-hostnames
                 path: |
@@ -252,7 +252,7 @@
             done
   
         - name: Upload all results
-          uses: actions/upload-artifact@v4
+          uses: actions/upload-artifact@v6
           with:
              name: all_logs.zip
              path: |
@@ -370,7 +370,7 @@
             
         - name: Upload final results
           if: steps.find_final_files.outputs.files != ''
-          uses: actions/upload-artifact@v4
+          uses: actions/upload-artifact@v6
           with:
             name: final-results
             path: ${{ steps.find_final_files.outputs.files }}
