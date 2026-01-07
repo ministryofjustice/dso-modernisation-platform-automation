@@ -6,7 +6,7 @@ on:
     inputs:
       jumpserver:
         type: choice
-        description: Which environment to start
+        description: Which environment to stop
         default: test
         options:
           - test
@@ -76,11 +76,11 @@ jobs:
             fi
             if [[ "${cron_time}" == '05 21 * * 1-5' ]]; then
               if ((is_bst == 1)); then
-                jumpservers="test preproduction"
+                jumpservers="test"
               fi
             elif [[ "${cron_time}" == '05 22 * * 1-5' ]]; then
               if ((is_bst == 0)); then
-                jumpservers="test preproduction"
+                jumpservers="test"
               fi
             else
               echo "Unsupported schedule cron ${cron_time}"
