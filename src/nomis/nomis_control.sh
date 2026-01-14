@@ -40,8 +40,6 @@ get_account_name() {
     account_name="nomis-test"
   elif [[ $nomis_environment == "t3" ]]; then
     account_name="nomis-test"
-  elif [[ $nomis_environment == "lsast" ]]; then
-    account_name="nomis-preproduction"
   elif [[ $nomis_environment == "preprod" ]]; then
     account_name="nomis-preproduction"
   elif [[ $nomis_environment == "prod" ]]; then
@@ -277,8 +275,6 @@ get_url() {
       url="c-t2.test.nomis.service.justice.gov.uk"
     elif [[ $nomis_environment == "t3" ]]; then
       url="c-t3.test.nomis.service.justice.gov.uk"
-    elif [[ $nomis_environment == "lsast" ]]; then
-      url="c-lsast.preproduction.nomis.service.justice.gov.uk"
     elif [[ $nomis_environment == "preprod" ]]; then
       url="c.preproduction.nomis.service.justice.gov.uk"
     elif [[ $nomis_environment == "prod" ]]; then

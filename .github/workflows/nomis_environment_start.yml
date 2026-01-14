@@ -12,7 +12,6 @@ on:
           - t1
           - t2
           - t3
-          - lsast
           - preprod
       weblogic_deployment:
         type: choice
