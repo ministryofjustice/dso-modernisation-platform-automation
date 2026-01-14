@@ -12,7 +12,6 @@ on:
           - t1
           - t2
           - t3
-          - lsast
           - preprod
       weblogic_deployment:
         type: choice
@@ -88,11 +87,11 @@ jobs:
             fi
             if [[ "${cron_time}" == '05 18 * * 1-5' ]]; then
               if ((is_bst == 1)); then
-                nomis_environments="t1 t2 t3 lsast preprod"
+                nomis_environments="t1 t2 t3 preprod"
               fi
             elif [[ "${cron_time}" == '05 19 * * 1-5' ]]; then
               if ((is_bst == 0)); then
-                nomis_environments="t1 t2 t3 lsast preprod"
+                nomis_environments="t1 t2 t3 preprod"
               fi
             else
               echo "Unsupported schedule cron ${cron_time}"
