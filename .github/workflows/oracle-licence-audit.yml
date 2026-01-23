@@ -66,7 +66,7 @@ jobs:
       matrix: ${{ steps.calc_matrix.outputs.matrix }}
     steps:
       - name: Checkout helper scripts
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
         with:
           path: dso-modernisation-platform-automation
 
@@ -96,7 +96,7 @@ jobs:
       inventory: inventory/ansible
     steps:
       - name: Checkout ansible config
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           path: ansible
@@ -104,7 +104,7 @@ jobs:
           fetch-depth: 0
 
       - name: Checkout Inventory & Roles
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           sparse-checkout-cone-mode: false
@@ -116,7 +116,7 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch Required Roles & Site
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           sparse-checkout-cone-mode: false
@@ -346,7 +346,7 @@ jobs:
       environment_name: hmpps-oem-development
     steps:
       - name: Checkout ansible config
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           path: ansible
@@ -354,7 +354,7 @@ jobs:
           fetch-depth: 0
 
       - name: Checkout Inventory & Roles
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           sparse-checkout-cone-mode: false
@@ -366,7 +366,7 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch Required Roles & Site
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           sparse-checkout-cone-mode: false
