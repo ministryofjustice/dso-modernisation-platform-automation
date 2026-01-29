@@ -108,11 +108,11 @@ jobs:
             fi
             if [[ "${cron_time}" == '05 18 * * 1-5' ]]; then
               if ((is_bst == 1)); then
-                onr_environments="t2 pp pd" # space separated list
+                onr_environments="t2 pp" # space separated list
               fi
             elif [[ "${cron_time}" == '05 19 * * 1-5' ]]; then
               if ((is_bst == 0)); then
-                onr_environments="t2 pp pd" # space separated list
+                onr_environments="t2 pp" # space separated list
               fi
             else
               echo "Unsupported schedule cron ${cron_time}"
