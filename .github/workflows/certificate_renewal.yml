@@ -132,10 +132,11 @@ jobs:
           ec2_hostname="${{ matrix.ec2_hostname }}"
           renew_expiry_days="${{ needs.check-strategy.outputs.renew_expiry_days }}"
           domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
-          echo "EC2=$ec2_hostname RenewExpiryDays=$renew_expiry_days DomainNames=$domain_names"
-          sed -i "s|sed-domain-names|$domain_names|g" src/certificates/CheckCertRenewal.ps1
-          sed -i "s|sed-renew-expiry-days|$renew_expiry_days|g" src/certificates/CheckCertRenewal.ps1
-          cert=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/CheckCertRenewal.ps1")
+          check_renewal_script=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").check_renewal_script' src/certificates/certs.json)
+          echo "EC2=$ec2_hostname RenewExpiryDays=$renew_expiry_days DomainNames=$domain_names Script=$check_renewal_script"
+          sed -i "s|sed-domain-names|$domain_names|g" src/certificates/$check_renewal_script
+          sed -i "s|sed-renew-expiry-days|$renew_expiry_days|g" src/certificates/$check_renewal_script
+          cert=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/$check_renewal_script")
           echo "$cert"
           requires_update=$(echo "$cert" | grep "^requires_update=" | cut -d= -f2)
           echo "requires_update=${requires_update}" >> $GITHUB_OUTPUT
@@ -247,10 +248,11 @@ jobs:
           ec2_hostname="${{ matrix.ec2_hostname }}"
           renew_expiry_days="${{ needs.check-strategy.outputs.renew_expiry_days }}"
           domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
-          echo "EC2=$ec2_hostname RenewExpiryDays=$renew_expiry_days DomainNames=$domain_names"
-          sed -i "s|sed-domain-names|$domain_names|g" src/certificates/CheckCertRenewal.ps1
-          sed -i "s|sed-renew-expiry-days|$renew_expiry_days|g" src/certificates/CheckCertRenewal.ps1
-          cert=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/CheckCertRenewal.ps1")
+          check_renewal_script=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").check_renewal_script' src/certificates/certs.json)
+          echo "EC2=$ec2_hostname RenewExpiryDays=$renew_expiry_days DomainNames=$domain_names Script=$check_renewal_script"
+          sed -i "s|sed-domain-names|$domain_names|g" src/certificates/$check_renewal_script
+          sed -i "s|sed-renew-expiry-days|$renew_expiry_days|g" src/certificates/$check_renewal_script
+          cert=$(src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-get-expiry" "src/certificates/$check_renewal_script")
           echo "$cert"
           renew_cert=$(echo "$cert" | grep "^renew_cert=" | cut -d= -f2)
           update_web=$(echo "$cert" | grep "^update_web=" | cut -d= -f2)
@@ -278,24 +280,27 @@ jobs:
           Write-Output "aws secretsmanager put-secret-value --secret-id /ec2/${{ matrix.ec2_hostname }}/web-cert --secret-string xxx"
           aws secretsmanager put-secret-value --secret-id '/ec2/${{ matrix.ec2_hostname }}/web-cert' --secret-string "$WebCertSecret"
 
-      - name: Import LetsEncrypt Cert into WebStore
+      - name: Import LetsEncrypt Cert into Store
         if: ${{ steps.certexpiry.outputs.renew_cert == 1 }}
         run: |
           ec2_hostname="${{ matrix.ec2_hostname }}"
+          import_cert_script=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").import_cert_script' src/certificates/certs.json)
+          echo "EC2=$ec2_hostname Script=$import_cert_script"
           cert=$(aws secretsmanager get-secret-value --secret-id '/ec2/${{ matrix.ec2_hostname }}/web-cert' --query SecretString --output text)
           chainBase64=$(jq -r .ChainBase64 <<< "$cert")
           pfxBase64=$(jq -r .PfxBase64 <<< "$cert")
           password=$(jq -r .Password <<< "$cert")
-          sed -i "s|sed-chain-base64|$chainBase64|g" src/certificates/ImportLetsEncryptCert.ps1
-          sed -i "s|sed-pfx-base64|$pfxBase64|g" src/certificates/ImportLetsEncryptCert.ps1
-          sed -i "s|sed-password|$password|g" src/certificates/ImportLetsEncryptCert.ps1
-          src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-import-cert" "src/certificates/ImportLetsEncryptCert.ps1"
+          sed -i "s|sed-chain-base64|$chainBase64|g" src/certificates/$import_cert_script
+          sed -i "s|sed-pfx-base64|$pfxBase64|g" src/certificates/$import_cert_script
+          sed -i "s|sed-password|$password|g" src/certificates/$import_cert_script
+          src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-import-cert" "src/certificates/$import_cert_script"
 
-      - name: Update IIS WebBinding
+      - name: Update Web Bindings
         if: ${{ steps.certexpiry.outputs.update_web == 1 }}
         run: |
           ec2_hostname="${{ matrix.ec2_hostname }}"
           domain_names=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").domain_names | join(" ")' src/certificates/certs.json)
-          echo "EC2=$ec2_hostname DomainNames=$domain_names"
-          sed -i "s|sed-domain-names|$domain_names|g" src/certificates/UpdateWebBinding.ps1
-          src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-web-binding" "src/certificates/UpdateWebBinding.ps1"
+          update_web_script=$(jq -r '.certs[] | select(.ec2_hostname == "'$ec2_hostname'").update_web_script' src/certificates/certs.json)
+          echo "EC2=$ec2_hostname DomainNames=$domain_names Script=$update_web_script"
+          sed -i "s|sed-domain-names|$domain_names|g" src/certificates/$update_web_script
+          src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-web-binding" "src/certificates/$update_web_script"

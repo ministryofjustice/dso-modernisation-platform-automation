@@ -7,6 +7,9 @@
         "pp-cafmwebx.az.justice.gov.uk"
       ],
       "ec2_hostname": "pp-cafm-w-4-b",
+      "check_renewal_script": "CheckCertRenewal.ps1",
+      "import_cert_script": "ImportLetsEncryptCert.ps1",
+      "update_web_script": "UpdateWebBinding.ps1",
       "schedule": 0
     },
     {
@@ -16,6 +19,9 @@
         "pp-cafmwebx.az.justice.gov.uk"
       ],
       "ec2_hostname": "pp-cafm-w-5-a",
+      "check_renewal_script": "CheckCertRenewal.ps1",
+      "import_cert_script": "ImportLetsEncryptCert.ps1",
+      "update_web_script": "UpdateWebBinding.ps1",
       "schedule": 0
     },
     {
@@ -25,6 +31,9 @@
         "cafmwebx2.az.justice.gov.uk"
       ],
       "ec2_hostname": "pd-cafm-w-36-b",
+      "check_renewal_script": "CheckCertRenewal.ps1",
+      "import_cert_script": "ImportLetsEncryptCert.ps1",
+      "update_web_script": "UpdateWebBinding.ps1",
       "schedule": 1
     },
     {
@@ -34,6 +43,9 @@
         "cafmwebx2.az.justice.gov.uk"
       ],
       "ec2_hostname": "pd-cafm-w-37-a",
+      "check_renewal_script": "CheckCertRenewal.ps1",
+      "import_cert_script": "ImportLetsEncryptCert.ps1",
+      "update_web_script": "UpdateWebBinding.ps1",
       "schedule": 2
     },
     {
@@ -43,6 +55,9 @@
         "cafmtrainweb.az.justice.gov.uk"
       ],
       "ec2_hostname": "pd-cafm-w-38-b",
+      "check_renewal_script": "CheckCertRenewal.ps1",
+      "import_cert_script": "ImportLetsEncryptCert.ps1",
+      "update_web_script": "UpdateWebBinding.ps1",
       "schedule": 0
     }
   ]
