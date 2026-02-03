@@ -59,6 +59,14 @@
       "import_cert_script": "ImportLetsEncryptCert.ps1",
       "update_web_script": "UpdateWebBinding.ps1",
       "schedule": 0
+    },
+    {
+      "account_name": "oasys-national-reporting-test",
+      "domain_names": [
+        "t2.test.reporting.oasys.service.justice.gov.uk"
+      ],
+      "ec2_hostname": "t2-onr-weboidc-1",
+      "schedule": 0
     }
   ]
 }
