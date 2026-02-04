@@ -285,7 +285,8 @@ jobs:
           $LetsEncryptCert = New-PACertificate ($DomainNames.Split(' ')) -DnsPlugin Route53 -PluginArgs @{R53UseIAMRole=$true} -Contact $Config.Email -AcceptTOS -PfxPass $Password -Force -Verbose
           $ChainBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($LetsEncryptCert.ChainFile))
           $PfxBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($LetsEncryptCert.PfxFile))
-          $WebCertSecret = @{ChainBase64=$ChainBase64;PfxBase64=$PfxBase64;Password=$Password} | ConvertTo-Json -Compress
+          $PfxFullChainBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($LetsEncryptCert.PfxFullChain))
+          $WebCertSecret = @{ChainBase64=$ChainBase64;PfxBase64=$PfxBase64;PfxFullChainBase64=$PfxFullChainBase64;Password=$Password} | ConvertTo-Json -Compress
           Write-Output "aws secretsmanager put-secret-value --secret-id /ec2/${{ matrix.ec2_hostname }}/web-cert --secret-string xxx"
           aws secretsmanager put-secret-value --secret-id '/ec2/${{ matrix.ec2_hostname }}/web-cert' --secret-string "$WebCertSecret"
 
