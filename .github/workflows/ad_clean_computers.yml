@@ -33,7 +33,7 @@
           target_domain: "${{ steps.parseinput.outputs.target_domain }}"
         steps:
           - name: Checkout Repository
-            uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+            uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
             with:
               ref: ${{ github.ref }}
     
@@ -79,7 +79,7 @@
               aws-region: eu-west-2
     
           - name: Checkout Repository
-            uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+            uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
             with:
               ref: ${{ github.ref }}
 
@@ -192,7 +192,7 @@
             esac
   
         - name: Checkout Repository
-          uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+          uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
           with:
             ref: ${{ github.ref }}
 
@@ -312,7 +312,7 @@
             echo "CURRENT_DATE=$(date +"%d-%m-%y")" >> $GITHUB_ENV
 
         - name: Checkout Repository
-          uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+          uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
           with:
             ref: ${{ github.ref }}
 

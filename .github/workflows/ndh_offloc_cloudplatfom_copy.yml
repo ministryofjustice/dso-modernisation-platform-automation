@@ -42,7 +42,7 @@ jobs:
         current_time: "${{ steps.parseinput.outputs.current_time }}"
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           ref: ${{ github.ref }}
 
@@ -99,7 +99,7 @@ jobs:
       dest_file_exists: ${{ steps.check_dest.outputs.dest_file_exists }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: ${{ github.ref }}
 
