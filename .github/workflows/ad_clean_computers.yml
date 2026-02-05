@@ -72,7 +72,7 @@
               echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
     
           - name: Configure AWS Credentials
-            uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708  # v5.1.1
+            uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7  # v6.0.0
             with:
               role-to-assume: "${{ steps.account.outputs.role_arn }}"
               role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
@@ -197,7 +197,7 @@
             ref: ${{ github.ref }}
 
         - name: Configure AWS credentials for Admin account
-          uses: aws-actions/configure-aws-credentials@v5
+          uses: aws-actions/configure-aws-credentials@v6
           with:
             role-to-assume: >- 
               arn:aws:iam::${{ github.event.inputs.target_domain == 'PROD' && secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_ACCOUNT_ID || secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
@@ -317,7 +317,7 @@
             ref: ${{ github.ref }}
 
         - name: Configure AWS credentials for Admin account
-          uses: aws-actions/configure-aws-credentials@v5
+          uses: aws-actions/configure-aws-credentials@v6
           with:
             role-to-assume: >- 
               arn:aws:iam::${{ github.event.inputs.target_domain == 'PROD' && secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_ACCOUNT_ID || secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
