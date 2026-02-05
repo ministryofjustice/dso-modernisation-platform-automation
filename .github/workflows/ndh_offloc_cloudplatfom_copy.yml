@@ -111,7 +111,7 @@ jobs:
           echo "account_id=${account_id}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials for Source
-        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
         with:
           role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-source"
@@ -197,7 +197,7 @@ jobs:
             fi
 
       - name: Configure AWS Credentials for Destination
-        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
         with:
           role-to-assume: ${{ needs.setup.outputs.cp_environment == 'preprod' && secrets.OFFLOC_TRANSFER_GHA_ROLE_ARN_PREPROD || secrets.OFFLOC_TRANSFER_GHA_ROLE_ARN_PROD }}
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-dest"
