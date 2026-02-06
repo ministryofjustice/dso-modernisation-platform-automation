@@ -1,0 +1,114 @@
+---
+name: Copy DFI report files to Delius-Mis
+
+on:
+  workflow_dispatch:
+    inputs:
+      check_files:
+        type: choice
+        description: Check files mode (show what files exist in each bucket without transferring)
+        default: "false" # Change to true to enable check files mode
+        options:
+          - "true"
+          - "false"
+      dfi_environment:
+        type: choice
+        description: Delius-Mis AWS modernisation platform environemnt to copy files to
+        default: "dev" # TODO: change this to stage or preprod or prod later
+        options:
+          - "dev"
+          - "stage"
+          - "preprod"
+          - "prod"
+        
+  schedule:                # Only runs on prod environment 
+    - cron: "20 02 * * *"  # Runs at 02:20 UTC daily
+    - cron: "20 03 * * *"  # Runs at 03:20 UTC daily (to handle BST/GMT)
+
+permissions:
+  id-token: write
+  contents: read
+  
+run-name: ${{ github.event_name == 'schedule' && 'DFI report file copy to Delius-Mis' || format('DFI report file copy to Delius-Mis {0}{1}', inputs.dfi_environment, inputs.check_files == 'true' && ' (check files)' || '') }}
+
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+        check_files: "${{ steps.parseinput.outputs.check_files }}"
+        dfi_environment: "${{ steps.parseinput.outputs.dfi_environment }}"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b  # v4.1.4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Parse Workflow Inputs
+        id: parseinput
+        run: |
+            # Check trigger types and set values
+            if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+              check_files="${{ github.event.inputs.check_files }}"
+              dfi_environment="${{ github.event.inputs.dfi_environment }}"
+              echo "Manual trigger detected - using provided inputs"
+            elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+              check_files="false"
+              dfi_environment="dev" # TODO: change this back later
+              echo "Scheduled trigger detected - using production environment and set check_files to false "
+            else
+              echo "Unsupported event ${GITHUB_EVENT_NAME}"
+              exit 1
+            fi
+
+            echo "check_files=${check_files}" >> $GITHUB_OUTPUT
+            echo "dfi_environment=${dfi_environment}" >> $GITHUB_OUTPUT
+            
+            if [[ "${check_files}" == "true" ]]; then
+              echo "Running in check files mode."
+            else
+              echo "Running in transfer mode."
+            fi
+  copytodeliusmis:
+    name: Copy to Delius Mis
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+        with:
+          ref: ${{ github.ref }}
+      
+      - name: Get DFI Source S3 Uri
+        id: source_uri
+        run: |
+          source_uri="${{ secrets.DFI_SOURCE_URI }}"
+
+      - name: Get DFI Destination S3 Uri
+        id: destination_uri
+        run: |
+          destination_uri="${{ secrets.DFI_DESTINATION_URI }}" 
+
+      - name: Get Account Id
+        id: account_id
+        run: |
+          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids.delius-mis-development }}"
+          echo "account_id=${account_id}"
+          echo "account_id=${account_id}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials for Source
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        with:
+          role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
+          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-source"
+          aws-region: eu-west-2
+
+      - name: Check Source files
+        id: check_source
+        env: 
+          SOURCE_BUCKET: ${{ secrets.DFI_SOURCE_URI }}
+        run: |
+          aws s3 ls "s3://${SOURCE_BUCKET}"
+
+        # aws s3 sync "${{ secrets.DFI_SOURCE_URI }}" "${{ secrets.DFI_DESTINATION_URI }}" --profile "delius-mis-dev" --sse aws:kms --sse-kms-key-id "${{ secrets.DFI_DESTINATION_KEY_ID_ARN }}" --acl bucket-owner-full-control
