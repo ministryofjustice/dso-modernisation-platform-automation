@@ -2,7 +2,7 @@
 #
 # Generate lists of Oracle workflow options:
 #  - primary databases
-#  - database systems
+#  - database systems (i.e. primary and all standby databases)
 
 set -euo pipefail
 

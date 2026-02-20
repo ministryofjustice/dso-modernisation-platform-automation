@@ -1,6 +1,6 @@
 name: Oracle DB SQL Plan Baseline Installation
 
-# TargetDatabase options may be generated using the oracle_db_generate_primary_list.yml workflow
+# TargetDatabase options may be generated using the oracle_db_generate_target_list.yml workflow
 
 on:
   workflow_dispatch:

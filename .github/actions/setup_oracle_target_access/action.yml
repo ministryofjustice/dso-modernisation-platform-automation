@@ -1,0 +1,145 @@
+
+name: "Setup Oracle Target Action"
+description: "Set up Access to Oracle Targets (either Primary Databases or comma-separated list of System Members)"
+
+inputs:
+   TargetEntities:
+      description: "Database entities to target"
+      required: true
+   TargetEntitiesType:
+      description: "primary|system"
+      required: true
+   SourceConfigVersion:
+      description: "Branch/tag/commit for modernisation-platform-configuration-management"
+      required: false
+      default: "main"
+   ModernisationPlatformEnvironmentManagement:
+      description: "Secret MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT"
+      required: true
+
+outputs:
+   target_environment:
+       description: "AWS Environment hosting the selected targets"
+       value: ${{ steps.prepareinventorynames.outputs.target_environment }}
+   target_group:
+       description: "Name of the Ansible Group Variables file associated with the target"
+       value: ${{ steps.prepareinventorynames.outputs.target_group }}
+   target_pairs:
+       description: "Comma separate list of EC2:database pairs (used when a non-Delius database system is selected)"
+       value: ${{ steps.prepareinventorynames.outputs.target_pairs }}
+
+runs:
+   using: composite
+   steps:
+    - name: Checkout Inventory & Roles
+      uses: actions/checkout@v5
+      with:
+        repository: ministryofjustice/modernisation-platform-configuration-management
+        sparse-checkout-cone-mode: false
+        sparse-checkout: |
+          ansible/hosts
+          ansible/group_vars
+          ansible/ansible.cfg
+        path: inventory
+        ref: ${{ inputs.SourceConfigVersion }}
+        fetch-depth: 0
+
+    - name: Checkout helper scripts
+      uses: actions/checkout@v5
+      with:
+        path: dso-modernisation-platform-automation
+
+    - name: Prepare Inventory Name
+      id: prepareinventorynames
+      env:
+          TARGET_ENTITIES: ${{ inputs.TargetSystem }}
+      shell: bash
+      run: |
+          TARGET_ENVIRONMENT=${TARGET_ENTITIES%%[[:space:]]*}
+          # The last field in the input will either be a single database (if primary database targets)
+          # or a comma-separated list of databases following the delimiter => (if system targets)
+          # We convert both forms to a comma-separated list, since a primary database is simply
+          # a comma-separated list with only one element.
+          TARGET_DATABASES=$(echo ${TARGET_ENTITIES} | awk '{last=$NF; sub(/.*=>/,"",last); print last}')
+          TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}
+          case "${TARGET_ENVIRONMENT}" in
+            delius_core*|delius_mis*)
+                    case "${TARGET_ENVIRONMENT}" in
+                        delius_core*) APPLICATION=delius-core ;;
+                        delius_mis*)  APPLICATION=delius-mis  ;;
+                    esac
+                    if [ "${{ inputs.TargetEntitiesType }}" == "primary" ]
+                    then
+                       TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_primarydb
+                    else
+                       TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_dbs
+                    fi
+                    ;;
+            hmpps_oem*)
+                    APPLICATION=hmpps-oem
+                    # There is only ever one database in an OEM environment
+                    TARGET_PAIRS="*-oem-a:${TARGET_DATABASES}"
+                    ;;
+            nomis*|corporate_staff_rostering*|oasys*)
+                    # For these applications the target hosts for the databases can be found in
+                    # the Ansible configuration files
+                    case "${TARGET_ENVIRONMENT}" in
+                        nomis_combined_reporting*)
+                            APPLICATION=nomis-combined-reporting
+                            ;;
+                        nomis*)
+                            APPLICATION=nomis
+                            ;;
+                        oasys_national_reporting*)
+                            APPLICATION=oasys-national-reporting
+                            ;;
+                        oasys*)
+                            APPLICATION=oasys
+                            ;;
+                        corporate_staff_rostering*)
+                            APPLICATION=corporate-staff-rostering
+                            ;;
+                    esac
+                    YQ_QUERY='.db_configs as $db | ["'"${TARGET_DATABASES//,/\",\"}"'"] | map($db[.] .host_name + ":" + .) | join(",")'
+                    TARGET_PAIRS=$(yq ${YQ_QUERY} inventory/ansible/group_vars/environment_name_${TARGET_ENVIRONMENT}.yml)
+                    ;;
+            *)      echo "Unknown application type"
+                    ;;
+          esac
+          # ENVIRONMENT_TYPE is one of development|test|preproduction|production
+          ENVIRONMENT_TYPE=$(echo ${TARGET_ENVIRONMENT} \
+                              | sed 's/_/-/g' | awk -F${APPLICATION}- '{print $2}' \
+                              | awk -F- '{print $1}' )
+          echo "target_environment=${TARGET_ENVIRONMENT}"        >> $GITHUB_OUTPUT
+          echo "target_group=${TARGET_GROUP}"                    >> $GITHUB_OUTPUT
+          echo "application=${APPLICATION}"                      >> $GITHUB_OUTPUT
+          echo "environment_type=${ENVIRONMENT_TYPE}"            >> $GITHUB_OUTPUT
+          echo "account_name=${APPLICATION}-${ENVIRONMENT_TYPE}" >> $GITHUB_OUTPUT
+          echo "target_pairs=${TARGET_PAIRS}"                    >> $GITHUB_OUTPUT
+
+    - name: Show Known Identifiers
+      shell: bash
+      run: |
+            echo <<-EOECHO
+               target_environment: ${{ steps.prepareinventorynames.outputs.target_environment }}
+               application       : ${{ steps.prepareinventorynames.outputs.application }}
+               environment_type  : ${{ steps.prepareinventorynames.outputs.environment_type }}
+               account_name      : ${{ steps.prepareinventorynames.outputs.account_name }}
+               target_pairs      : ${{ steps.prepareinventorynames.outputs.target_pairs }}
+            EOECHO
+
+    - name: Get Account Details
+      id: account
+      shell: bash
+      run: |
+            echo "account name: ${{ steps.prepareinventorynames.outputs.account_name }}"
+            account_id="${{ fromJSON(inputs.ModernisationPlatformEnvironmentManagement).account_ids[steps.prepareinventorynames.outputs.account_name] }}"
+            role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+            echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+      with:
+        role-to-assume: "${{ steps.account.outputs.role_arn }}"
+        role-session-name: "setup-oracle-target-access-${{ steps.prepareinventorynames.outputs.account_name }}-${{ github.run_number }}"
+        aws-region: eu-west-2
