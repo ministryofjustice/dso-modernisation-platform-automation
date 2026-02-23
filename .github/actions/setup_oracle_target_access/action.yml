@@ -151,9 +151,7 @@ runs:
                     # Therefore for Non-Delius environments we split the runs into multiple batches
                     # to only permit the playbook to run against a single host only once at a time.
                     function create_host_batches {
-                        input=$1
-
-                        IFS=',' read -ra items <<< "$input"
+                        IFS=',' read -ra items <<< "$1"
 
                         # Array of subsets
                         declare -a subsets
@@ -194,6 +192,7 @@ runs:
                         done
                         BATCH_COUNT=${batch_counter}
                         }
+                    # We group each of the target:database pair batches within brackets
                     BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS} | sed 's/^/[/' | sed 's/$/]/' | paste -sd' ' -)
                     ;;
             *)      echo "Unknown application type"
