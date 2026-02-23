@@ -209,7 +209,7 @@ runs:
                     # We group each of the target:database pair batches as a JSON array
                     # (We need to base64 encode it otherwise GitHub Actions treats the braces as 
                     #  enclosing secrets and converts everything into asterisks, breaking the JSON)
-                    BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS} | base64 -w0)
+                    BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS})
                     BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | grep -o '\[[^]]*\]' | wc -l)
                     ;;
             *)      echo "Unknown application type"
