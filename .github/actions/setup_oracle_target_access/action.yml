@@ -240,7 +240,7 @@ runs:
                batch_count               : ${{ steps.prepareinventorynames.outputs.batch_count }}
             EOECHO
             BATCHED_TARGET_PAIRS=$(echo ${{ steps.prepareinventorynames.outputs.batched_target_pairs }} | base64 -d | jq --compact-output '.' > /tmp/batched_target_pairs.json)
-            echo "  batched_target_pairs      : $(cat /tmp/batched_target_pairs.json)"
+            echo "  batched_target_pairs      : $(jq -r . /tmp/batched_target_pairs.json)"
 
     - name: Get Account Details
       id: account
