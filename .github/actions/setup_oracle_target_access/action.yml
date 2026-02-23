@@ -209,7 +209,7 @@ runs:
                     # We group each of the target:database pair batches as a JSON array
                     # (We need to base64 encode it otherwise GitHub Actions treats the braces as 
                     #  enclosing secrets and converts everything into asterisks, breaking the JSON
-                    # and creating a mess in the log files so its unreadable)
+                    # and creating a mess in the log files with many lines ending up unreadable)
                     BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS} | base64 -w 0)
                     BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | base64 -d | grep -o '\[[^]]*\]' | wc -l)
                     ;;
@@ -238,7 +238,7 @@ runs:
                application               : ${{ steps.prepareinventorynames.outputs.application }}
                environment_type          : ${{ steps.prepareinventorynames.outputs.environment_type }}
                account_name              : ${{ steps.prepareinventorynames.outputs.account_name }}
-               batched_target_pairs      : ${BATCHED_TARGET_PAIRS}
+               batched_target_pairs      : ::remove-mask::${BATCHED_TARGET_PAIRS}
                batch_count               : ${{ steps.prepareinventorynames.outputs.batch_count }}
             EOECHO
 
