@@ -187,13 +187,21 @@ runs:
                             fi
                         done
 
-                        # Print results as JSON array
+                        # Print results as JSON array of arrays
                         printf '['
                         for i in "${!subsets[@]}"; do
                             if [ $i -gt 0 ]; then
                                 printf ','
                             fi
-                            printf '"%s"' "${subsets[$i]}"
+                            printf '['
+                            IFS=',' read -ra batch_items <<< "${subsets[$i]}"
+                            for j in "${!batch_items[@]}"; do
+                                if [ $j -gt 0 ]; then
+                                    printf ','
+                                fi
+                                printf '"%s"' "${batch_items[$j]}"
+                            done
+                            printf ']'
                         done
                         printf ']'
                         }
