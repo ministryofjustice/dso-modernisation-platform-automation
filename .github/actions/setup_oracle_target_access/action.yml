@@ -231,12 +231,13 @@ runs:
     - name: Show Known Identifiers
       shell: bash
       run: |
+            BATCHED_TARGET_PAIRS=(echo ${{ steps.prepareinventorynames.outputs.batched_target_pairs }} | base64 -d | jq --compact-output '.')
             echo <<-EOECHO
                target_environment        : ${{ steps.prepareinventorynames.outputs.target_environment }}
                application               : ${{ steps.prepareinventorynames.outputs.application }}
                environment_type          : ${{ steps.prepareinventorynames.outputs.environment_type }}
                account_name              : ${{ steps.prepareinventorynames.outputs.account_name }}
-               batched_target_pairs      : ${{ steps.prepareinventorynames.outputs.batched_target_pairs }}
+               batched_target_pairs      : ${BATCHED_TARGET_PAIRS}
                batch_count               : ${{ steps.prepareinventorynames.outputs.batch_count }}
             EOECHO
 
