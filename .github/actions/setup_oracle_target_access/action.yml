@@ -155,10 +155,8 @@ runs:
 
                         # Array of subsets
                         declare -a subsets
-                        # Track which keys appear in each subset
+                        # Track which keys (host names) appear in each subset
                         declare -a used
-                        # Count number of host batches we have created
-                        batch_counter=0
 
                         for pair in "${items[@]}"; do
                             key="${pair%%:*}"
@@ -182,7 +180,6 @@ runs:
                             if ! $placed; then
                                 subsets+=("$pair")
                                 used+=("$key")
-                                batch_counter+=1
                             fi
                         done
 
@@ -190,10 +187,10 @@ runs:
                         for s in "${subsets[@]}"; do
                             echo "$s"
                         done
-                        BATCH_COUNT=${batch_counter}
                         }
                     # We group each of the target:database pair batches within brackets
                     BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS} | sed 's/^/[/' | sed 's/$/]/' | paste -sd' ' -)
+                    BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | grep -o '\[[^]]*\]' | wc -l)
                     ;;
             *)      echo "Unknown application type"
                     ;;
@@ -209,6 +206,7 @@ runs:
           echo "environment_type=${ENVIRONMENT_TYPE}"            >> $GITHUB_OUTPUT
           echo "account_name=${APPLICATION}-${ENVIRONMENT_TYPE}" >> $GITHUB_OUTPUT
           echo "batched_target_pairs=${BATCHED_TARGET_PAIRS}"    >> $GITHUB_OUTPUT
+          echo "batch_count=${BATCH_COUNT}"                      >> $GITHUB_OUTPUT
 
     - name: Show Known Identifiers
       shell: bash
