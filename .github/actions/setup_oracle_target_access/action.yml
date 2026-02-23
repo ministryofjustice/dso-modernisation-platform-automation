@@ -147,7 +147,6 @@ runs:
                           RESOLVED_PAIRS="${RESOLVED_PAIRS},${HOST_NAME}:${DATABASE}"
                        fi
                     done
-                    TARGET_PAIRS=$RESOLVED_PAIRS
                     # In Non-Delius environments it is possible for a database system to contain
                     # more than one database on the *same host*.  It is not recommended to run
                     # an Ansible playbook currently against the same target host more than once
@@ -187,7 +186,7 @@ runs:
                             fi
                         done
 
-                        # Print results as JSON array of arrays
+                        # Print results as JSON array of arrays with dictionaries
                         printf '['
                         for i in "${!subsets[@]}"; do
                             if [ $i -gt 0 ]; then
@@ -199,14 +198,18 @@ runs:
                                 if [ $j -gt 0 ]; then
                                     printf ','
                                 fi
-                                printf '"%s"' "${batch_items[$j]}"
+                                # Split pair into key:value and create dictionary
+                                pair="${batch_items[$j]}"
+                                key="${pair%%:*}"
+                                value="${pair#*:}"
+                                printf '{"host":"%s","database":"%s"}' "$key" "$value"
                             done
                             printf ']'
                         done
                         printf ']'
                         }
                     # We group each of the target:database pair batches as a JSON array
-                    BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS})
+                    BATCHED_TARGET_PAIRS=$(create_host_batches ${RESOLVED_PAIRS})
                     BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | grep -o '\[[^]]*\]' | wc -l)
                     ;;
             *)      echo "Unknown application type"
