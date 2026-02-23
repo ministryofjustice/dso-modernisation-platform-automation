@@ -200,7 +200,7 @@ runs:
                                     printf ','
                                 fi
                                 #printf '"%d"-->"%s"' "$j" "${batch_items[$j]}"
-                                printf '{"%s":"%s"}' "${batch_items[$j]%%:*}" "${batch_items[$j]#*:}"
+                                printf '["%s":"%s"]' "${batch_items[$j]%%:*}" "${batch_items[$j]#*:}"
                             done
                             printf ']'
                         done
@@ -209,8 +209,8 @@ runs:
                     # We group each of the target:database pair batches as a JSON array
                     # (We need to base64 encode it otherwise GitHub Actions treats the braces as 
                     #  enclosing secrets and converts everything into asterisks, breaking the JSON)
-                    BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS} | base64 -w0)
-                    BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | base64 -d | grep -o '\[[^]]*\]' | wc -l)
+                    BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS})
+                    BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | grep -o '\[[^]]*\]' | wc -l)
                     ;;
             *)      echo "Unknown application type"
                     ;;
@@ -231,13 +231,12 @@ runs:
     - name: Show Known Identifiers
       shell: bash
       run: |
-            DECODED_BATCHED_TARGET_PAIRS=$(echo ${{ steps.prepareinventorynames.outputs.batched_target_pairs }} | base64 -d)
             echo <<-EOECHO
                target_environment        : ${{ steps.prepareinventorynames.outputs.target_environment }}
                application               : ${{ steps.prepareinventorynames.outputs.application }}
                environment_type          : ${{ steps.prepareinventorynames.outputs.environment_type }}
                account_name              : ${{ steps.prepareinventorynames.outputs.account_name }}
-               batched_target_pairs      : ${DECODED_BATCHED_TARGET_PAIRS}
+               batched_target_pairs      : ${{ steps.prepareinventorynames.outputs.batched_target_pairs }}
                batch_count               : ${{ steps.prepareinventorynames.outputs.batch_count }}
             EOECHO
 
