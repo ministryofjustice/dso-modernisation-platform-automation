@@ -74,6 +74,10 @@ runs:
                     else
                        TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_dbs
                     fi
+                    # For Delius we only ever have one database per host so we do not need
+                    # to batch up the Ansible runs to prevent running more than once
+                    # on the same host concurrently.   Therefore hard code batch count to 1.
+                    BATCH_COUNT=1
                     ;;
             nomis*|corporate_staff_rostering*|oasys*|hmpps-oem*)
                     # For these applications the target hosts for the databases can be found in
@@ -183,13 +187,18 @@ runs:
                             fi
                         done
 
-                        # Print results
-                        for s in "${subsets[@]}"; do
-                            echo "$s"
+                        # Print results as JSON array
+                        printf '['
+                        for i in "${!subsets[@]}"; do
+                            if [ $i -gt 0 ]; then
+                                printf ','
+                            fi
+                            printf '"%s"' "${subsets[$i]}"
                         done
+                        printf ']'
                         }
-                    # We group each of the target:database pair batches within brackets
-                    BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS} | sed 's/^/[/' | sed 's/$/]/' | paste -sd' ' -)
+                    # We group each of the target:database pair batches as a JSON array
+                    BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS})
                     BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | grep -o '\[[^]]*\]' | wc -l)
                     ;;
             *)      echo "Unknown application type"

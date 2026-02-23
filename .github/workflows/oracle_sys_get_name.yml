@@ -146,8 +146,20 @@ jobs:
       - name: Get Database Name
         id: get_db_name
         run: |
-             echo "DO NOTHING"
-             exit 0
+             # For Non-Delius environments the hosts and databases are supplied as a list of
+             # pairs (since there is potentially more than one database per host, the 
+             # database name must be supplied).  Additionally these lists are batched to 
+             # prevent attempting to run Ansible on the same host more than once concurrently.
+             
+             for i in $(seq 1 ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }}); do
+               echo "Processing batch $i"
+             done
+
+
+
+
+
+
              # In Non-Delius environments the database name must be supplied since there is
              # potentially more than one primary database per host.   (Optional for Delius)
              if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_name }}" ]
