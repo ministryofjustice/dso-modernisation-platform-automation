@@ -199,7 +199,7 @@ runs:
                                 if [ $j -gt 0 ]; then
                                     printf ','
                                 fi
-                                printf '"%s"' "${batch_items[$j]}"
+                                printf '"%d"-->"%s"' "$j" "${batch_items[$j]}"
                                 #printf '{"%s":"%s"}' "BEFORE" "AFTER"
                             done
                             printf ']'
