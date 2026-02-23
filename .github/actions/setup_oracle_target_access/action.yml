@@ -210,7 +210,7 @@ runs:
                     # (We need to base64 encode it otherwise GitHub Actions treats the braces as 
                     #  enclosing secrets and converts everything into asterisks, breaking the JSON)
                     BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS} | base64 -w0)
-                    BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | grep -o '\[[^]]*\]' | wc -l)
+                    BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | base64 -d | grep -o '\[[^]]*\]' | wc -l)
                     ;;
             *)      echo "Unknown application type"
                     ;;
