@@ -124,7 +124,8 @@ jobs:
         id: setup_primary_db_access
         uses: ./.github/actions/setup_oracle_target_access
         with:
-          TargetSystem: "${{ github.event.inputs.TargetSystem }}"
+          TargetEntities: "${{ github.event.inputs.TargetSystem }}"
+          TargetEntitiesType: "system"
           SourceConfigVersion: "${{ github.event.inputs.SourceConfigVersion }}"
           ModernisationPlatformEnvironmentManagement: "${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}"
 
@@ -160,4 +161,4 @@ jobs:
                  --extra-vars '{"dry_run":${{ github.event.inputs.DryRun }}}' \
                  --extra-vars "target=${{ steps.setup_primary_db_access.outputs.target_group }}" \
                  ${TARGET_DB_NAME_SWITCH} ${TARGET_DB_HOST_LIMIT} \
-                 --extra-vars force_role=oracle-db-sql-baselines roles/ansible/site.yml
+                 --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml

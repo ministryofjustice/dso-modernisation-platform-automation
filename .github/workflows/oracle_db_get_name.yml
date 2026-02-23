@@ -7,6 +7,7 @@ description: "Read-only workflow to access primary databases and read their name
 # to them.
 
 # TargetDatabase options may be generated using the oracle_db_generate_primary_list.yml workflow
+# using the "primary" option
 
 on:
   workflow_dispatch:
@@ -170,6 +171,8 @@ jobs:
              fi
              # In Non-Delius environments the target primary database host must be supplied since the
              # Ansible inventory does not segregate primary and and standby hosts.  (Optional for Delius)
+             # (In Delius the split is done using the "database" tag in EC2 which is set to either primarydb or
+             # standbydb1 or standbydb2.  This tag is not used outside of Delius so those groups do not exist).
              if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_host }}" ]
              then
                 TARGET_DB_HOST_LIMIT="--limit ${{ steps.setup_primary_db_access.outputs.target_db_host }}"

@@ -52,7 +52,7 @@ runs:
     - name: Prepare Inventory Name
       id: prepareinventorynames
       env:
-          TARGET_ENTITIES: ${{ inputs.TargetSystem }}
+          TARGET_ENTITIES: ${{ inputs.TargetEntities }}
       shell: bash
       run: |
           TARGET_ENVIRONMENT=${TARGET_ENTITIES%%[[:space:]]*}
@@ -75,12 +75,7 @@ runs:
                        TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_dbs
                     fi
                     ;;
-            hmpps_oem*)
-                    APPLICATION=hmpps-oem
-                    # There is only ever one database in an OEM environment
-                    TARGET_PAIRS="*-oem-a:${TARGET_DATABASES}"
-                    ;;
-            nomis*|corporate_staff_rostering*|oasys*)
+            nomis*|corporate_staff_rostering*|oasys*|hmpps-oem*)
                     # For these applications the target hosts for the databases can be found in
                     # the Ansible configuration files
                     case "${TARGET_ENVIRONMENT}" in
@@ -99,9 +94,55 @@ runs:
                         corporate_staff_rostering*)
                             APPLICATION=corporate-staff-rostering
                             ;;
+                        hmpps-oem*)
+                            APPLICATION=hmpps-oem
+                            ;;
                     esac
                     YQ_QUERY='.db_configs as $db | ["'"${TARGET_DATABASES//,/\",\"}"'"] | map($db[.] .host_name + ":" + .) | join(",")'
-                    TARGET_PAIRS=$(yq ${YQ_QUERY} inventory/ansible/group_vars/environment_name_${TARGET_ENVIRONMENT}.yml)
+                    TARGET_PAIRS=$(yq "${YQ_QUERY}" inventory/ansible/group_vars/environment_name_${TARGET_ENVIRONMENT}.yml)
+                    # The host_name variable in the Ansible configuration has been set in one of 3 ways:
+                    # (1) Using the inventory_hostname
+                    # (2) Using a fully qualified hostname.  We can simply strip off the 
+                    #     domain name to get the inventory_hostname.
+                    # (3) Using an IP address.  We will need to lookup the Ansible inventory
+                    #     to find out which host is using this as a private IPv4 address
+                    # FQ Host:
+                    TARGET_PAIRS=$(echo $TARGET_PAIRS | \
+                        awk -F',' 'BEGIN{OFS=","}{
+                            for (i=1; i<=NF; i++) {
+                                n = split($i, p, ":"); # p[1]=host, p[2]=database
+                                h = p[1]
+                                if (h ~ /[A-Za-z]/) # contains a letter => hostname, not IP
+                                sub(/\..*/, "", h)  # strip domain from the first dot
+                                $i = h ":" p[2]
+                            }
+                            print
+                            }'
+                    )
+                    # If "(3) Using an IP address" applies, we use the Ansible
+                    # inventory to resolve this to the inventory_hostname
+                    RESOLVED_PAIRS=""
+                    for PAIR in ${TARGET_PAIRS//,/ }
+                    do
+                       HOST_NAME=$(echo $PAIR | cut -f1 -d:)
+                       DATABASE=$(echo $PAIR | cut -f2 -d:)
+                       # Detect where the HOST_NAME has been specified as an IP instead
+                       if [[ $HOST_NAME =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(:|$) ]]; then
+                          RESOLVED_IP=$(jq -r --arg ip "${HOST_NAME}" '
+                                    ._meta.hostvars
+                                    | to_entries
+                                    | map(select(.value.network_interfaces[]?.private_ip_address == $ip))
+                                    | .[].key
+                                    ' < <(ansible-inventory -i inventory/ansible --list))
+                          HOST_NAME="$RESOLVED_IP"
+                       fi
+                       if [ -z "$RESOLVED_PAIRS" ]; then
+                          RESOLVED_PAIRS="${HOST_NAME}:${DATABASE}"
+                       else
+                          RESOLVED_PAIRS="${RESOLVED_PAIRS},${HOST_NAME}:${DATABASE}"
+                       fi
+                    done
+                    TARGET_PAIRS=$RESOLVED_PAIRS
                     ;;
             *)      echo "Unknown application type"
                     ;;
