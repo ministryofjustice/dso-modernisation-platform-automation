@@ -200,7 +200,7 @@ runs:
                                     printf ','
                                 fi
                                 # printf '"%s"' "${batch_items[$j]}"
-                                printf '{"%s":"%s"}' "${batch_items[$j]%%:*}" "${batch_itenms[$j]#*:}"
+                                printf '{"%s":"%s"}' "${batch_items[$j]%%:*}" "${batch_items[$j]#*:}"
                             done
                             printf ']'
                         done
