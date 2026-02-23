@@ -199,7 +199,8 @@ runs:
                                 if [ $j -gt 0 ]; then
                                     printf ','
                                 fi
-                                printf '"%s"' "${batch_items[$j]}"
+                                # printf '"%s"' "${batch_items[$j]}"
+                                printf '{"%s":"%s"}' "${batch_items[$j]%%:*}" "${batch_itenms[$j]#*:}"
                             done
                             printf ']'
                         done
