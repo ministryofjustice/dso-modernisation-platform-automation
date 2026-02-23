@@ -192,14 +192,14 @@ runs:
                         for s in "${subsets[@]}"; do
                             echo "$s"
                         done
-                        BATCH_COUNT=$(batch_counter)
+                        BATCH_COUNT=${batch_counter}
                         }
                     BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS} | sed 's/^/[/' | sed 's/$/]/' | paste -sd' ' -)
                     ;;
             *)      echo "Unknown application type"
                     ;;
           esac
-          
+
           # ENVIRONMENT_TYPE is one of development|test|preproduction|production
           ENVIRONMENT_TYPE=$(echo ${TARGET_ENVIRONMENT} \
                               | sed 's/_/-/g' | awk -F${APPLICATION}- '{print $2}' \
