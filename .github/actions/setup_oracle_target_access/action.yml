@@ -202,7 +202,7 @@ runs:
                                 pair="${batch_items[$j]}"
                                 key="${pair%%:*}"
                                 value="${pair#*:}"
-                                printf '{"host":"%s","database":"%s"}' "$key" "$value"
+                                printf '{"%s","%s"}' "$key" "$value"
                             done
                             printf ']'
                         done
