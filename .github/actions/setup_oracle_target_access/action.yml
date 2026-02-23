@@ -99,6 +99,7 @@ runs:
                             ;;
                     esac
                     YQ_QUERY='.db_configs as $db | ["'"${TARGET_DATABASES//,/\",\"}"'"] | map($db[.] .host_name + ":" + .) | join(",")'
+                    # TARGET_PAIRS are host:database pairs (mapping a database name to a host_name)
                     TARGET_PAIRS=$(yq "${YQ_QUERY}" inventory/ansible/group_vars/environment_name_${TARGET_ENVIRONMENT}.yml)
                     # The host_name variable in the Ansible configuration has been set in one of 3 ways:
                     # (1) Using the inventory_hostname
@@ -143,10 +144,62 @@ runs:
                        fi
                     done
                     TARGET_PAIRS=$RESOLVED_PAIRS
+                    # In Non-Delius environments it is possible for a database system to contain
+                    # more than one database on the *same host*.  It is not recommended to run
+                    # an Ansible playbook currently against the same target host more than once
+                    # as this can result in locking issues and unpredictable behaviour.
+                    # Therefore for Non-Delius environments we split the runs into multiple batches
+                    # to only permit the playbook to run against a single host only once at a time.
+                    function create_host_batches {
+                        input=$1
+
+                        IFS=',' read -ra items <<< "$input"
+
+                        # Array of subsets
+                        declare -a subsets
+                        # Track which keys appear in each subset
+                        declare -a used
+                        # Count number of host batches we have created
+                        batch_counter=0
+
+                        for pair in "${items[@]}"; do
+                            key="${pair%%:*}"
+                            placed=false
+
+                            # Try to place into existing subsets
+                            for i in "${!subsets[@]}"; do
+                                if [[ " ${used[$i]} " != *" $key "* ]]; then
+                                    if [[ -z "${subsets[$i]}" ]]; then
+                                        subsets[$i]="$pair"
+                                    else
+                                        subsets[$i]="${subsets[$i]},$pair"
+                                    fi
+                                    used[$i]="${used[$i]} $key"
+                                    placed=true
+                                    break
+                                fi
+                            done
+
+                            # If no subset could take it, create new subset
+                            if ! $placed; then
+                                subsets+=("$pair")
+                                used+=("$key")
+                                batch_counter+=1
+                            fi
+                        done
+
+                        # Print results
+                        for s in "${subsets[@]}"; do
+                            echo "$s"
+                        done
+                        BATCH_COUNT=$(batch_counter)
+                        }
+                    BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS} | sed 's/^/[/' | sed 's/$/]/' | paste -sd' ' -)
                     ;;
             *)      echo "Unknown application type"
                     ;;
           esac
+          
           # ENVIRONMENT_TYPE is one of development|test|preproduction|production
           ENVIRONMENT_TYPE=$(echo ${TARGET_ENVIRONMENT} \
                               | sed 's/_/-/g' | awk -F${APPLICATION}- '{print $2}' \
@@ -156,17 +209,18 @@ runs:
           echo "application=${APPLICATION}"                      >> $GITHUB_OUTPUT
           echo "environment_type=${ENVIRONMENT_TYPE}"            >> $GITHUB_OUTPUT
           echo "account_name=${APPLICATION}-${ENVIRONMENT_TYPE}" >> $GITHUB_OUTPUT
-          echo "target_pairs=${TARGET_PAIRS}"                    >> $GITHUB_OUTPUT
+          echo "batched_target_pairs=${BATCHED_TARGET_PAIRS}"    >> $GITHUB_OUTPUT
 
     - name: Show Known Identifiers
       shell: bash
       run: |
             echo <<-EOECHO
-               target_environment: ${{ steps.prepareinventorynames.outputs.target_environment }}
-               application       : ${{ steps.prepareinventorynames.outputs.application }}
-               environment_type  : ${{ steps.prepareinventorynames.outputs.environment_type }}
-               account_name      : ${{ steps.prepareinventorynames.outputs.account_name }}
-               target_pairs      : ${{ steps.prepareinventorynames.outputs.target_pairs }}
+               target_environment        : ${{ steps.prepareinventorynames.outputs.target_environment }}
+               application               : ${{ steps.prepareinventorynames.outputs.application }}
+               environment_type          : ${{ steps.prepareinventorynames.outputs.environment_type }}
+               account_name              : ${{ steps.prepareinventorynames.outputs.account_name }}
+               batched_target_pairs      : ${{ steps.prepareinventorynames.outputs.batched_target_pairs }}
+               batch_count               : ${{ steps.prepareinventorynames.outputs.batch_count }}
             EOECHO
 
     - name: Get Account Details
