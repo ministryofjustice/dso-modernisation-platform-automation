@@ -152,27 +152,19 @@ jobs:
              # prevent attempting to run Ansible on the same host more than once concurrently.
              
              for BATCH in $(seq 0 $(( ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }} - 1 )) ); do
-               echo "Processing batch $BATCH"
+               echo "Processing batch $(( BATCH + 1 )) of ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }}"
                # For Non-Delius environments create host-->database mapping based on the batch targets
-               echo "${{ steps.setup_db_system_access.outputs.BATCHED_TARGET_PAIRS }}" | base64 -d | jq --compact-output --argjson idx "$BATCH" '.[$idx]'
+               if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_name }}" ]
+               then
+                  CURRENT_BATCH=$(echo "${{ steps.setup_db_system_access.outputs.BATCHED_TARGET_PAIRS }}" | base64 -d | jq --compact-output --argjson idx "$BATCH" '.[$idx]')
+                  TARGET_HOST_LIMIT="--limit "$(echo ${CURRENT_BATCH} | jq -r '.[] | keys[]' | paste -sd,)
+                  HOST_TO_DB_MAP="--extra-vars target_db_names='${CURRENT_BATCH}'"
+                  echo "Limiting to hosts:    ${TARGET_HOST_LIMIT}"
+                  echo "Host to database map: ${HOST_TO_DB_MAP}"
+               fi
+               ansible-playbook \
+                    -i $inventory \
+                    --extra-vars "target=${{ steps.setup_primary_db_access.outputs.target_group }}" \
+                    ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
+                    --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml
              done
-             exit 0
-             # In Non-Delius environments the database name must be supplied since there is
-             # potentially more than one primary database per host.   (Optional for Delius)
-             if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_name }}" ]
-             then
-                TARGET_DB_NAME_SWITCH="--extra-vars target_db_name=${{ steps.setup_primary_db_access.outputs.target_db_name }}"
-             fi
-             # In Non-Delius environments the target primary database host must be supplied since the
-             # Ansible inventory does not segregate primary and and standby hosts.  (Optional for Delius)
-             # (In Delius the split is done using the "database" tag in EC2 which is set to either primarydb or
-             # standbydb1 or standbydb2.  This tag is not used outside of Delius so those groups do not exist).
-             if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_host }}" ]
-             then
-                TARGET_DB_HOST_LIMIT="--limit ${{ steps.setup_primary_db_access.outputs.target_db_host }}"
-             fi
-             ansible-playbook \
-                 -i $inventory \
-                 --extra-vars "target=${{ steps.setup_primary_db_access.outputs.target_group }}" \
-                 ${TARGET_DB_NAME_SWITCH} ${TARGET_DB_HOST_LIMIT} \
-                 --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml
