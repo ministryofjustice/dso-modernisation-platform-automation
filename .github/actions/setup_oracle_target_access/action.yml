@@ -218,9 +218,13 @@ runs:
                     ;;
             hmpps_oem*)
                     APPLICATION=hmpps-oem
-                    # No target host required for OEM since there
-                    # is only ever one host in the environment.
-                    TARGET_DB_HOST="*-oem-a"
+                    # No target host required for OEM since there is only ever one host in the environment.
+                    # The host name is not specified in the Ansible group vars but it is always on the
+                    # OMS Server.  Only one batch will be required as EM and RMAN are treated as
+                    # separate systems, so there is only ever one primary database on the host in scope.
+                    HOST_NAME=$(yq '.OMS_SERVER | split(".")[0]' inventory/ansible/group_vars/environment_name_${TARGET_ENVIRONMENT}.yml)
+                    BATCHED_TARGET_PAIRS="${HOST_NAME}:${TARGET_DATABASES}"
+                    BATCH_COUNT=1
                     ;;
             *)      echo "Unknown application type"
                     ;;
