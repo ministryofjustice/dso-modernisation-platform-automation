@@ -154,7 +154,7 @@ jobs:
              for BATCH in $(seq 0 $(( ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }} - 1 )) ); do
                echo "Processing batch $(( BATCH + 1 )) of ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }}"
                # For Non-Delius environments create host-->database mapping based on the batch targets
-               if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_name }}" ]
+               if [ ! -z "${{ steps.setup_db_system_access.outputs.target_db_name }}" ]
                then
                   CURRENT_BATCH=$(echo "${{ steps.setup_db_system_access.outputs.BATCHED_TARGET_PAIRS }}" | base64 -d | jq --compact-output --argjson idx "$BATCH" '.[$idx]')
                   TARGET_HOST_LIMIT="--limit "$(echo ${CURRENT_BATCH} | jq -r '.[] | keys[]' | paste -sd,)
@@ -164,7 +164,7 @@ jobs:
                fi
                ansible-playbook \
                     -i $inventory \
-                    --extra-vars "target=${{ steps.setup_primary_db_access.outputs.target_group }}" \
+                    --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
                     ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
                     --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml
              done
