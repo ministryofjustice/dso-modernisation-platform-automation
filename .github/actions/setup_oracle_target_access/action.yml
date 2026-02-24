@@ -24,9 +24,12 @@ outputs:
    target_group:
        description: "Name of the Ansible Group Variables file associated with the target"
        value: ${{ steps.prepareinventorynames.outputs.target_group }}
-   target_pairs:
-       description: "Comma separate list of EC2:database pairs (used when a non-Delius database system is selected)"
-       value: ${{ steps.prepareinventorynames.outputs.target_pairs }}
+   batched_target_pairs:
+       description: "JSON array of EC2:database pairs (used when a non-Delius database system is selected)"
+       value: ${{ steps.prepareinventorynames.outputs.batched_target_pairs }}
+   batch_count:
+       description: "Number of arrays (batches) of EC2:database pairs supplied in batched_target_pairs"
+       value: ${{ steps.prepareinventorynames.outputs.batch_count }}
 
 runs:
    using: composite
