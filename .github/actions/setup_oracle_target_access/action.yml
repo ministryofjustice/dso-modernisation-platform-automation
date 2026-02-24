@@ -66,7 +66,7 @@ runs:
           TARGET_DATABASES=$(echo ${TARGET_ENTITIES} | awk '{last=$NF; sub(/.*=>/,"",last); print last}')
           TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}
           case "${TARGET_ENVIRONMENT}" in
-            delius_core)
+            delius_core*)
                     APPLICATION=delius-core
                     if [ "${{ inputs.TargetEntitiesType }}" == "primary" ]
                     then
