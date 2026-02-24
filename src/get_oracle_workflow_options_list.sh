@@ -43,14 +43,15 @@ declare -a TARGET_ENTRIES
 
 for GROUP_VARS_FILE in $(ls -1 ${GROUP_VARS_DIRECTORY} | grep -f <(sed 's/.*/environment_name_&_.*.yml/' ${DBA_APPLICATIONS_LIST} | sed 's/-/_/g'));
 do
-   if [[ "${MODE}" == "primary" ]]; then
-      # For Delius (delius-core and delius-mis) we are only interested in the primary databases hosts
-      # and we do not need the database name as there is only one per host
-      if [[ "${GROUP_VARS_FILE}" == *"delius"* ]]; then
-         if [[ "${GROUP_VARS_FILE}" == *"_primarydb.yml" ]]; then
-            TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE%%_primarydb.yml} | sed 's/^environment_name_//')")
-         fi
-      else
+   # For Delius (delius-core and delius-mis) we simply refer to the primarydb as there is only ever exactly one
+   # of those per application group - the environment name is regardless if it is a primary or system mode
+   if [[ "${GROUP_VARS_FILE}" == *"delius"* ]]; then
+      if [[ "${GROUP_VARS_FILE}" == *"_primarydb.yml" ]]; then
+         TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE%%_primarydb.yml} | sed 's/^environment_name_//')")
+      fi
+   else
+      # Non-Delius applications...
+      if [[ "${MODE}" == "primary" ]]; then
          # For other applications find all the databases listed in the environment
          for DATABASE in $(yq '.db_configs? | select(. != null) | keys | .[]' ${GROUP_VARS_DIRECTORY}/${GROUP_VARS_FILE});
          do
@@ -67,16 +68,8 @@ do
                fi
             fi
          done
-      fi
-   else
-      # MODE == system
-      # For Delius (delius-core and delius-mis) we are only identify systems using the *all files
-      # for the environment
-      if [[ "${GROUP_VARS_FILE}" == *"delius"* ]]; then
-         if [[ "${GROUP_VARS_FILE}" == *"_all.yml" ]]; then
-            TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE%%_all.yml} | sed 's/^environment_name_//')")
-         fi
       else
+         # mode == system (get all databases; regardless of whether they are a primary or standby)
          if yq 'has("db_configs")' ${GROUP_VARS_DIRECTORY}/${GROUP_VARS_FILE} | grep -q true; then
             # We ignore entries which do not have a host_name as they will correspond to either obsolete databases
             # or the RMAN catalog database, which only exists in hmpps-oem* environment
