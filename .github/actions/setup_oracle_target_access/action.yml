@@ -30,6 +30,9 @@ outputs:
    batch_count:
        description: "Number of arrays (batches) of EC2:database pairs supplied in batched_target_pairs"
        value: ${{ steps.prepareinventorynames.outputs.batch_count }}
+   application:
+       description: "Name of the application to which this system belongs"
+       value: ${{ steps.prepareinventorynames.outputs.application }}
 
 runs:
    using: composite

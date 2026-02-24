@@ -8,6 +8,9 @@ description: "Generate list of environment names and their associated databases 
 # This is a workaround since GHA does not currently support dynamic option lists.
 
 on:
+  push:
+    branches:
+      - DBA-1166
   workflow_dispatch:
     inputs:
       TargetType:

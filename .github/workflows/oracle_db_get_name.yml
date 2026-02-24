@@ -188,6 +188,7 @@ jobs:
               fi
                ansible-playbook \
                     -i $inventory \
+                    --extra-vars "application=${{ steps.setup_db_system_access.outputs.application }}" \
                     --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
                     ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
                     --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml
