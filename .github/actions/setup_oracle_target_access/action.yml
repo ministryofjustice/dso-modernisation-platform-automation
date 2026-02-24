@@ -66,28 +66,22 @@ runs:
           TARGET_DATABASES=$(echo ${TARGET_ENTITIES} | awk '{last=$NF; sub(/.*=>/,"",last); print last}')
           TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}
           case "${TARGET_ENVIRONMENT}" in
-            delius_core*)
-                    APPLICATION=delius-core
+            delius_core_*|delius_mis_*)
+                    case "${TARGET_ENVIRONMENT}" in
+                       delius_core_*)
+                          APPLICATION=delius-core
+                          ;;
+                       delius_mis_*)
+                          APPLICATION=delius-mis
+                          ;;
+                    esac
                     if [ "${{ inputs.TargetEntitiesType }}" == "primary" ]
                     then
-                       TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_delius_primarydb
+                       TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_primarydb
                     else
-                       TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_delius_dbs
+                       TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_dbs
                     fi
                     # For Delius we only ever have one database per host so we do not need
-                    # to batch up the Ansible runs to prevent running more than once
-                    # on the same host concurrently.   Therefore hard code batch count to 1.
-                    BATCH_COUNT=1
-                    ;;
-            delius_mis*)
-                    APPLICATION=delius-mis
-                    if [ "${{ inputs.TargetEntitiesType }}" == "primary" ]
-                    then
-                       TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_mis_primarydb,environment_name_${TARGET_ENVIRONMENT}_boe_primarydb,environment_name_${TARGET_ENVIRONMENT}_dsd_primarydb
-                    else
-                       TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_mis_dbs,environment_name_${TARGET_ENVIRONMENT}_boe_dbs,environment_name_${TARGET_ENVIRONMENT}_dsd_dbs
-                    fi
-                    # For Delius MIS we only ever have one database per host so we do not need
                     # to batch up the Ansible runs to prevent running more than once
                     # on the same host concurrently.   Therefore hard code batch count to 1.
                     BATCH_COUNT=1
