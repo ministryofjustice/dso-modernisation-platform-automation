@@ -236,6 +236,7 @@ runs:
       run: |
             cat <<-EOECHO
                target_environment        : ${{ steps.prepareinventorynames.outputs.target_environment }}
+               target_group              : ${{ steps.prepareinventorynames.outputs.target_group }}
                application               : ${{ steps.prepareinventorynames.outputs.application }}
                environment_type          : ${{ steps.prepareinventorynames.outputs.environment_type }}
                account_name              : ${{ steps.prepareinventorynames.outputs.account_name }}
