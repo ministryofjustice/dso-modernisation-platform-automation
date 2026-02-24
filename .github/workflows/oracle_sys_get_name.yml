@@ -10,9 +10,6 @@ description: "Read-only workflow to access all databases and read their names"
 # using the "system" option
 
 on:
-  push:
-    branches:
-      - "DBA-1166"
   workflow_dispatch:
     inputs:
       TargetSystem:
