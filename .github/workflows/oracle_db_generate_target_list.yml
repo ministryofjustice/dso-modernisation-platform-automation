@@ -8,9 +8,6 @@ description: "Generate list of environment names and their associated databases 
 # This is a workaround since GHA does not currently support dynamic option lists.
 
 on:
-  push:
-    branches:
-      - DBA-1166
   workflow_dispatch:
     inputs:
       TargetType:
@@ -18,7 +15,7 @@ on:
         type: choice
         options:
           - primary
-          - systems
+          - system
       SourceConfigVersion:
         description: 'Branch/tag/commit for modernisation-platform-configuration-management'
         type: string
