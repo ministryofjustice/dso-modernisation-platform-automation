@@ -231,7 +231,7 @@ runs:
     - name: Show Known Identifiers
       shell: bash
       run: |
-            echo <<-EOECHO
+            cat <<-EOECHO
                target_environment        : ${{ steps.prepareinventorynames.outputs.target_environment }}
                application               : ${{ steps.prepareinventorynames.outputs.application }}
                environment_type          : ${{ steps.prepareinventorynames.outputs.environment_type }}
