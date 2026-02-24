@@ -86,7 +86,7 @@ runs:
                     # on the same host concurrently.   Therefore hard code batch count to 1.
                     BATCH_COUNT=1
                     ;;
-            nomis*|corporate_staff_rostering*|oasys*|hmpps-oem*)
+            nomis*|corporate_staff_rostering*|oasys*|hmpps_oem*)
                     # For these applications the target hosts for the databases can be found in
                     # the Ansible configuration files
                     case "${TARGET_ENVIRONMENT}" in
@@ -105,7 +105,7 @@ runs:
                         corporate_staff_rostering*)
                             APPLICATION=corporate-staff-rostering
                             ;;
-                        hmpps-oem*)
+                        hmpps_oem*)
                             APPLICATION=hmpps-oem
                             ;;
                     esac
