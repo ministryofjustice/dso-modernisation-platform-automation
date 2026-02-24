@@ -239,11 +239,10 @@ runs:
                batch_count               : ${{ steps.prepareinventorynames.outputs.batch_count }}
             EOECHO
             # We cannot echo the batched_target_pairs directly in JSON since GitHub Actions will
-            # incorrectly detect it as a Secret and try to mask it.  Therefore we need to convert
+            # incorrectly detect hostnames as secrets and try to mask it.  Therefore we need to convert
             # it back into plain text for display purposes.
             echo "  batched_target_pairs:      "
             echo '${{ steps.prepareinventorynames.outputs.batched_target_pairs }}' | base64 -d | jq -r 'map( map(to_entries[] | "\(.key):\(.value)") | join(", ") )[]'
-            echo '${{ steps.prepareinventorynames.outputs.batched_target_pairs }}' | base64 -d | jq -r '.'
 
     - name: Get Account Details
       id: account

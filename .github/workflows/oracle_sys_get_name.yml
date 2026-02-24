@@ -151,15 +151,12 @@ jobs:
              # database name must be supplied).  Additionally these lists are batched to 
              # prevent attempting to run Ansible on the same host more than once concurrently.
              
-             for i in $(seq 1 ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }}); do
-               echo "Processing batch $i"
+             for BATCH in $(seq 1 ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }}); do
+               echo "Processing batch $BATCH"
+               # For Non-Delius environments create host-->database mapping based on the batch targets
+               echo "${{ steps.setup_db_system_access.outputs.BATCHED_TARGET_PAIRS }}"
              done
-
-
-
-
-
-
+             exit 0
              # In Non-Delius environments the database name must be supplied since there is
              # potentially more than one primary database per host.   (Optional for Delius)
              if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_name }}" ]
