@@ -223,8 +223,8 @@ runs:
                     # OMS Server.  Only one batch will be required as EM and RMAN are treated as
                     # separate systems, so there is only ever one primary database on the host in scope.
                     HOST_NAME=$(yq '.OMS_SERVER | split(".")[0]' inventory/ansible/group_vars/environment_name_${TARGET_ENVIRONMENT}.yml)
-                    echo "${HOST_NAME}:${TARGET_DATABASES}" 
-                    BATCHED_TARGET_PAIRS=$(echo "${HOST_NAME}:${TARGET_DATABASES}" | base64 -w 0)
+                    echo "[[{\"${HOST_NAME}\":\"${TARGET_DATABASES}\"}]]"
+                    BATCHED_TARGET_PAIRS=$(echo "[[{\"${HOST_NAME}\":\"${TARGET_DATABASES}\"}]]" | base64 -w 0)
                     BATCH_COUNT=1
                     ;;
             *)      echo "Unknown application type"
