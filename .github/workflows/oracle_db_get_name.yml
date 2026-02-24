@@ -164,26 +164,30 @@ jobs:
       - name: Get Database Name
         id: get_db_name
         run: |
-             # For Non-Delius environments the hosts and databases are supplied as a list of
-             # pairs (since there is potentially more than one database per host, the 
-             # database name must be supplied).  Additionally these lists are batched to 
-             # prevent attempting to run Ansible on the same host more than once concurrently.
-             
-             for BATCH in $(seq 0 $(( ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }} - 1 )) ); do
-               echo "Processing batch $(( BATCH + 1 )) of ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }}"
-               # For Non-Delius environments create host-->database mapping based on the batch targets.
-               # These are called the batched target pairs as they are an array of hostname/database pairs.
-               if [ ! -z "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" ]
-               then
-                  CURRENT_BATCH=$(echo "${{ steps.setup_db_system_access.outputs.BATCHED_TARGET_PAIRS }}" | base64 -d | jq --compact-output --argjson idx "$BATCH" '.[$idx]')
-                  TARGET_HOST_LIMIT="--limit "$(echo ${CURRENT_BATCH} | jq -r '.[] | keys[]' | paste -sd,)
-                  HOST_TO_DB_MAP="--extra-vars target_db_names='${CURRENT_BATCH}'"
-                  echo "Limiting to hosts:    ${TARGET_HOST_LIMIT}"
-                  echo "Host to database map: ${HOST_TO_DB_MAP}"
-               fi
+              if [ ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }} -ne 1 ];
+              then
+                  echo "Multiple primary databases are not expected for the same database system."
+                  exit 1
+              fi
+              # For Non-Delius environments create host-->database mapping based on the batch targets.
+              # These are called the batched target pairs as they are an array of hostname/database pairs.
+              if [ ! -z "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" ]
+              then
+                # When targeting primary databases, we expect a single batch containing a single database
+                CURRENT_BATCH=$(echo "${{ steps.setup_db_system_access.outputs.BATCHED_TARGET_PAIRS }}" | base64 -d | jq --compact-output '.[0]')
+                DATABASE_COUNT=$(echo ${CURRENT_BATCH} | jq 'length')
+                if [ ${DATABASE_COUNT} -ne 1]
+                then
+                   echo "Only one primary database should be supplied - found ${CURRENT_BATCH}."
+                   exit 1
+                fi
+                TARGET_HOST_LIMIT="--limit "$(echo ${CURRENT_BATCH} | jq -r '.[0] | keys[0]')
+                HOST_TO_DB_MAP="--extra-vars target_db_names='${CURRENT_BATCH}'"
+                echo "Limiting to hosts:    ${TARGET_HOST_LIMIT}"
+                echo "Host to database map: ${HOST_TO_DB_MAP}"
+              fi
                ansible-playbook \
                     -i $inventory \
                     --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
                     ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
                     --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml
-             done
