@@ -44,11 +44,16 @@ declare -a TARGET_ENTRIES
 for GROUP_VARS_FILE in $(ls -1 ${GROUP_VARS_DIRECTORY} | grep -f <(sed 's/.*/environment_name_&_.*.yml/' ${DBA_APPLICATIONS_LIST} | sed 's/-/_/g'));
 do
    # For Delius (delius-core and delius-mis) we simply refer to the primarydb as there is only ever exactly one
-   # of those per application group - the environment name is regardless if it is a primary or system mode
+   # of those per application group - the entry is the same regardless if it is a primary or system mode
    if [[ "${GROUP_VARS_FILE}" == *"delius"* ]]; then
       if [[ "${GROUP_VARS_FILE}" == *"_primarydb.yml" ]]; then
          TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE%%_primarydb.yml} | sed 's/^environment_name_//')")
       fi
+   elif [[ "${GROUP_VARS_FILE}" == *"hmpps_oem"* ]]; then
+       # For OEM we refer to the primary EMREP and RCVCAT databases as there are only ever these 2
+       # primary databases in the environment - the entry is the same regardless if it is a primary or system mode 
+       TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE#*environment_name_} | sed 's/.yml$//') EMREP")
+       TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE#*environment_name_} | sed 's/.yml$//') RCVCAT")
    else
       # Non-Delius applications...
       if [[ "${MODE}" == "primary" ]]; then
@@ -57,11 +62,7 @@ do
          do
             # The RCVCAT database is referenced in all non-Delius environments but it is
             # only a real database in the hmpps_oem application environments so exclude it elsewhere
-            if [[ "${DATABASE}" == "RCVCAT" ]]; then
-               if [[ "${GROUP_VARS_FILE}" == *"hmpps_oem"* ]]; then
-                  TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE#*environment_name_} | sed 's/.yml$//') ${DATABASE}")
-               fi
-            else
+            if [[ "${DATABASE}" != "RCVCAT" ]]; then
                if [[ ! "${DATABASE}" == "DR"* ]]; then
                   # Non-Delius standby databases are identified by the DR prefix. Ignore those.
                   TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE#*environment_name_} | sed 's/.yml$//') ${DATABASE}")
