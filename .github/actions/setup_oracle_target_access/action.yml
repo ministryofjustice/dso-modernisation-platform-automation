@@ -67,7 +67,7 @@ runs:
           TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}
           case "${TARGET_ENVIRONMENT}" in
             delius_core)
-                    APPLICATION=delius-core ;;
+                    APPLICATION=delius-core
                     if [ "${{ inputs.TargetEntitiesType }}" == "primary" ]
                     then
                        TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_delius_primarydb
@@ -80,7 +80,7 @@ runs:
                     BATCH_COUNT=1
                     ;;
             delius_mis*)
-                    APPLICATION=delius-mis  ;;
+                    APPLICATION=delius-mis
                     if [ "${{ inputs.TargetEntitiesType }}" == "primary" ]
                     then
                        TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_mis_primarydb,environment_name_${TARGET_ENVIRONMENT}_boe_primarydb,environment_name_${TARGET_ENVIRONMENT}_dsd_primarydb
