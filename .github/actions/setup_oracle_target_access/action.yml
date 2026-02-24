@@ -243,6 +243,7 @@ runs:
             # it back into plain text for display purposes.
             echo "  batched_target_pairs:      "
             echo '${{ steps.prepareinventorynames.outputs.batched_target_pairs }}' | base64 -d | jq -r 'map( map(to_entries[] | "\(.key):\(.value)") | join(", ") )[]'
+            echo '${{ steps.prepareinventorynames.outputs.batched_target_pairs }}' | base64 -d | jq -r '.'
 
     - name: Get Account Details
       id: account
