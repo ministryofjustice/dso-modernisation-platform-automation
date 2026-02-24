@@ -210,7 +210,7 @@ runs:
                     # (We need to convert it to base64 to prevent GitHub Actions from
                     #  masking it and breaking the formatting)
                     BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS} | base64 -w 0)
-                    BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | base64 -d | grep -o '\[[^]]*\]' | wc -l)
+                    BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | base64 -d | jq 'length')
                     ;;
             *)      echo "Unknown application type"
                     ;;
