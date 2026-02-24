@@ -144,7 +144,7 @@ jobs:
         id: setup_db_system_access
         uses: ./.github/actions/setup_oracle_target_access
         with:
-          TargetEntities: "${{ github.event.inputs.TargetSystem }}"
+          TargetEntities: "${{ github.event.inputs.TargetDatabase }}"
           TargetEntitiesType: "primary"
           SourceConfigVersion: "${{ github.event.inputs.SourceConfigVersion }}"
           ModernisationPlatformEnvironmentManagement: "${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}"
