@@ -207,8 +207,10 @@ runs:
                         printf ']'
                         }
                     # We group each of the target:database pair batches as a JSON array
-                    BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS})
-                    BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | grep -o '\[[^]]*\]' | wc -l)
+                    # (We need to convert it to base64 to prevent GitHub Actions from
+                    #  masking it and breaking the formatting)
+                    BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS} | base64 -w 0)
+                    BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | base64 -d | grep -o '\[[^]]*\]' | wc -l)
                     ;;
             *)      echo "Unknown application type"
                     ;;
@@ -240,7 +242,7 @@ runs:
             # incorrectly detect it as a Secret and try to mask it.  Therefore we need to convert
             # it back into plain text for display purposes.
             echo "  batched_target_pairs:      "
-            echo "${{ steps.prepareinventorynames.outputs.batched_target_pairs }}" | jq -r 'map( map(to_entries[] | "\(.key):\(.value)") | join(", ") )[]'
+            echo '${{ steps.prepareinventorynames.outputs.batched_target_pairs }}' | base64 -d | jq -r 'map( map(to_entries[] | "\(.key):\(.value)") | join(", ") )[]'
 
     - name: Get Account Details
       id: account
