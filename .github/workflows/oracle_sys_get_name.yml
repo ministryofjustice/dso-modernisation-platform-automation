@@ -153,8 +153,9 @@ jobs:
              
              for BATCH in $(seq 0 $(( ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }} - 1 )) ); do
                echo "Processing batch $(( BATCH + 1 )) of ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }}"
-               # For Non-Delius environments create host-->database mapping based on the batch targets
-               if [ ! -z "${{ steps.setup_db_system_access.outputs.target_db_name }}" ]
+               # For Non-Delius environments create host-->database mapping based on the batch targets.
+               # These are called the batched target pairs as they are an array of hostname/database pairs.
+               if [ ! -z "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" ]
                then
                   CURRENT_BATCH=$(echo "${{ steps.setup_db_system_access.outputs.BATCHED_TARGET_PAIRS }}" | base64 -d | jq --compact-output --argjson idx "$BATCH" '.[$idx]')
                   TARGET_HOST_LIMIT="--limit "$(echo ${CURRENT_BATCH} | jq -r '.[] | keys[]' | paste -sd,)
