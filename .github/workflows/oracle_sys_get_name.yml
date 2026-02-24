@@ -154,7 +154,7 @@ jobs:
              for BATCH in $(seq 1 ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }}); do
                echo "Processing batch $BATCH"
                # For Non-Delius environments create host-->database mapping based on the batch targets
-               echo "${{ steps.setup_db_system_access.outputs.BATCHED_TARGET_PAIRS }}"
+               echo "${{ steps.setup_db_system_access.outputs.BATCHED_TARGET_PAIRS }}" | base64 -d
              done
              exit 0
              # In Non-Delius environments the database name must be supplied since there is
