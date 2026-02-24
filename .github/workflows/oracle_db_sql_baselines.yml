@@ -188,6 +188,7 @@ jobs:
               fi
               ansible-playbook \
                  -i $inventory \
+                 --extra-vars "application=${{ steps.setup_db_system_access.outputs.application }}" \
                  --extra-vars '{"dry_run":${{ github.event.inputs.DryRun }}}' \
                  --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
                  ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
