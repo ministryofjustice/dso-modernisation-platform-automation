@@ -101,7 +101,7 @@ done
 
 # Get longest string length so we can format the array
 MAX_LENGTH=0
-for s in "${TARGET_ENTRIES[@]} ";
+for s in "${TARGET_ENTRIES[@]}";
 do
    (( ${#s} > MAX_LENGTH )) && MAX_LENGTH=${#s}
 done
@@ -115,8 +115,4 @@ fi
 # Print all target entries in alphabetical order formatted for align together
 printf '%s\n' "${TARGET_ENTRIES[@]}" | sort | awk -v MAX=${MAX_LENGTH} '{PAD=2+MAX-length($1 $2); printf("          - '\''%s%*s%s'\''\n",$1,PAD,"",$2)}'
 
-if [[ "${MODE}" == "primary" ]]; then
-   echo "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
-else
-   echo "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
-fi
+echo "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
