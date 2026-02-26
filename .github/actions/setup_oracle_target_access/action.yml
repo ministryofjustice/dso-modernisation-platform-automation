@@ -230,6 +230,7 @@ runs:
                     BATCH_COUNT=1
                     ;;
             *)      echo "Unknown application type"
+                    exit 1
                     ;;
           esac
 

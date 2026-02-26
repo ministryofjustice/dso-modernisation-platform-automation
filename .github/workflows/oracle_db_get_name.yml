@@ -6,7 +6,7 @@ description: "Read-only workflow to access primary databases and read their name
 # and name resolution of primary databases across environments without making any changes
 # to them.
 
-# TargetDatabase options may be generated using the oracle_db_generate_primary_list.yml workflow
+# TargetDatabase options may be generated using the oracle_db_generate_target_list.yml workflow
 # using the "primary" option
 
 on:

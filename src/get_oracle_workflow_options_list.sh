@@ -86,6 +86,7 @@ do
                                  .services[] as $svc
                                  | {service:$svc, key:.key}
                               )
+                              | sort_by(.service)
                               | group_by(.service)
                               | map("(\(.[0].service))=>\(map(.key) | join(","))")
                               | .[]'
