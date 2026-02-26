@@ -1,0 +1,280 @@
+
+name: "Setup Oracle Target Action"
+description: "Set up Access to Oracle Targets (either Primary Databases or comma-separated list of System Members)"
+
+inputs:
+   TargetEntities:
+      description: "Database entities to target"
+      required: true
+   TargetEntitiesType:
+      description: "primary|system"
+      required: true
+   SourceConfigVersion:
+      description: "Branch/tag/commit for modernisation-platform-configuration-management"
+      required: false
+      default: "main"
+   ModernisationPlatformEnvironmentManagement:
+      description: "Secret MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT"
+      required: true
+
+outputs:
+   target_environment:
+       description: "AWS Environment hosting the selected targets"
+       value: ${{ steps.prepareinventorynames.outputs.target_environment }}
+   target_group:
+       description: "Name of the Ansible Group Variables file associated with the target"
+       value: ${{ steps.prepareinventorynames.outputs.target_group }}
+   batched_target_pairs:
+       description: "JSON array of EC2:database pairs (used when a non-Delius database system is selected)"
+       value: ${{ steps.prepareinventorynames.outputs.batched_target_pairs }}
+   batch_count:
+       description: "Number of arrays (batches) of EC2:database pairs supplied in batched_target_pairs"
+       value: ${{ steps.prepareinventorynames.outputs.batch_count }}
+   application:
+       description: "Name of the application to which this system belongs"
+       value: ${{ steps.prepareinventorynames.outputs.application }}
+
+runs:
+   using: composite
+   steps:
+    - name: Checkout Inventory & Roles
+      uses: actions/checkout@v5
+      with:
+        repository: ministryofjustice/modernisation-platform-configuration-management
+        sparse-checkout-cone-mode: false
+        sparse-checkout: |
+          ansible/hosts
+          ansible/group_vars
+          ansible/ansible.cfg
+        path: inventory
+        ref: ${{ inputs.SourceConfigVersion }}
+        fetch-depth: 0
+
+    - name: Checkout helper scripts
+      uses: actions/checkout@v5
+      with:
+        path: dso-modernisation-platform-automation
+
+    - name: Prepare Inventory Name
+      id: prepareinventorynames
+      env:
+          TARGET_ENTITIES: ${{ inputs.TargetEntities }}
+      shell: bash
+      run: |
+          TARGET_ENVIRONMENT=${TARGET_ENTITIES%%[[:space:]]*}
+          # The last field in the input will either be a single database (if primary database targets)
+          # or a comma-separated list of databases following the delimiter => (if system targets)
+          # We convert both forms to a comma-separated list, since a primary database is simply
+          # a comma-separated list with only one element.
+          TARGET_DATABASES=$(echo ${TARGET_ENTITIES} | awk '{last=$NF; sub(/.*=>/,"",last); print last}')
+          TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}
+          case "${TARGET_ENVIRONMENT}" in
+            delius_core_*|delius_mis_*)
+                    case "${TARGET_ENVIRONMENT}" in
+                       delius_core_*)
+                          APPLICATION=delius-core
+                          ;;
+                       delius_mis_*)
+                          APPLICATION=delius-mis
+                          ;;
+                    esac
+                    if [ "${{ inputs.TargetEntitiesType }}" == "primary" ]
+                    then
+                       TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_primarydb
+                    else
+                       TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_dbs
+                    fi
+                    # For Delius we only ever have one database per host so we do not need
+                    # to batch up the Ansible runs to prevent running more than once
+                    # on the same host concurrently.   Therefore hard code batch count to 1.
+                    BATCH_COUNT=1
+                    ;;
+            nomis*|corporate_staff_rostering*|oasys*)
+                    # For these applications the target hosts for the databases can be found in
+                    # the Ansible configuration files
+                    case "${TARGET_ENVIRONMENT}" in
+                        nomis_combined_reporting*)
+                            APPLICATION=nomis-combined-reporting
+                            ;;
+                        nomis*)
+                            APPLICATION=nomis
+                            ;;
+                        oasys_national_reporting*)
+                            APPLICATION=oasys-national-reporting
+                            ;;
+                        oasys*)
+                            APPLICATION=oasys
+                            ;;
+                        corporate_staff_rostering*)
+                            APPLICATION=corporate-staff-rostering
+                            ;;
+                    esac
+                    YQ_QUERY='.db_configs as $db | ["'"${TARGET_DATABASES//,/\",\"}"'"] | map($db[.] .host_name + ":" + .) | join(",")'
+                    # TARGET_PAIRS are host:database pairs (mapping a database name to a host_name)
+                    TARGET_PAIRS=$(yq "${YQ_QUERY}" inventory/ansible/group_vars/environment_name_${TARGET_ENVIRONMENT}.yml)
+                    # The host_name variable in the Ansible configuration has been set in one of 3 ways:
+                    # (1) Using the inventory_hostname
+                    # (2) Using a fully qualified hostname.  We can simply strip off the 
+                    #     domain name to get the inventory_hostname.
+                    # (3) Using an IP address.  We will need to lookup the Ansible inventory
+                    #     to find out which host is using this as a private IPv4 address
+                    # FQ Host:
+                    TARGET_PAIRS=$(echo $TARGET_PAIRS | \
+                        awk -F',' 'BEGIN{OFS=","}{
+                            for (i=1; i<=NF; i++) {
+                                n = split($i, p, ":"); # p[1]=host, p[2]=database
+                                h = p[1]
+                                if (h ~ /[A-Za-z]/) # contains a letter => hostname, not IP
+                                sub(/\..*/, "", h)  # strip domain from the first dot
+                                $i = h ":" p[2]
+                            }
+                            print
+                            }'
+                    )
+                    # If "(3) Using an IP address" applies, we use the Ansible
+                    # inventory to resolve this to the inventory_hostname
+                    RESOLVED_PAIRS=""
+                    for PAIR in ${TARGET_PAIRS//,/ }
+                    do
+                       HOST_NAME=$(echo $PAIR | cut -f1 -d:)
+                       DATABASE=$(echo $PAIR | cut -f2 -d:)
+                       # Detect where the HOST_NAME has been specified as an IP instead
+                       if [[ $HOST_NAME =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+                          RESOLVED_IP=$(jq -r --arg ip "${HOST_NAME}" '
+                                    ._meta.hostvars
+                                    | to_entries
+                                    | map(select(.value.network_interfaces[]?.private_ip_address == $ip))
+                                    | .[].key
+                                    ' < <(ansible-inventory -i inventory/ansible --list))
+                          HOST_NAME="$RESOLVED_IP"
+                       fi
+                       if [ -z "$RESOLVED_PAIRS" ]; then
+                          RESOLVED_PAIRS="${HOST_NAME}:${DATABASE}"
+                       else
+                          RESOLVED_PAIRS="${RESOLVED_PAIRS},${HOST_NAME}:${DATABASE}"
+                       fi
+                    done
+                    TARGET_PAIRS=$RESOLVED_PAIRS
+                    # In Non-Delius environments it is possible for a database system to contain
+                    # more than one database on the *same host*.  It is not recommended to run
+                    # an Ansible playbook currently against the same target host more than once
+                    # as this can result in locking issues and unpredictable behaviour.
+                    # Therefore for Non-Delius environments we split the runs into multiple batches
+                    # to only permit the playbook to run against a single host only once at a time.
+                    function create_host_batches {
+                        IFS=',' read -ra items <<< "$1"
+
+                        # Array of subsets
+                        declare -a subsets
+                        # Track which keys (host names) appear in each subset
+                        declare -a used
+
+                        for pair in "${items[@]}"; do
+                            key="${pair%%:*}"
+                            placed=false
+
+                            # Try to place into existing subsets
+                            for i in "${!subsets[@]}"; do
+                                if [[ " ${used[$i]} " != *" $key "* ]]; then
+                                    if [[ -z "${subsets[$i]}" ]]; then
+                                        subsets[$i]="$pair"
+                                    else
+                                        subsets[$i]="${subsets[$i]},$pair"
+                                    fi
+                                    used[$i]="${used[$i]} $key"
+                                    placed=true
+                                    break
+                                fi
+                            done
+
+                            # If no subset could take it, create new subset
+                            if ! $placed; then
+                                subsets+=("$pair")
+                                used+=("$key")
+                            fi
+                        done
+
+                        # Print results as JSON array of arrays
+                        printf '['
+                        for i in "${!subsets[@]}"; do
+                            if [ $i -gt 0 ]; then
+                                printf ','
+                            fi
+                            printf '['
+                            IFS=',' read -ra batch_items <<< "${subsets[$i]}"
+                            for j in "${!batch_items[@]}"; do
+                                if [ $j -gt 0 ]; then
+                                    printf ','
+                                fi
+                                #printf '"%d"-->"%s"' "$j" "${batch_items[$j]}"
+                                printf '{"%s":"%s"}' "${batch_items[$j]%%:*}" "${batch_items[$j]#*:}"
+                            done
+                            printf ']'
+                        done
+                        printf ']'
+                        }
+                    # We group each of the target:database pair batches as a JSON array
+                    # (We need to convert it to base64 to prevent GitHub Actions from
+                    #  masking it and breaking the formatting)
+                    BATCHED_TARGET_PAIRS=$(create_host_batches ${TARGET_PAIRS} | base64 -w 0)
+                    BATCH_COUNT=$(echo ${BATCHED_TARGET_PAIRS} | base64 -d | jq 'length')
+                    ;;
+            hmpps_oem*)
+                    APPLICATION=hmpps-oem
+                    # No target host required for OEM since there is only ever one host in the environment.
+                    # The host name is not specified in the Ansible group vars but it is always on the
+                    # OMS Server.  Only one batch will be required as EM and RMAN are treated as
+                    # separate systems, so there is only ever one primary database on the host in scope.
+                    HOST_NAME=$(yq '.OMS_SERVER | split(".")[0]' inventory/ansible/group_vars/environment_name_${TARGET_ENVIRONMENT}.yml)
+                    BATCHED_TARGET_PAIRS=$(echo "[[{\"${HOST_NAME}\":\"${TARGET_DATABASES}\"}]]" | base64 -w 0)
+                    BATCH_COUNT=1
+                    ;;
+            *)      echo "Unknown application type"
+                    exit 1
+                    ;;
+          esac
+
+          # ENVIRONMENT_TYPE is one of development|test|preproduction|production
+          ENVIRONMENT_TYPE=$(echo ${TARGET_ENVIRONMENT} \
+                              | sed 's/_/-/g' | awk -F${APPLICATION}- '{print $2}' \
+                              | awk -F- '{print $1}' )
+          echo "target_environment=${TARGET_ENVIRONMENT}"        >> $GITHUB_OUTPUT
+          echo "target_group=${TARGET_GROUP}"                    >> $GITHUB_OUTPUT
+          echo "application=${APPLICATION}"                      >> $GITHUB_OUTPUT
+          echo "environment_type=${ENVIRONMENT_TYPE}"            >> $GITHUB_OUTPUT
+          echo "account_name=${APPLICATION}-${ENVIRONMENT_TYPE}" >> $GITHUB_OUTPUT
+          echo "batched_target_pairs=${BATCHED_TARGET_PAIRS}"    >> $GITHUB_OUTPUT
+          echo "batch_count=${BATCH_COUNT}"                      >> $GITHUB_OUTPUT
+
+    - name: Show Known Identifiers
+      shell: bash
+      run: |
+            cat <<-EOECHO
+               target_environment        : ${{ steps.prepareinventorynames.outputs.target_environment }}
+               target_group              : ${{ steps.prepareinventorynames.outputs.target_group }}
+               application               : ${{ steps.prepareinventorynames.outputs.application }}
+               environment_type          : ${{ steps.prepareinventorynames.outputs.environment_type }}
+               account_name              : ${{ steps.prepareinventorynames.outputs.account_name }}
+               batch_count               : ${{ steps.prepareinventorynames.outputs.batch_count }}
+            EOECHO
+            # We cannot echo the batched_target_pairs directly in JSON since GitHub Actions will
+            # incorrectly detect hostnames as secrets and try to mask it.  Therefore we need to convert
+            # it back into plain text for display purposes.
+            echo "  batched_target_pairs:      "
+            echo '${{ steps.prepareinventorynames.outputs.batched_target_pairs }}' | base64 -d | jq -r 'map( map(to_entries[] | "\(.key):\(.value)") | join(", ") )[]'
+
+    - name: Get Account Details
+      id: account
+      shell: bash
+      run: |
+            echo "account name: ${{ steps.prepareinventorynames.outputs.account_name }}"
+            account_id="${{ fromJSON(inputs.ModernisationPlatformEnvironmentManagement).account_ids[steps.prepareinventorynames.outputs.account_name] }}"
+            role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
+            echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+      with:
+        role-to-assume: "${{ steps.account.outputs.role_arn }}"
+        role-session-name: "setup-oracle-target-access-${{ steps.prepareinventorynames.outputs.account_name }}-${{ github.run_number }}"
+        aws-region: eu-west-2

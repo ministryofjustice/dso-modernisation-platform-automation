@@ -1,7 +1,8 @@
-name: Oracle DB Generate Primary List
-description: "Generate list of environment names and their associated databases"
+name: Oracle DB Generate Oracle Targets List
+description: "Generate list of environment names and their associated databases or database systems"
 
 # This is a helper workflow which generates a list of environments and databases
+# or database systems
 # which may be cut & paste into the options list for other workflows whenever
 # the set of available databases changes.   
 # This is a workaround since GHA does not currently support dynamic option lists.
@@ -9,6 +10,12 @@ description: "Generate list of environment names and their associated databases"
 on:
   workflow_dispatch:
     inputs:
+      TargetType:
+        description: 'Generate List of Primary Databases only or Database Systems (including standby databases)'
+        type: choice
+        options:
+          - primary
+          - system
       SourceConfigVersion:
         description: 'Branch/tag/commit for modernisation-platform-configuration-management'
         type: string
@@ -48,4 +55,4 @@ jobs:
       - name: Generate Primary Database List
         shell: bash
         run: |
-             src/get_oracle_workflow_options_list.sh src/DBA_APPLICATIONS.txt $inventory/group_vars
+             src/get_oracle_workflow_options_list.sh ${{ inputs.TargetType }} src/DBA_APPLICATIONS.txt $inventory/group_vars

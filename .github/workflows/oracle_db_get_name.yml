@@ -6,7 +6,8 @@ description: "Read-only workflow to access primary databases and read their name
 # and name resolution of primary databases across environments without making any changes
 # to them.
 
-# TargetDatabase options may be generated using the oracle_db_generate_primary_list.yml workflow
+# TargetDatabase options may be generated using the oracle_db_generate_target_list.yml workflow
+# using the "primary" option
 
 on:
   workflow_dispatch:
@@ -140,10 +141,11 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Setup Primary Database Access
-        id: setup_primary_db_access
-        uses: ./.github/actions/setup_oracle_db_access
+        id: setup_db_system_access
+        uses: ./.github/actions/setup_oracle_target_access
         with:
-          TargetDatabase: "${{ github.event.inputs.TargetDatabase }}"
+          TargetEntities: "${{ github.event.inputs.TargetDatabase }}"
+          TargetEntitiesType: "primary"
           SourceConfigVersion: "${{ github.event.inputs.SourceConfigVersion }}"
           ModernisationPlatformEnvironmentManagement: "${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}"
 
@@ -162,20 +164,31 @@ jobs:
       - name: Get Database Name
         id: get_db_name
         run: |
-             # In Non-Delius environments the database name must be supplied since there is
-             # potentially more than one primary database per host.   (Optional for Delius)
-             if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_name }}" ]
-             then
-                TARGET_DB_NAME_SWITCH="--extra-vars target_db_name=${{ steps.setup_primary_db_access.outputs.target_db_name }}"
-             fi
-             # In Non-Delius environments the target primary database host must be supplied since the
-             # Ansible inventory does not segregate primary and and standby hosts.  (Optional for Delius)
-             if [ ! -z "${{ steps.setup_primary_db_access.outputs.target_db_host }}" ]
-             then
-                TARGET_DB_HOST_LIMIT="--limit ${{ steps.setup_primary_db_access.outputs.target_db_host }}"
-             fi
-             ansible-playbook \
-                 -i $inventory \
-                 --extra-vars "target=${{ steps.setup_primary_db_access.outputs.target_group }}" \
-                 ${TARGET_DB_NAME_SWITCH} ${TARGET_DB_HOST_LIMIT} \
-                 --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml
+              if [ ${{ steps.setup_db_system_access.outputs.batch_count }} -ne 1 ];
+              then
+                  echo "Multiple primary databases are not expected for the same database system."
+                  exit 1
+              fi
+              # For Non-Delius environments create host-->database mapping based on the batch targets.
+              # These are called the batched target pairs as they are an array of hostname/database pairs.
+              if [ ! -z "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" ]
+              then
+                # When targeting primary databases, we expect a single batch containing a single database
+                CURRENT_BATCH=$(echo "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" | base64 -d | jq --compact-output '.[0]')
+                DATABASE_COUNT=$(echo ${CURRENT_BATCH} | jq 'length')
+                if [ ${DATABASE_COUNT} -ne 1 ]
+                then
+                   echo "Only one primary database should be supplied - found ${CURRENT_BATCH}."
+                   exit 1
+                fi
+                TARGET_HOST_LIMIT="--limit "$(echo ${CURRENT_BATCH} | jq -r '.[0] | keys[0]')
+                HOST_TO_DB_MAP="--extra-vars target_db_names='${CURRENT_BATCH}'"
+                echo "Limiting to hosts:    ${TARGET_HOST_LIMIT}"
+                echo "Host to database map: ${HOST_TO_DB_MAP}"
+              fi
+               ansible-playbook \
+                    -i $inventory \
+                    --extra-vars "application=${{ steps.setup_db_system_access.outputs.application }}" \
+                    --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
+                    ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
+                    --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml

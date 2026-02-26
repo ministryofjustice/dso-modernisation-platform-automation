@@ -1,0 +1,183 @@
+name: Oracle System - Get All Database Names
+description: "Read-only workflow to access all databases and read their names"
+
+# This workflow is intended for development and debug purposes only.   It allows us to
+# connect to all databases in a system and read their names.  This allows us to check inventory
+# and name resolution of primary databases across environments without making any changes
+# to them.
+
+# TargetDatabase options may be generated using the oracle_db_generate_target_list.yml workflow
+# using the "system" option
+
+on:
+  workflow_dispatch:
+    inputs:
+      TargetSystem:
+        description: 'Database Systems for Getting Name'
+        default: ''
+        type: choice
+        options:
+          - 'corporate_staff_rostering_preproduction      (IWFM_TAF)=>PPIWFM'
+          - 'corporate_staff_rostering_production   (IWFM_TAF)=>PIWFM,DRIWFM'
+          - 'corporate_staff_rostering_test               (IWFM_TAF)=>T3IWFM'
+          - 'delius_core_development_dev_delius                             '
+          - 'delius_core_preproduction_preprod_delius                       '
+          - 'delius_core_preproduction_stage_delius                         '
+          - 'delius_core_test_test_delius                                   '
+          - 'delius_mis_development_dev_boe                                 '
+          - 'delius_mis_development_dev_dsd                                 '
+          - 'delius_mis_development_dev_mis                                 '
+          - 'delius_mis_preproduction_preprod_boe                           '
+          - 'delius_mis_preproduction_preprod_dsd                           '
+          - 'delius_mis_preproduction_preprod_mis                           '
+          - 'delius_mis_preproduction_stage_boe                             '
+          - 'delius_mis_preproduction_stage_dsd                             '
+          - 'delius_mis_preproduction_stage_mis                             '
+          - 'hmpps_oem_development                                     EMREP'
+          - 'hmpps_oem_development                                    RCVCAT'
+          - 'hmpps_oem_preproduction                                   EMREP'
+          - 'hmpps_oem_preproduction                                  RCVCAT'
+          - 'hmpps_oem_production                                      EMREP'
+          - 'hmpps_oem_production                                     RCVCAT'
+          - 'hmpps_oem_test                                            EMREP'
+          - 'hmpps_oem_test                                           RCVCAT'
+          - 'nomis_combined_reporting_preproduction     (BIAUD_TAF)=>PPBIAUD'
+          - 'nomis_combined_reporting_preproduction     (BISYS_TAF)=>PPBISYS'
+          - 'nomis_combined_reporting_production        (BIAUD_TAF)=>PDBIAUD'
+          - 'nomis_combined_reporting_production     (BIPAUDP_CFG)=>PDBIPAUD'
+          - 'nomis_combined_reporting_production      (BIPAUD_TAF)=>PDBIPAUD'
+          - 'nomis_combined_reporting_production     (BIPSYSP_CFG)=>PDBIPSYS'
+          - 'nomis_combined_reporting_production      (BIPSYS_TAF)=>PDBIPSYS'
+          - 'nomis_combined_reporting_production        (BISYS_TAF)=>PDBISYS'
+          - 'nomis_combined_reporting_production          (DRBIAUD)=>DRBIAUD'
+          - 'nomis_combined_reporting_production        (DRBIPAUD)=>DRBIPAUD'
+          - 'nomis_combined_reporting_production        (DRBIPSYS)=>DRBIPSYS'
+          - 'nomis_combined_reporting_production          (DRBISYS)=>DRBISYS'
+          - 'nomis_combined_reporting_test              (BIAUD_TAF)=>T1BIAUD'
+          - 'nomis_combined_reporting_test            (BIPAUD_TAF)=>T1BIPAUD'
+          - 'nomis_combined_reporting_test            (BIPSYS_TAF)=>T1BIPSYS'
+          - 'nomis_combined_reporting_test              (BISYS_TAF)=>T1BISYS'
+          - 'nomis_preproduction                      (CNMAUD_TAF)=>PPCNMAUD'
+          - 'nomis_preproduction                      (MIS_TAF)=>PPMIS,LSMIS'
+          - 'nomis_preproduction                            (NDH_TAF)=>PPNDH'
+          - 'nomis_preproduction                (NOMIS_APIRO)=>PPCNOM,LSCNOM'
+          - 'nomis_preproduction                  (NOMIS_TAF)=>PPCNOM,LSCNOM'
+          - 'nomis_preproduction               (OLDNOMIS_TAF)=>PPCNOM,LSCNOM'
+          - 'nomis_preproduction                     (OR_TAF)=>PPCNOM,LSCNOM'
+          - 'nomis_preproduction                        (TRDAT_TAF)=>PPTRDAT'
+          - 'nomis_production                         (CNMAUD_TAF)=>PDCNMAUD'
+          - 'nomis_production                         (MIS_TAF)=>PDMIS,DRMIS'
+          - 'nomis_production                         (NDH_TAF)=>PDNDH,DRNDH'
+          - 'nomis_production                          (NOMIS_APIRO)=>PDCNOM'
+          - 'nomis_production                      (NOMIS_APIRO_TAF)=>DRCNOM'
+          - 'nomis_production                     (NOMIS_TAF)=>PDCNOM,DRCNOM'
+          - 'nomis_production                  (OLDNOMIS_TAF)=>PDCNOM,DRCNOM'
+          - 'nomis_production                        (OR_TAF)=>PDCNOM,DRCNOM'
+          - 'nomis_production                   (TRDAT_TAF)=>PDTRDAT,DRTRDAT'
+          - 'nomis_test                               (CNMAUD_TAF)=>T1CNMAUD'
+          - 'nomis_test                                     (MIS_TAF)=>T1MIS'
+          - 'nomis_test                               (NDH_TAF)=>T1NDH,T2NDH'
+          - 'nomis_test                  (NOMIS_APIRO)=>T1CNOM,T2CNOM,T3CNOM'
+          - 'nomis_test                    (NOMIS_TAF)=>T1CNOM,T2CNOM,T3CNOM'
+          - 'nomis_test                 (OLDNOMIS_TAF)=>T1CNOM,T2CNOM,T3CNOM'
+          - 'nomis_test                                 (ORSYS_TAF)=>T1ORSYS'
+          - 'nomis_test                       (OR_TAF)=>T1CNOM,T2CNOM,T3CNOM'
+          - 'nomis_test                         (TRDAT_TAF)=>T1TRDAT,T2TRDAT'
+          - 'oasys_national_reporting_preproduction     (BIAUD_TAF)=>PPBOAUD'
+          - 'oasys_national_reporting_preproduction     (BISYS_TAF)=>PPBOSYS'
+          - 'oasys_national_reporting_production        (BIAUD_TAF)=>PDBOAUD'
+          - 'oasys_national_reporting_production        (BISYS_TAF)=>PDBOSYS'
+          - 'oasys_national_reporting_test              (BIAUD_TAF)=>T2BOAUD'
+          - 'oasys_national_reporting_test              (BISYS_TAF)=>T2BOSYS'
+          - 'oasys_preproduction                        (BIAUD_TAF)=>PPBOAUD'
+          - 'oasys_preproduction                        (BISYS_TAF)=>PPBOSYS'
+          - 'oasys_preproduction                        (OASYS_TAF)=>PPOASYS'
+          - 'oasys_preproduction                    (ONRAUD42_TAF)=>PPBIAD42'
+          - 'oasys_preproduction                    (ONRSYS42_TAF)=>PPBISY42'
+          - 'oasys_production                   (BOAUD_TAF)=>PDBOAUD,DRBOAUD'
+          - 'oasys_production                   (BOSYS_TAF)=>PDBOSYS,DRBOSYS'
+          - 'oasys_production                  (PRACTICE_OASYS_TAF)=>PROASYS'
+          - 'oasys_production                  (TRAINING_OASYS_TAF)=>TROASYS'
+          - 'oasys_test                                 (BIAUD_TAF)=>T2BOAUD'
+          - 'oasys_test                                 (BISYS_TAF)=>T2BOSYS'
+          - 'oasys_test                    (MISTRANS_TAF)=>T1MISTRN,T2MISTRN'
+          - 'oasys_test                      (OASREP_TAF)=>T1OASREP,T2OASREP'
+          - 'oasys_test                               (OASYS2_TAF)=>T2OASYS2'
+          - 'oasys_test                (OASYS_TAF)=>T1OASYS,T1AZBIPI,T2OASYS'
+          - 'oasys_test                      (ONRAUD_TAF)=>T1ONRAUD,T2ONRAUD'
+          - 'oasys_test                     (ONRBODS_TAF)=>T1ONRBDS,T2ONRBDS'
+          - 'oasys_test                      (ONRSYS_TAF)=>T1ONRSYS,T2ONRSYS'
+      SourceConfigVersion:
+        description: 'Branch/tag/commit for modernisation-platform-configuration-management'
+        type: string
+        default: 'main'
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+env:
+  ansible_config: operations/playbooks/ansible.cfg
+  inventory: inventory/ansible
+
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ministryofjustice/hmpps-delius-operational-automation:0.80.0
+    timeout-minutes: 1440
+    continue-on-error: false
+    steps:
+
+      - name: Checkout Local Repo to get Composite Action
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Database System Access
+        id: setup_db_system_access
+        uses: ./.github/actions/setup_oracle_target_access
+        with:
+          TargetEntities: "${{ github.event.inputs.TargetSystem }}"
+          TargetEntitiesType: "system"
+          SourceConfigVersion: "${{ github.event.inputs.SourceConfigVersion }}"
+          ModernisationPlatformEnvironmentManagement: "${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}"
+
+      - name: Fetch Required Roles & Site
+        uses: actions/checkout@v6.0.2
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ansible/roles/oracle-db-get-name
+            ansible/site.yml
+          path: roles
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
+          fetch-depth: 0
+
+      - name: Get Database Name
+        id: get_db_name
+        run: |
+             # For Non-Delius environments the hosts and databases are supplied as a list of
+             # pairs (since there is potentially more than one database per host, the 
+             # database name must be supplied).  Additionally these lists are batched to 
+             # prevent attempting to run Ansible on the same host more than once concurrently.
+             
+             for BATCH in $(seq 0 $(( ${{ steps.setup_db_system_access.outputs.batch_count }} - 1 )) ); do
+               echo "Processing batch $(( BATCH + 1 )) of ${{ steps.setup_db_system_access.outputs.batch_count }}"
+               # For Non-Delius environments create host-->database mapping based on the batch targets.
+               # These are called the batched target pairs as they are an array of hostname/database pairs.
+               if [ ! -z "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" ]
+               then
+                  CURRENT_BATCH=$(echo "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" | base64 -d | jq --compact-output --argjson idx "$BATCH" '.[$idx]')
+                  TARGET_HOST_LIMIT="--limit "$(echo ${CURRENT_BATCH} | jq -r '.[] | keys[]' | paste -sd,)
+                  HOST_TO_DB_MAP="--extra-vars target_db_names='${CURRENT_BATCH}'"
+                  echo "Limiting to hosts:    ${TARGET_HOST_LIMIT}"
+                  echo "Host to database map: ${HOST_TO_DB_MAP}"
+               fi
+               ansible-playbook \
+                    -i $inventory \
+                    --extra-vars "application=${{ steps.setup_db_system_access.outputs.application }}" \
+                    --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
+                    ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
+                    --extra-vars force_role=oracle-db-get-name roles/ansible/site.yml
+             done
