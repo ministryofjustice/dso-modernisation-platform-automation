@@ -164,7 +164,7 @@ jobs:
       - name: Install SQL Plan Baselines
         id: install_sql_plan_baselines
         run: |
-              if [ ${{ steps.setup_db_system_access.outputs.BATCH_COUNT }} -ne 1 ];
+              if [ ${{ steps.setup_db_system_access.outputs.batch_count }} -ne 1 ];
               then
                   echo "Multiple primary databases are not expected for the same database system."
                   exit 1
@@ -174,9 +174,9 @@ jobs:
               if [ ! -z "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" ]
               then
                 # When targeting primary databases, we expect a single batch containing a single database
-                CURRENT_BATCH=$(echo "${{ steps.setup_db_system_access.outputs.BATCHED_TARGET_PAIRS }}" | base64 -d | jq --compact-output '.[0]')
+                CURRENT_BATCH=$(echo "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" | base64 -d | jq --compact-output '.[0]')
                 DATABASE_COUNT=$(echo ${CURRENT_BATCH} | jq 'length')
-                if [ ${DATABASE_COUNT} -ne 1]
+                if [ ${DATABASE_COUNT} -ne 1 ]
                 then
                    echo "Only one primary database should be supplied - found ${CURRENT_BATCH}."
                    exit 1

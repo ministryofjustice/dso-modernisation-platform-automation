@@ -139,7 +139,7 @@ runs:
                        HOST_NAME=$(echo $PAIR | cut -f1 -d:)
                        DATABASE=$(echo $PAIR | cut -f2 -d:)
                        # Detect where the HOST_NAME has been specified as an IP instead
-                       if [[ $HOST_NAME =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(:|$) ]]; then
+                       if [[ $HOST_NAME =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
                           RESOLVED_IP=$(jq -r --arg ip "${HOST_NAME}" '
                                     ._meta.hostvars
                                     | to_entries
