@@ -33,7 +33,11 @@ outputs:
    application:
        description: "Name of the application to which this system belongs"
        value: ${{ steps.prepareinventorynames.outputs.application }}
-
+   application_tier:
+       description: "Tier of application: development|test|stage|preproduction|production"
+       value: ${{ steps.prepareinventorynames.outputs.application_tier }}
+       
+       
 runs:
    using: composite
    steps:
@@ -68,6 +72,7 @@ runs:
           # a comma-separated list with only one element.
           TARGET_DATABASES=$(echo ${TARGET_ENTITIES} | awk '{last=$NF; sub(/.*=>/,"",last); print last}')
           TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}
+          APPLICATION_TIER=$(echo ${TARGET_ENVIRONMENT} | awk -F_ '{print $NF}')
           case "${TARGET_ENVIRONMENT}" in
             delius_core_*|delius_mis_*)
                     case "${TARGET_ENVIRONMENT}" in
@@ -84,6 +89,11 @@ runs:
                     else
                        TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_dbs
                     fi
+                    # Delius contains multiple tiers within the same AWS account
+                    # (For example, stage & pre-prod are in preproduction)
+                    # So we refer to the 2nd last component of the environment name, rather than the last
+                    # and overwrite this variable
+                    APPLICATION_TIER=$(echo ${TARGET_ENVIRONMENT} | awk -F_ '{print $NF-1}')
                     # For Delius we only ever have one database per host so we do not need
                     # to batch up the Ansible runs to prevent running more than once
                     # on the same host concurrently.   Therefore hard code batch count to 1.
@@ -235,11 +245,15 @@ runs:
           esac
 
           # ENVIRONMENT_TYPE is one of development|test|preproduction|production
+          # NOTE:  This refers to the Modernisation Platform environment type
+          #        and may differ from the application tier where a single AWS account
+          #        contains multiple tiers (such as stage & pre-prod tiers in the preproduction environment)
           ENVIRONMENT_TYPE=$(echo ${TARGET_ENVIRONMENT} \
                               | sed 's/_/-/g' | awk -F${APPLICATION}- '{print $2}' \
                               | awk -F- '{print $1}' )
           echo "target_environment=${TARGET_ENVIRONMENT}"        >> $GITHUB_OUTPUT
           echo "target_group=${TARGET_GROUP}"                    >> $GITHUB_OUTPUT
+          echo "application_tier=${APPLICATION_TIER}"            >> $GITHUB_OUTPUT
           echo "application=${APPLICATION}"                      >> $GITHUB_OUTPUT
           echo "environment_type=${ENVIRONMENT_TYPE}"            >> $GITHUB_OUTPUT
           echo "account_name=${APPLICATION}-${ENVIRONMENT_TYPE}" >> $GITHUB_OUTPUT
@@ -252,6 +266,7 @@ runs:
             cat <<-EOECHO
                target_environment        : ${{ steps.prepareinventorynames.outputs.target_environment }}
                target_group              : ${{ steps.prepareinventorynames.outputs.target_group }}
+               application_tier:         : ${{ steps.prepareinventorynames.outputs.appplication_tier }}
                application               : ${{ steps.prepareinventorynames.outputs.application }}
                environment_type          : ${{ steps.prepareinventorynames.outputs.environment_type }}
                account_name              : ${{ steps.prepareinventorynames.outputs.account_name }}
