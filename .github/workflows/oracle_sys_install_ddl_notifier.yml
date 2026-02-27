@@ -154,7 +154,9 @@ jobs:
           repository: ministryofjustice/modernisation-platform-configuration-management
           sparse-checkout-cone-mode: false
           sparse-checkout: |
-            ansible/roles/oracle-db-get-name
+            ansible/roles/oracle-db-ddl-notifier
+            ansible/roles/oracle-oms-setup
+            ansible/roles/
             ansible/site.yml
           path: roles
           ref: ${{ github.event.inputs.SourceConfigVersion }}
