@@ -73,7 +73,6 @@ runs:
           TARGET_DATABASES=$(echo ${TARGET_ENTITIES} | awk '{last=$NF; sub(/.*=>/,"",last); print last}')
           TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}
           APPLICATION_TIER=$(echo ${TARGET_ENVIRONMENT} | awk -F_ '{print $NF}')
-          echo "Application Tier initially set to ${APPLICATION_TIER}"
           case "${TARGET_ENVIRONMENT}" in
             delius_core_*|delius_mis_*)
                     case "${TARGET_ENVIRONMENT}" in
@@ -95,7 +94,6 @@ runs:
                     # So we refer to the 2nd last component of the environment name, rather than the last
                     # and overwrite this variable
                     APPLICATION_TIER=$(echo ${TARGET_ENVIRONMENT} | awk -F_ '{print $(NF-1)}')
-                              echo "Application Tier changed to ${APPLICATION_TIER}"
                     # For Delius we only ever have one database per host so we do not need
                     # to batch up the Ansible runs to prevent running more than once
                     # on the same host concurrently.   Therefore hard code batch count to 1.
@@ -268,7 +266,7 @@ runs:
             cat <<-EOECHO
                target_environment        : ${{ steps.prepareinventorynames.outputs.target_environment }}
                target_group              : ${{ steps.prepareinventorynames.outputs.target_group }}
-               application_tier:         : ${{ steps.prepareinventorynames.outputs.appplication_tier }}
+               application_tier:         : ${{ steps.prepareinventorynames.outputs.application_tier }}
                application               : ${{ steps.prepareinventorynames.outputs.application }}
                environment_type          : ${{ steps.prepareinventorynames.outputs.environment_type }}
                account_name              : ${{ steps.prepareinventorynames.outputs.account_name }}
