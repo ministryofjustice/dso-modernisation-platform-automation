@@ -160,8 +160,8 @@ jobs:
           ref: ${{ github.event.inputs.SourceConfigVersion }}
           fetch-depth: 0
 
-      - name: Get Database Name
-        id: get_db_name
+      - name: Install DDL Notifier
+        id: install_ddl_notifier
         run: |
              # For Non-Delius environments the hosts and databases are supplied as a list of
              # pairs (since there is potentially more than one database per host, the 
