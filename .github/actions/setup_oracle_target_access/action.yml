@@ -34,7 +34,7 @@ outputs:
        description: "Name of the application to which this system belongs"
        value: ${{ steps.prepareinventorynames.outputs.application }}
    application_tier:
-       description: "Tier of application: development|test|stage|preproduction|production"
+       description: "Tier of application: dev|test|stage|preprod|prod (derived from TARGET_ENVIRONMENT)"
        value: ${{ steps.prepareinventorynames.outputs.application_tier }}
        
        
