@@ -5,9 +5,11 @@ on:
   workflow_dispatch:
   schedule:
     # files are created on share just before 06:00 localtime
-    # schedule pipeline at 06:30 localtime - 2 entries to deal with BST/GMT
+    # schedule pipeline at 06:30 and 12:20 localtime - 2 entries to deal with BST/GMT
     - cron: "30 5 * * *"
     - cron: "30 6 * * *"
+    - cron: "20 11 * * *"
+    - cron: "20 12 * * *"
 
 permissions:
   id-token: write
@@ -34,12 +36,12 @@ jobs:
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
             fi
-            if [[ "${cron_time}" == '30 5 * * *' ]]; then
+            if [[ "${cron_time}" == '30 5 * * *' || "${cron_time}" == '20 11 * * *' ]]; then
               if ((is_bst == 0)); then
                 account_name=
                 ec2_name_tag=
               fi
-            elif [[ "${cron_time}" == '30 6 * * *' ]]; then
+            elif [[ "${cron_time}" == '30 6 * * *' || "${cron_time}" == '20 12 * * *']]; then
               if ((is_bst == 1)); then
                 account_name=
                 ec2_name_tag=
