@@ -41,7 +41,7 @@ jobs:
                 account_name=
                 ec2_name_tag=
               fi
-            elif [[ "${cron_time}" == '30 6 * * *' || "${cron_time}" == '20 12 * * *']]; then
+            elif [[ "${cron_time}" == '30 6 * * *' || "${cron_time}" == '20 12 * * *' ]]; then
               if ((is_bst == 1)); then
                 account_name=
                 ec2_name_tag=
