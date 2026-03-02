@@ -13,9 +13,6 @@ description: "Install trigger and package to send Slack Notifications of DDL Cha
 # using the "system" option
 
 on:
-  push:
-    branches:
-      - DBA-1166-TRACKER
   workflow_dispatch:
     inputs:
       TargetSystem:
@@ -186,9 +183,9 @@ jobs:
                     -i $inventory \
                     --extra-vars "application=${{ steps.setup_db_system_access.outputs.application }}" \
                     --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
-                    --extra-vars "target_environment=${{ steps.setup_db_system_access.outputs.target_group }}" \
+                    --extra-vars "target_environment=${{ steps.setup_db_system_access.outputs.target_environment }}" \
                     --extra-vars "application_tier=${{ steps.setup_db_system_access.outputs.application_tier }}" \
-                    --extra-vars "account_name=${{ steps.setup_db_system_access.outputs.application_tier }}" \
+                    --extra-vars "account_name=${{ steps.setup_db_system_access.outputs.account_name }}" \
                     ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
                     --extra-vars force_role=oracle-db-ddl-notifier roles/ansible/site.yml
              done
