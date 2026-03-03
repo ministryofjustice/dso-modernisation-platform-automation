@@ -27,6 +27,13 @@ on:
         type: number
         description: How many seconds to wait in stage 3 after disabling of services
         default: 600
+      force:
+        type: choice
+        description: Run all stages regardless of whether there is an error when true
+        default: false
+        options:
+          - true
+          - false
       dryrun:
         type: choice
         description: Dryrun mode (leave as false unless testing)
@@ -92,6 +99,9 @@ jobs:
             onr_environments="${{ github.event.inputs.onr_environment }}"
             stop_or_shutdown="${{ github.event.inputs.stop_or_shutdown }}"
             script_flags="$script_flags -3 ${{ github.event.inputs.pipeline_stage3_wait_secs }}"
+            if [[ "${{ github.event.inputs.force }}" == "true" ]]; then
+              script_flags="$script_flags -f"
+            fi
             if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
               script_flags="$script_flags -d"
               gha_environment="oasys-national-reporting-dryrun"

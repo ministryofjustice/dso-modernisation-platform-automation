@@ -16,6 +16,13 @@ on:
         type: string
         description: limit which stages of the start process to run, 0-8 or all
         default: all
+      force:
+        type: choice
+        description: Run all stages regardless of whether there is an error when true
+        default: false
+        options:
+          - true
+          - false
       dryrun:
         type: choice
         description: Dryrun mode (leave as false unless testing)
@@ -78,6 +85,9 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             ncr_environments="${{ github.event.inputs.ncr_environment }}"
             pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
+            if [[ "${{ github.event.inputs.force }}" == "true" ]]; then
+              script_flags="$script_flags -f"
+            fi
             if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
               script_flags="$script_flags -d"
             fi
