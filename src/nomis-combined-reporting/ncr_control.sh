@@ -862,9 +862,6 @@ do_pipeline() {
     if [[ $2 == "all" || $2 == *0* ]]; then
       pipeline_stage_lb "STAGE 0: private-lb:   " enable  private -1
       pipeline_stage_lb "STAGE 0: public-lb:    " enable  public  -1
-      if (( EXPECTED_WEBADMIN_EC2_COUNT != 0 )); then
-        pipeline_stage_lb "STAGE 0: admin-lb:     " enable  admin   -1
-      fi
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
       pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO $WEBADMIN_EC2_INFO"
