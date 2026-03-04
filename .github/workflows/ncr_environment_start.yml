@@ -18,7 +18,7 @@ on:
         default: all
       force:
         type: choice
-        description: Run all stages regardless of whether there is an error when true
+        description: Force run all stages except disabling end user maintenance mode
         default: false
         options:
           - true
