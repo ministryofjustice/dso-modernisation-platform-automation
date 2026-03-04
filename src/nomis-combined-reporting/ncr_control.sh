@@ -7,6 +7,7 @@
 
 DRYRUN=0
 VERBOSE=0
+FORCE=0
 LBS=
 EC2_RUN_SCRIPT=$(dirname "$0")/../run_script_on_ec2.sh
 STAGE3_WAIT_SECS=600
@@ -26,6 +27,7 @@ Where <opts>:
   -3 wait_secs              Override default pipeline stage 3 wait time
   -d                        Enable dryrun for maintenance mode commands
   -e <env>                  Set nomis-combined-reporting environment
+  -f                        Force start/stop
   -l public|private|admin   Select LB endpoint(s)
   -v                        Enable verbose debug
 
@@ -444,7 +446,7 @@ lb_wait_for_target_group_health() {
 }
 
 do_env() {
-  set -eo pipefail
+  set -o pipefail
 
   if [[ $1 == "aws-account" ]]; then
     echo "$AWS_ACCOUNT"
@@ -454,7 +456,7 @@ do_env() {
 }
 
 do_ec2() {
-  set -eo pipefail
+  set -o pipefail
 
   set_env_ec2_info
   if [[ $1 == "display" ]]; then
@@ -469,7 +471,7 @@ do_ec2() {
 }
 
 do_lb() {
-  set -eo pipefail
+  set -o pipefail
 
   if [[ -z $LBS ]]; then
     error "No LB specified"
@@ -522,14 +524,14 @@ do_lb() {
 }
 
 pipeline_stage_lb() {
-  # enable/disable LB maintenance mode
+  # enable/disable LB maintenance mode
   local lb_cmd
   local lb_env
   local lb_expected_state
   local lb_ec2_count
   local logprefix
 
-  set -eo pipefail
+  set -o pipefail
 
   logprefix=$1
   lb_cmd=$2
@@ -578,7 +580,7 @@ pipeline_stage_ec2_start() {
   local n
   local logprefix
 
-  set -eo pipefail
+  set -o pipefail
 
   logprefix="$1"
   export TIMEOUT_SECS=$2
@@ -668,7 +670,7 @@ pipeline_stage_ec2_stop_or_shutdown() {
   local n
   local stop_or_shutdown
 
-  set -eo pipefail
+  set -o pipefail
 
   logprefix="$1"
   stop_or_shutdown=$2
@@ -776,7 +778,7 @@ pipeline_stage_bip() {
   local stage
   local waitsecs
 
-  set -eo pipefail
+  set -o pipefail
 
   logprefix="$1"
   bipcmd=$2
@@ -817,39 +819,93 @@ pipeline_stage_bip() {
 }
 
 do_pipeline() {
-  set -eo pipefail
+  set -o pipefail
 
-  set_env_ec2_info
+  if ! set_env_ec2_info; then
+    return 1
+  fi
+
+  failed=0
+  stage1_exitcode=0
+  stage2_exitcode=0
+  stage3_exitcode=0
+  stage4_exitcode=0
+  stage5_exitcode=0
+  stage6_exitcode=0
+  stage7_exitcode=0
 
   if [[ $1 == "start" ]]; then
     if [[ $2 == "all" || $2 == *8* ]]; then
-      pipeline_stage_ec2_start "STAGE 8: " "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"
-      if [[ -n $APP_EC2_INFO ]]; then
-        pipeline_stage_ec2_start "STAGE 8: " "$STAGE8_TIMEOUT_SECS" "$APP_EC2_INFO"
+      if ! pipeline_stage_ec2_start "STAGE 8: " "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"; then
+        return 1
       fi
-      set_env_ec2_info
+      if [[ -n $APP_EC2_INFO ]]; then
+        if ! pipeline_stage_ec2_start "STAGE 8: " "$STAGE8_TIMEOUT_SECS" "$APP_EC2_INFO"; then
+          return 1
+        fi
+      fi
+      if ! set_env_ec2_info; then
+        return 1
+      fi
     fi
     if [[ $2 == "all" || $2 == *7* ]]; then
-      pipeline_stage_bip "STAGE 7: " start 7 "$STAGE7_TIMEOUT_SECS" "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 7: " start 7 "$STAGE7_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage7_exitcode=$?
+      if [[ $stage7_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage7_exitcode
+      fi
     fi
     if [[ $2 == "all" || $2 == *6* ]]; then
-      pipeline_stage_bip "STAGE 6: " start 6 "$STAGE6_TIMEOUT_SECS" "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 6: " start 6 "$STAGE6_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage6_exitcode=$?
+      if [[ $stage6_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage6_exitcode
+      fi
     fi
     if [[ $2 == "all" || $2 == *5* ]]; then
-      pipeline_stage_bip "STAGE 5: " start 5 "$STAGE5_TIMEOUT_SECS" "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 5: " start 5 "$STAGE5_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage5_exitcode=$?
+      if [[ $stage5_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage5_exitcode
+      fi
     fi
     if [[ $2 == "all" || $2 == *4* ]]; then
-      pipeline_stage_bip "STAGE 4: " start 4 "$STAGE4_TIMEOUT_SECS" "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 4: " start 4 "$STAGE4_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage4_exitcode=$?
+      if [[ $stage4_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage4_exitcode
+      fi
     fi
     if [[ $2 == "all" || $2 == *3* ]]; then
-      pipeline_stage_bip "STAGE 3: " start 3 "$STAGE3_TIMEOUT_SECS" "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 3: " start 3 "$STAGE3_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage3_exitcode=$?
+      if [[ $stage3_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage3_exitcode
+      fi
     fi
     if [[ $2 == "all" || $2 == *2* ]]; then
-      pipeline_stage_bip "STAGE 2: " start 2 "$STAGE2_TIMEOUT_SECS" "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 2: " start 2 "$STAGE2_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage2_exitcode=$?
+      if [[ $stage2_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage2_exitcode
+      fi
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
-      pipeline_stage_ec2_start "STAGE 1: " "$STAGE1_TIMEOUT_SECS" "$WEB_EC2_INFO $WEBADMIN_EC2_INFO"
-      set_env_ec2_info
+      pipeline_stage_ec2_start "STAGE 1: " "$STAGE1_TIMEOUT_SECS" "$WEB_EC2_INFO $WEBADMIN_EC2_INFO" || stage1_exitcode=$?
+      if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage1_exitcode
+      fi
+      if ! set_env_ec2_info; then
+        stage1_exitcode=1
+        if [[ $FORCE != 1 ]]; then
+          return 1
+        fi
+      fi
+    fi
+    [[ $stage7_exitcode != 0 ]] && echo "STAGE 7: FAILED" && failed=1
+    [[ $stage6_exitcode != 0 ]] && echo "STAGE 6: FAILED" && failed=1
+    [[ $stage5_exitcode != 0 ]] && echo "STAGE 5: FAILED" && failed=1
+    [[ $stage4_exitcode != 0 ]] && echo "STAGE 4: FAILED" && failed=1
+    [[ $stage3_exitcode != 0 ]] && echo "STAGE 3: FAILED" && failed=1
+    [[ $stage2_exitcode != 0 ]] && echo "STAGE 2: FAILED" && failed=1
+    [[ $stage1_exitcode != 0 ]] && echo "STAGE 1: FAILED" && failed=1
+    if [[ $failed == 1 ]]; then
+      echo "SKIPPING STAGE 0 as some stages have failed"
+      return 1
     fi
     if [[ $2 == "all" || $2 == *0* ]]; then
       if (( EXPECTED_WEBADMIN_EC2_COUNT != 0 )); then
@@ -862,47 +918,95 @@ do_pipeline() {
     if [[ $2 == "all" || $2 == *0* ]]; then
       pipeline_stage_lb "STAGE 0: private-lb:   " enable  private -1
       pipeline_stage_lb "STAGE 0: public-lb:    " enable  public  -1
-      if (( EXPECTED_WEBADMIN_EC2_COUNT != 0 )); then
-        pipeline_stage_lb "STAGE 0: admin-lb:     " enable  admin   -1
-      fi
+      # Don't bother enabling maintenance mode for admin URL
+      # if (( EXPECTED_WEBADMIN_EC2_COUNT != 0 )); then
+      #   pipeline_stage_lb "STAGE 0: admin-lb:     " enable  admin   -1
+      # fi
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
-      pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO $WEBADMIN_EC2_INFO"
-      set_env_ec2_info
+      pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO $WEBADMIN_EC2_INFO" || stage1_exitcode=$?
+      if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage1_exitcode
+      fi
+      if ! set_env_ec2_info; then
+        stage1_exitcode=1
+        if [[ $FORCE != 1 ]]; then
+          return 1
+        fi
+      fi
     fi
     if [[ $2 == "all" || $2 == *2* ]]; then
-      pipeline_stage_bip "STAGE 2: " stop 2 "$STAGE2_TIMEOUT_SECS" "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 2: " stop 2 "$STAGE2_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage2_exitcode=$?
+      if [[ $stage2_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage2_exitcode
+      fi
     fi
     if [[ $2 == "all" || $2 == *3* ]]; then
-      pipeline_stage_bip "STAGE 3: " stop 3 "$STAGE3_TIMEOUT_SECS" "$CMS_EC2_INFO" "$STAGE3_WAIT_SECS"
+      pipeline_stage_bip "STAGE 3: " stop 3 "$STAGE3_TIMEOUT_SECS" "$CMS_EC2_INFO" "$STAGE3_WAIT_SECS" || stage3_exitcode=$?
+      if [[ $stage3_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage3_exitcode
+      fi
     fi
     if [[ $2 == "all" || $2 == *4* ]]; then
-      pipeline_stage_bip "STAGE 4: " stop 4 "$STAGE4_TIMEOUT_SECS" "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 4: " stop 4 "$STAGE4_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage4_exitcode=$?
+      if [[ $stage4_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage4_exitcode
+      fi
     fi
     if [[ $2 == "all" || $2 == *5* ]]; then
-      pipeline_stage_bip "STAGE 5: " stop 5 "$STAGE5_TIMEOUT_SECS" "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 5: " stop 5 "$STAGE5_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage5_exitcode=$?
+      if [[ $stage5_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage5_exitcode
+      fi
     fi
     if [[ $2 == "all" || $2 == *6* ]]; then
-      pipeline_stage_bip "STAGE 6: " stop 6 "$STAGE6_TIMEOUT_SECS" "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 6: " stop 6 "$STAGE6_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage6_exitcode=$?
+      if [[ $stage6_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage6_exitcode
+      fi
     fi
     if [[ $2 == "all" || $2 == *7* ]]; then
-      pipeline_stage_bip "STAGE 7: " stop 7 "$STAGE7_TIMEOUT_SECS" "$CMS_EC2_INFO"
+      pipeline_stage_bip "STAGE 7: " stop 7 "$STAGE7_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage7_exitcode=$?
+      if [[ $stage7_exitcode != 0 && $FORCE != 1 ]]; then
+        return $stage7_exitcode
+      fi
     fi
+
+    failed=0
+    [[ $stage1_exitcode != 0 ]] && echo "STAGE 1: FAILED" && failed=1
+    [[ $stage2_exitcode != 0 ]] && echo "STAGE 2: FAILED" && failed=1
+    [[ $stage3_exitcode != 0 ]] && echo "STAGE 3: FAILED" && failed=1
+    [[ $stage4_exitcode != 0 ]] && echo "STAGE 4: FAILED" && failed=1
+    [[ $stage5_exitcode != 0 ]] && echo "STAGE 5: FAILED" && failed=1
+    [[ $stage6_exitcode != 0 ]] && echo "STAGE 6: FAILED" && failed=1
+    [[ $stage7_exitcode != 0 ]] && echo "STAGE 7: FAILED" && failed=1
+
     if [[ $2 == "all" || $2 == *8* ]]; then
       if [[ -n $APP_EC2_INFO ]]; then
-        pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$STAGE8_TIMEOUT_SECS"  "$APP_EC2_INFO"
+        if ! pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$STAGE8_TIMEOUT_SECS" "$APP_EC2_INFO"; then
+          return 1
+        fi
       fi
-      pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"
-      set_env_ec2_info
+      if ! pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"; then
+        return 1
+      fi
+      if ! set_env_ec2_info; then
+        return 1
+      fi
     fi
+
+    if [[ $failed == 1 ]]; then
+      return 1
+    fi
+
   else
     usage
   fi
 }
 
 main() {
-  set -eo pipefail
-  while getopts "3:de:l:v" opt; do
+  set -o pipefail
+  while getopts "3:de:fl:v" opt; do
       case $opt in
           3)
               STAGE3_WAIT_SECS=${OPTARG}
@@ -912,6 +1016,9 @@ main() {
               ;;
           e)
               NCR_ENVIRONMENT=${OPTARG}
+              ;;
+          f)
+              FORCE=1
               ;;
           l)
               LBS=${OPTARG}
@@ -934,14 +1041,18 @@ main() {
 
   if [[ -z $1 ]]; then
     usage
+    exit 2
   fi
 
   if [[ -z $NCR_ENVIRONMENT ]]; then
     error "Please specify environment"
     usage
+    exit 2
   fi
 
-  set_env_variables
+  if ! set_env_variables; then
+    exit 1
+  fi
 
   if [[ $1 == "env" ]]; then
     shift

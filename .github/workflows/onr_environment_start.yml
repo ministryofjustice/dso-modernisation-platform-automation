@@ -16,6 +16,13 @@ on:
         type: string
         description: limit which stages of the start process to run, 0-8 or all
         default: all
+      force:
+        type: choice
+        description: Force run all stages except disabling end user maintenance mode
+        default: false
+        options:
+          - true
+          - false
       dryrun:
         type: choice
         description: Dryrun mode (leave as false unless testing)
@@ -43,7 +50,7 @@ permissions:
   id-token: write
   contents: read
 
-run-name: "ONR Environent Start (${{ inputs.onr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+run-name: "ONR Environment Start (${{ inputs.onr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
 
 jobs:
   setup:
@@ -78,6 +85,9 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             onr_environments="${{ github.event.inputs.onr_environment }}"
             pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
+            if [[ "${{ github.event.inputs.force }}" == "true" ]]; then
+              script_flags="$script_flags -f"
+            fi
             if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
               script_flags="$script_flags -d"
             fi
