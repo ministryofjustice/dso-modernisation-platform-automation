@@ -58,7 +58,7 @@ permissions:
   id-token: write
   contents: read
 
-run-name: "ONR Environent Stop (${{ inputs.onr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+run-name: "ONR Environment Stop (${{ inputs.onr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
 
 jobs:
   setup:

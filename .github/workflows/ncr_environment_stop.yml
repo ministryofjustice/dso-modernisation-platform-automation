@@ -58,7 +58,7 @@ permissions:
   id-token: write
   contents: read
 
-run-name: "NCR Environent Stop (${{ inputs.ncr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+run-name: "NCR Environment Stop (${{ inputs.ncr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
 
 jobs:
   setup:

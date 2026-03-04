@@ -50,7 +50,7 @@ permissions:
   id-token: write
   contents: read
 
-run-name: "ONR Environent Start (${{ inputs.onr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+run-name: "ONR Environment Start (${{ inputs.onr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
 
 jobs:
   setup:
