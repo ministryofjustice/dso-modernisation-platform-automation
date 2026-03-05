@@ -9,6 +9,7 @@ on:
         description: Which environment to start
         default: test
         options:
+          - development
           - test
           - preproduction
           - production
@@ -77,11 +78,11 @@ jobs:
             fi
             if [[ "${cron_time}" == '45 5 * * 1-5' || "${cron_time}" == '45 7 * * 1-5' ]]; then
               if ((is_bst == 1)); then
-                jumpservers="test preproduction"
+                jumpservers="development test preproduction"
               fi
             elif [[ "${cron_time}" == '45 6 * * 1-5' || "${cron_time}" == '45 8 * * 1-5' ]]; then
               if ((is_bst == 0)); then
-                jumpservers="test preproduction"
+                jumpservers="development test preproduction"
               fi
             else
               echo "Unsupported schedule cron ${cron_time}"
