@@ -33,7 +33,9 @@ get_account_name() {
   local jumpserver
 
   jumpserver=$1
-  if [[ $jumpserver =~ "t1" || $jumpserver =~ "test" ]]; then
+  if [[ $jumpserver =~ "dev" ]]; then
+    account_name="hmpps-domain-services-development"
+  elif [[ $jumpserver =~ "t1" || $jumpserver =~ "test" ]]; then
     account_name="hmpps-domain-services-test"
   elif [[ $jumpserver =~ "pp" || $jumpserver =~ "preproduction" ]]; then
     account_name="hmpps-domain-services-preproduction"
@@ -50,7 +52,9 @@ get_url() {
   local jumpserver
 
   jumpserver=$1
-  if [[ $jumpserver =~ "t1" || $jumpserver =~ "test" ]]; then
+  if [[ $jumpserver =~ "dev" ]]; then
+    url=""
+  elif [[ $jumpserver =~ "t1" || $jumpserver =~ "test" ]]; then
     url="rdweb1.test.hmpps-domain.service.justice.gov.uk"
   elif [[ $jumpserver =~ "pp" || $jumpserver =~ "preproduction" ]]; then
     url="rdweb1.preproduction.hmpps-domain.service.justice.gov.uk"
@@ -72,6 +76,9 @@ get_lb_rule_json() {
 
   if ! url=$(get_url "$1"); then
     return 1
+  fi
+  if [[ -z $url ]]; then
+    return 0
   fi
   lbarn=$(aws elbv2 describe-load-balancers | jq -r '.LoadBalancers[] | select(.LoadBalancerName=="'$LBNAME'").LoadBalancerArn')
   if [[ -z $lbarn ]]; then
@@ -102,6 +109,11 @@ disable_maintenance_mode() {
   if ! lbrulejson=$(get_lb_rule_json "$1"); then
     return 1
   fi
+  if [[ -z $lbrulejson ]]; then
+    echo "No LB in environment to disable" >&2
+    return 0
+  fi
+
   rulearn=$(jq -r '.RuleArn' <<< "$lbrulejson")
   priority=$(jq -r '.Priority' <<< "$lbrulejson")
   num_priorities=$(wc -l <<< "$priority" | tr -d " ")
@@ -132,6 +144,10 @@ enable_maintenance_mode() {
   if ! lbrulejson=$(get_lb_rule_json "$1"); then
     return 1
   fi
+  if [[ -z $lbrulejson ]]; then
+    echo "No LB in environment to enable" >&2
+    return 0
+  fi
   rulearn=$(jq -r '.RuleArn' <<< "$lbrulejson")
   priority=$(jq -r '.Priority' <<< "$lbrulejson")
   num_priorities=$(wc -l <<< "$priority" | tr -d " ")
@@ -160,6 +176,10 @@ get_maintenance_mode() {
 
   if ! lbrulejson=$(get_lb_rule_json "$1"); then
     return 1
+  fi
+  if [[ -z $lbrulejson ]]; then
+    echo "none"
+    return 0
   fi
   priority=$(jq -r '.Priority' <<< "$lbrulejson")
   num_priorities=$(wc -l <<< "$priority" | tr -d " ")
