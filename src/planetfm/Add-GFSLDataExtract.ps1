@@ -71,6 +71,9 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
     }
   }
 
+  Write-Output "Preparing upload in utf8 encoding"
+  $ansi = [System.Text.Encoding]::GetEncoding(1252)
+  $utf8 = New-Object System.Text.UTF8Encoding($false)
   foreach ($file in $files) {
     $filePath = $file.FullName
     $filePathUtf8 = $file.FullName + ".utf8"
