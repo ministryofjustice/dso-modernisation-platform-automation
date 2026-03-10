@@ -64,7 +64,7 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
       $uri = "$destinationUrl/$fileName"
 
       try {
-        # Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream"
+        Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream"
         Write-Host "Uploaded $fileName successfully."
       }
       catch {
@@ -90,8 +90,8 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
       try {
         $content = [System.IO.File]::ReadAllText($filePath, $ansi)
         [System.IO.File]::WriteAllText($filePathUtf8, $content, $utf8)
-        # Invoke-RestMethod -Uri $uri -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream"
-        Write-Host "Uploaded $filePathUtf8 -> $fileName successfully."
+        Invoke-RestMethod -Uri $uri -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream"
+        Write-Host "Uploaded $fileName successfully."
         Remove-Item $filePathUtf8
       }
       catch {
