@@ -63,8 +63,28 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
     $uri = "$destinationUrl/$fileName"
 
     try {
-      Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream"
+      # Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream"
       Write-Host "Uploaded $fileName successfully."
+    }
+    catch {
+      Write-Error "Failed to upload $fileName. Error: $_"
+    }
+  }
+
+  foreach ($file in $files) {
+    $filePath = $file.FullName
+    $filePathUtf8 = $file.FullName + ".utf8"
+
+    # URL-encode the file name if necessary
+    $fileName = [System.Net.WebUtility]::UrlEncode(($file.Name + ".utf8"))
+    $uri = "$destinationUrl/$fileName"
+
+    try {
+      $content = [System.IO.File]::ReadAllText($filePath, $ansi)
+      [System.IO.File]::WriteAllText($filePathUtf8, $content, $utf8)
+      # Invoke-RestMethod -Uri $uri -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream"
+      Write-Host "Uploaded $fileName successfully."
+      Remove-Item $filePathUtf8
     }
     catch {
       Write-Error "Failed to upload $fileName. Error: $_"
