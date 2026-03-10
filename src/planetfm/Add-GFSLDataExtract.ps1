@@ -56,18 +56,22 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
   $files = Get-ChildItem -Path $sourcePath
 
   foreach ($file in $files) {
-    $filePath = $file.FullName
+    if ($file.Extension -eq ".txt") {
+      $filePath = $file.FullName
 
-    # URL-encode the file name if necessary
-    $fileName = [System.Net.WebUtility]::UrlEncode($file.Name)
-    $uri = "$destinationUrl/$fileName"
+      # URL-encode the file name if necessary
+      $fileName = [System.Net.WebUtility]::UrlEncode($file.Name)
+      $uri = "$destinationUrl/$fileName"
 
-    try {
-      # Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream"
-      Write-Host "Uploaded $fileName successfully."
-    }
-    catch {
-      Write-Error "Failed to upload $fileName. Error: $_"
+      try {
+        # Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream"
+        Write-Host "Uploaded $fileName successfully."
+      }
+      catch {
+        Write-Error "Failed to upload $fileName. Error: $_"
+      }
+    } else {
+      Write-Output ("Ignoring " + $file.Name)
     }
   }
 
@@ -75,22 +79,24 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
   $ansi = [System.Text.Encoding]::GetEncoding(1252)
   $utf8 = New-Object System.Text.UTF8Encoding($false)
   foreach ($file in $files) {
-    $filePath = $file.FullName
-    $filePathUtf8 = $file.FullName + ".utf8"
+    if ($file.Extension -eq ".txt") {
+      $filePath = $file.FullName
+      $filePathUtf8 = [io.path]::ChangeExtension($filePath, "utf8")
 
-    # URL-encode the file name if necessary
-    $fileName = [System.Net.WebUtility]::UrlEncode(($file.Name + ".utf8"))
-    $uri = "$destinationUrl/$fileName"
+      # URL-encode the file name if necessary
+      $fileName = [System.Net.WebUtility]::UrlEncode([io.path]::ChangeExtension($file.Name, "utf8"))
+      $uri = "$destinationUrl/$fileName"
 
-    try {
-      $content = [System.IO.File]::ReadAllText($filePath, $ansi)
-      [System.IO.File]::WriteAllText($filePathUtf8, $content, $utf8)
-      # Invoke-RestMethod -Uri $uri -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream"
-      Write-Host "Uploaded $fileName successfully."
-      Remove-Item $filePathUtf8
-    }
-    catch {
-      Write-Error "Failed to upload $fileName. Error: $_"
+      try {
+        $content = [System.IO.File]::ReadAllText($filePath, $ansi)
+        [System.IO.File]::WriteAllText($filePathUtf8, $content, $utf8)
+        # Invoke-RestMethod -Uri $uri -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream"
+        Write-Host "Uploaded $filePathUtf8 -> $fileName successfully."
+        Remove-Item $filePathUtf8
+      }
+      catch {
+        Write-Error "Failed to upload $fileName. Error: $_"
+      }
     }
   }
 }
