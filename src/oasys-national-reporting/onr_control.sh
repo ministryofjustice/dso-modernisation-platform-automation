@@ -468,7 +468,7 @@ do_lb() {
 }
 
 pipeline_stage_lb() {
-  # enable/disable LB maintenance mode
+  # enable/disable LB maintenance mode
   local lb_cmd
   local lb_env
   local lb_expected_state
@@ -931,7 +931,7 @@ do_pipeline() {
 
 main() {
   set -o pipefail
-  while getopts "3:de:v" opt; do
+  while getopts "3:de:fv" opt; do
       case $opt in
           3)
               STAGE3_WAIT_SECS=${OPTARG}
@@ -941,6 +941,9 @@ main() {
               ;;
           e)
               ONR_ENVIRONMENT=${OPTARG}
+              ;;
+          f)
+              FORCE=1
               ;;
           v)
               VERBOSE=1
