@@ -97,7 +97,7 @@ jobs:
           aws-region: eu-west-2
 
       - name: Azure Login
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
 
