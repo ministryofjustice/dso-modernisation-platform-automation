@@ -134,7 +134,7 @@ jobs:
           ansible -m ping ${{ inputs.target_db_hostname }}
         working-directory: configuration-management/ansible
       - name: Download control file
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4.3.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v4.3.0
         with:
           name: control_file
       - name: Copy control file to target
