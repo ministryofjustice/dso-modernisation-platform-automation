@@ -138,7 +138,7 @@ set_env_ec2_info() {
   if ! WEB_EC2_INFO=$(get_ec2_server_info "server-type" "onr-web"); then
     return 1
   fi
-  WEBSSO_EC2_INFO=$(get_ec2_server_info "server-type" "onr-websso")
+  WEBSSO_EC2_INFO=$(get_ec2_server_info "server-type" "onr-webssoTEST")
 
   if [[ -z $CMS_EC2_INFO ]]; then
     error "Error retrieving EC2 info with onr-bip-cms tags"
