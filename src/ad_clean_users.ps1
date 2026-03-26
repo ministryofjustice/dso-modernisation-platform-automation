@@ -96,16 +96,26 @@ $deletedCount = 0
 $errorCount = 0
 
 # Get the secret value
-import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
+# import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
+# $hostname = (Get-ComputerInfo).CsName
+# $adSecretValue = Get-SECSecretValue -SecretId "/$($hostname.ToLower())/dso-ad-computer-cleanup" -Region "eu-west-2"
+# $adSecretValue = $adSecretValue.SecretString | ConvertFrom-Json
+# $username = $adSecretValue.username
+# $password = $adSecretValue.password
+# $domainname = $adSecretValue.domainname
+# $password = ConvertTo-SecureString -String $password -AsPlainText -Force
+
+# $adcred = New-Object System.Management.Automation.PSCredential ($username, $Password)
+
+Import-Module -Name AWS.Tools.SecretsManager
 $hostname = (Get-ComputerInfo).CsName
 $adSecretValue = Get-SECSecretValue -SecretId "/$($hostname.ToLower())/dso-ad-computer-cleanup" -Region "eu-west-2"
 $adSecretValue = $adSecretValue.SecretString | ConvertFrom-Json
 $username = $adSecretValue.username
-$password = $adSecretValue.password
 $domainname = $adSecretValue.domainname
-$password = ConvertTo-SecureString -String $password -AsPlainText -Force
+$securePassword = ConvertTo-SecureString -String $adSecretValue.password -AsPlainText -Force
 
-$adcred = New-Object System.Management.Automation.PSCredential ($username, $Password)
+$adcred = New-Object System.Management.Automation.PSCredential ($username, $securePassword)
 
 # ============================================================================
 # FUNCTIONS
