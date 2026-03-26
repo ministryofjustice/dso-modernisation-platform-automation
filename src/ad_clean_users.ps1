@@ -35,7 +35,7 @@
 
 .NOTES
     Author: Dave Kent
-    Version: 2.0
+    Version: 3.0 # adds group enumeration for accounts in the deletion scope.
     Requires: ActiveDirectory PowerShell module
 #>
 
@@ -128,14 +128,37 @@ function Test-ExcludedOU {
     )
     
     foreach ($excludedPath in $excludedPaths) {
-        # Check if the user's DN contains the excluded path
-        # This will match the OU and all nested sub-OUs
         if ($UserDN -like "*,$excludedPath") {
-            # Write-Host "  [EXCLUDED] Matched: $UserDN" -ForegroundColor DarkGray
             return $true
         }
     }
     return $false
+}
+
+function Get-UserGroupMembership {
+    param(
+        [string[]]$MemberOf
+    )
+    
+    if (-not $MemberOf -or $MemberOf.Count -eq 0) {
+        return "None"
+    }
+
+    $groupNames = foreach ($groupDN in $MemberOf) {
+        try {
+            (Get-ADGroup -Identity $groupDN -ErrorAction Stop).Name
+        }
+        catch {
+            # Fall back to parsing the CN from the DN if the lookup fails
+            if ($groupDN -match '^CN=([^,]+)') {
+                $matches[1]
+            } else {
+                $groupDN
+            }
+        }
+    }
+
+    return ($groupNames -join ", ")
 }
 
 # ============================================================================
@@ -159,7 +182,7 @@ Write-Host "========================================`n" -ForegroundColor Cyan
 Write-Log -Message "=== AD User Management Script Started ===" -LogPath $disableLogPath
 Write-Log -Message "Mode: $(if ($DryRunBool) { 'DRY-RUN' } else { 'LIVE' })" -LogPath $disableLogPath
 Write-Log -Message "Disable Threshold: $DisableDays days" -LogPath $disableLogPath
-Write-Log -Message "Delete Threshold: $DeleteDays days" -LogPath $disableLogPath
+Write-Log -Message "Delete Threshold: $DeleteDays days" -LogPath $deleteLogPath
 
 Write-Log -Message "=== AD User Management Script Started ===" -LogPath $deleteLogPath
 Write-Log -Message "Mode: $(if ($DryRunBool) { 'DRY-RUN' } else { 'LIVE' })" -LogPath $deleteLogPath
@@ -171,8 +194,9 @@ try {
     $null = Get-ADOrganizationalUnit -Identity $userOUFull -ErrorAction Stop
     
     # Get all user accounts from the specified OU and sub-OUs
+    # MemberOf added to capture group membership for deletion logging
     Write-Host "Retrieving user accounts from $userOUFull..." -ForegroundColor Cyan
-    $allUsers = Get-ADUser -Filter * -SearchBase $userOUFull -SearchScope Subtree -Properties LastLogonDate, DistinguishedName, Enabled
+    $allUsers = Get-ADUser -Filter * -SearchBase $userOUFull -SearchScope Subtree -Properties LastLogonDate, DistinguishedName, Enabled, MemberOf
     
     $totalUsers = $allUsers.Count
     Write-Host "Found $totalUsers user account(s) in OU structure.`n" -ForegroundColor Green
@@ -196,13 +220,14 @@ try {
     
     foreach ($user in $usersToDelete) {
         $lastLogon = if ($user.LastLogonDate) { $user.LastLogonDate.ToString('yyyy-MM-dd HH:mm:ss') } else { "Never" }
-        $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | OU: $($user.DistinguishedName)"
+        $groupMembership = Get-UserGroupMembership -MemberOf $user.MemberOf
+        $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | Groups: $groupMembership | OU: $($user.DistinguishedName)"
         
         try {
             if ($DryRunBool) {
                 Write-Log -Message "[DRY-RUN] Would DELETE: $logMessage" -LogPath $deleteLogPath
             } else {
-                Remove-ADUser -Identity $user -Confirm:$false -ErrorAction Stop  -Credential $adcred
+                Remove-ADUser -Identity $user -Confirm:$false -ErrorAction Stop -Credential $adcred
                 Write-Log -Message "[DELETED] $logMessage" -LogPath $deleteLogPath
             }
             $deletedCount++
@@ -218,7 +243,6 @@ try {
     # ========================================
     Write-Host "`nProcessing accounts for disabling (inactive > $DisableDays days)..." -ForegroundColor Cyan
     
-    # Only process accounts that haven't been deleted and are currently enabled
     $usersToDisable = $users | Where-Object {
         $_.Enabled -eq $true -and
         $_.LastLogonDate -and
@@ -298,7 +322,6 @@ if ($DryRunBool) {
     Write-Host "Set -DryRun False to execute changes.`n" -ForegroundColor Yellow
 }
 
-# Return exit code based on errors
 if ($errorCount -gt 0) {
     exit 1
 } else {
