@@ -35,28 +35,28 @@
 
 .NOTES
     Author: Dave Kent
-    Version: 2.0
+    Version: 3.0 # adds group enumeration for accounts in the deletion scope.
     Requires: ActiveDirectory PowerShell module
 #>
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$DryRun = "True",
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [int]$DisableDays = 180,
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [int]$DeleteDays = 360,
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$UserOU = "OU=Users,OU=NOMS RBAC",
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string[]]$ServiceAccountsOUPaths = @("OU=Service"),
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$LogBasePath = "C:\ScriptLogs\ADUserManagement"
 )
 
@@ -127,15 +127,41 @@ function Test-ExcludedOU {
         [string]$UserDN
     )
     
+    # Check if the user's DN contains the excluded path, this will match the OU and all nested sub-OUs
     foreach ($excludedPath in $excludedPaths) {
-        # Check if the user's DN contains the excluded path
-        # This will match the OU and all nested sub-OUs
         if ($UserDN -like "*,$excludedPath") {
             # Write-Host "  [EXCLUDED] Matched: $UserDN" -ForegroundColor DarkGray
             return $true
         }
     }
     return $false
+}
+
+function Get-UserGroupMembership {
+    param(
+        [string[]]$MemberOf
+    )
+    
+    if (-not $MemberOf -or $MemberOf.Count -eq 0) {
+        return "None"
+    }
+
+    $groupNames = foreach ($groupDN in $MemberOf) {
+        try {
+            (Get-ADGroup -Identity $groupDN -ErrorAction Stop).Name
+        }
+        catch {
+            # Fall back to parsing the CN from the DN if the lookup fails
+            if ($groupDN -match '^CN=([^,]+)') {
+                $matches[1]
+            }
+            else {
+                $groupDN
+            }
+        }
+    }
+
+    return ($groupNames -join ", ")
 }
 
 # ============================================================================
@@ -159,7 +185,7 @@ Write-Host "========================================`n" -ForegroundColor Cyan
 Write-Log -Message "=== AD User Management Script Started ===" -LogPath $disableLogPath
 Write-Log -Message "Mode: $(if ($DryRunBool) { 'DRY-RUN' } else { 'LIVE' })" -LogPath $disableLogPath
 Write-Log -Message "Disable Threshold: $DisableDays days" -LogPath $disableLogPath
-Write-Log -Message "Delete Threshold: $DeleteDays days" -LogPath $disableLogPath
+Write-Log -Message "Delete Threshold: $DeleteDays days" -LogPath $deleteLogPath
 
 Write-Log -Message "=== AD User Management Script Started ===" -LogPath $deleteLogPath
 Write-Log -Message "Mode: $(if ($DryRunBool) { 'DRY-RUN' } else { 'LIVE' })" -LogPath $deleteLogPath
@@ -171,8 +197,9 @@ try {
     $null = Get-ADOrganizationalUnit -Identity $userOUFull -ErrorAction Stop
     
     # Get all user accounts from the specified OU and sub-OUs
+    # MemberOf added to capture group membership for deletion logging
     Write-Host "Retrieving user accounts from $userOUFull..." -ForegroundColor Cyan
-    $allUsers = Get-ADUser -Filter * -SearchBase $userOUFull -SearchScope Subtree -Properties LastLogonDate, DistinguishedName, Enabled
+    $allUsers = Get-ADUser -Filter * -SearchBase $userOUFull -SearchScope Subtree -Properties LastLogonDate, DistinguishedName, Enabled, MemberOf
     
     $totalUsers = $allUsers.Count
     Write-Host "Found $totalUsers user account(s) in OU structure.`n" -ForegroundColor Green
@@ -196,13 +223,15 @@ try {
     
     foreach ($user in $usersToDelete) {
         $lastLogon = if ($user.LastLogonDate) { $user.LastLogonDate.ToString('yyyy-MM-dd HH:mm:ss') } else { "Never" }
-        $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | OU: $($user.DistinguishedName)"
+        $groupMembership = Get-UserGroupMembership -MemberOf $user.MemberOf
+        $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | Groups: $groupMembership | OU: $($user.DistinguishedName)"
         
         try {
             if ($DryRunBool) {
                 Write-Log -Message "[DRY-RUN] Would DELETE: $logMessage" -LogPath $deleteLogPath
-            } else {
-                Remove-ADUser -Identity $user -Confirm:$false -ErrorAction Stop  -Credential $adcred
+            }
+            else {
+                Remove-ADUser -Identity $user -Confirm:$false -ErrorAction Stop -Credential $adcred
                 Write-Log -Message "[DELETED] $logMessage" -LogPath $deleteLogPath
             }
             $deletedCount++
@@ -233,7 +262,8 @@ try {
         try {
             if ($DryRunBool) {
                 Write-Log -Message "[DRY-RUN] Would DISABLE: $logMessage" -LogPath $disableLogPath
-            } else {
+            }
+            else {
                 Disable-ADAccount -Identity $user -ErrorAction Stop -Credential $adcred
                 Write-Log -Message "[DISABLED] $logMessage" -LogPath $disableLogPath
             }
@@ -301,6 +331,7 @@ if ($DryRunBool) {
 # Return exit code based on errors
 if ($errorCount -gt 0) {
     exit 1
-} else {
+}
+else {
     exit 0
 }
