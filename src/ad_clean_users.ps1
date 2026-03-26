@@ -41,22 +41,22 @@
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$DryRun = "True",
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [int]$DisableDays = 180,
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [int]$DeleteDays = 360,
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$UserOU = "OU=Users,OU=NOMS RBAC",
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string[]]$ServiceAccountsOUPaths = @("OU=Service"),
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$LogBasePath = "C:\ScriptLogs\ADUserManagement"
 )
 
@@ -127,8 +127,10 @@ function Test-ExcludedOU {
         [string]$UserDN
     )
     
+    # Check if the user's DN contains the excluded path, this will match the OU and all nested sub-OUs
     foreach ($excludedPath in $excludedPaths) {
         if ($UserDN -like "*,$excludedPath") {
+            # Write-Host "  [EXCLUDED] Matched: $UserDN" -ForegroundColor DarkGray
             return $true
         }
     }
@@ -152,7 +154,8 @@ function Get-UserGroupMembership {
             # Fall back to parsing the CN from the DN if the lookup fails
             if ($groupDN -match '^CN=([^,]+)') {
                 $matches[1]
-            } else {
+            }
+            else {
                 $groupDN
             }
         }
@@ -226,7 +229,8 @@ try {
         try {
             if ($DryRunBool) {
                 Write-Log -Message "[DRY-RUN] Would DELETE: $logMessage" -LogPath $deleteLogPath
-            } else {
+            }
+            else {
                 Remove-ADUser -Identity $user -Confirm:$false -ErrorAction Stop -Credential $adcred
                 Write-Log -Message "[DELETED] $logMessage" -LogPath $deleteLogPath
             }
@@ -243,6 +247,7 @@ try {
     # ========================================
     Write-Host "`nProcessing accounts for disabling (inactive > $DisableDays days)..." -ForegroundColor Cyan
     
+    # Only process accounts that haven't been deleted and are currently enabled
     $usersToDisable = $users | Where-Object {
         $_.Enabled -eq $true -and
         $_.LastLogonDate -and
@@ -257,7 +262,8 @@ try {
         try {
             if ($DryRunBool) {
                 Write-Log -Message "[DRY-RUN] Would DISABLE: $logMessage" -LogPath $disableLogPath
-            } else {
+            }
+            else {
                 Disable-ADAccount -Identity $user -ErrorAction Stop -Credential $adcred
                 Write-Log -Message "[DISABLED] $logMessage" -LogPath $disableLogPath
             }
@@ -322,8 +328,10 @@ if ($DryRunBool) {
     Write-Host "Set -DryRun False to execute changes.`n" -ForegroundColor Yellow
 }
 
+# Return exit code based on errors
 if ($errorCount -gt 0) {
     exit 1
-} else {
+}
+else {
     exit 0
 }
