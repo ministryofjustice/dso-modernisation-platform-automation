@@ -2,7 +2,8 @@
 # INACTIVE COMPUTER MANAGEMENT
 #-------------------------------
 #Import-Module ActiveDirectory
-import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
+#import-Module -Name AWSPowerShell -MinimumVersion 4.1.807 # removed 27/03/25
+Import-Module -Name AWS.Tools.SecretsManager # for AWSPowerShell v5 compatibility
 $currentDate = Get-Date -F 'dd-MM-yy'
 
 # Get the secret value
@@ -10,11 +11,10 @@ $hostname = (Get-ComputerInfo).CsName
 $adSecretValue = Get-SECSecretValue -SecretId "/$($hostname.ToLower())/dso-ad-computer-cleanup" -Region "eu-west-2"
 $adSecretValue = $adSecretValue.SecretString | ConvertFrom-Json
 $username = $adSecretValue.username
-$password = $adSecretValue.password
 $domainname = $adSecretValue.domainname
-$password = ConvertTo-SecureString -String $password -AsPlainText -Force
+$securePassword = ConvertTo-SecureString -String $adSecretValue.password -AsPlainText -Force
 
-$adcred = New-Object System.Management.Automation.PSCredential ($username, $Password)
+$adcred = New-Object System.Management.Automation.PSCredential ($username, $securePassword)
 
 $LogDir = "C:\ScriptLogs"
 Expand-Archive -Path "$LogDir\all_logs.zip" -DestinationPath $LogDir -Force

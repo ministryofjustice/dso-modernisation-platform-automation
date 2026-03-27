@@ -96,16 +96,16 @@ $deletedCount = 0
 $errorCount = 0
 
 # Get the secret value
-import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
+# import-Module -Name AWSPowerShell -MinimumVersion 4.1.807
+Import-Module -Name AWS.Tools.SecretsManager
 $hostname = (Get-ComputerInfo).CsName
 $adSecretValue = Get-SECSecretValue -SecretId "/$($hostname.ToLower())/dso-ad-computer-cleanup" -Region "eu-west-2"
 $adSecretValue = $adSecretValue.SecretString | ConvertFrom-Json
 $username = $adSecretValue.username
-$password = $adSecretValue.password
 $domainname = $adSecretValue.domainname
-$password = ConvertTo-SecureString -String $password -AsPlainText -Force
+$securePassword = ConvertTo-SecureString -String $adSecretValue.password -AsPlainText -Force
 
-$adcred = New-Object System.Management.Automation.PSCredential ($username, $Password)
+$adcred = New-Object System.Management.Automation.PSCredential ($username, $securePassword)
 
 # ============================================================================
 # FUNCTIONS
@@ -199,7 +199,7 @@ try {
     # Get all user accounts from the specified OU and sub-OUs
     # MemberOf added to capture group membership for deletion logging
     Write-Host "Retrieving user accounts from $userOUFull..." -ForegroundColor Cyan
-    $allUsers = Get-ADUser -Filter * -SearchBase $userOUFull -SearchScope Subtree -Properties LastLogonDate, DistinguishedName, Enabled, MemberOf
+    $allUsers = Get-ADUser -Filter * -SearchBase $userOUFull -SearchScope Subtree -Properties LastLogonDate, logonCount, DistinguishedName, Enabled, MemberOf, whenCreated, LastLogon
     
     $totalUsers = $allUsers.Count
     Write-Host "Found $totalUsers user account(s) in OU structure.`n" -ForegroundColor Green
@@ -218,13 +218,15 @@ try {
     Write-Host "Processing accounts for deletion (inactive > $DeleteDays days)..." -ForegroundColor Cyan
     
     $usersToDelete = $users | Where-Object {
-        $_.LastLogonDate -and $_.LastLogonDate -lt $deleteThreshold
+        ($_.LastLogonDate -and $_.LastLogonDate -lt $deleteThreshold) -or
+        (($_.LastLogon -eq 0 -or $_.LastLogon -eq $null) -and $_.whenCreated -lt $deleteThreshold)
     }
     
     foreach ($user in $usersToDelete) {
         $lastLogon = if ($user.LastLogonDate) { $user.LastLogonDate.ToString('yyyy-MM-dd HH:mm:ss') } else { "Never" }
+        $neverUsed = (-not $user.LastLogonDate -and $user.logonCount -eq 0)
         $groupMembership = Get-UserGroupMembership -MemberOf $user.MemberOf
-        $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | Groups: $groupMembership | OU: $($user.DistinguishedName)"
+        $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | LogonCount: $($user.logonCount) | WhenCreated: $($user.whenCreated.ToString('yyyy-MM-dd')) | NeverUsed: $neverUsed | Groups: $groupMembership | OU: $($user.DistinguishedName)"
         
         try {
             if ($DryRunBool) {
@@ -247,17 +249,18 @@ try {
     # ========================================
     Write-Host "`nProcessing accounts for disabling (inactive > $DisableDays days)..." -ForegroundColor Cyan
     
-    # Only process accounts that haven't been deleted and are currently enabled
+    # Only process accounts that haven't been deleted and are currently enabled include unused aged accounts
     $usersToDisable = $users | Where-Object {
-        $_.Enabled -eq $true -and
-        $_.LastLogonDate -and
-        $_.LastLogonDate -lt $disableThreshold -and
-        $_.LastLogonDate -ge $deleteThreshold
+        $_.Enabled -eq $true -and (
+            ($_.LastLogonDate -and $_.LastLogonDate -lt $disableThreshold -and $_.LastLogonDate -ge $deleteThreshold) -or
+            (($_.LastLogon -eq 0 -or $_.LastLogon -eq $null) -and $_.whenCreated -lt $disableThreshold -and $_.whenCreated -ge $deleteThreshold)
+        )
     }
     
     foreach ($user in $usersToDisable) {
         $lastLogon = if ($user.LastLogonDate) { $user.LastLogonDate.ToString('yyyy-MM-dd HH:mm:ss') } else { "Never" }
-        $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | OU: $($user.DistinguishedName)"
+        $neverUsed = (-not $user.LastLogonDate -and $user.logonCount -eq 0)
+        $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | LogonCount: $($user.logonCount) | WhenCreated: $($user.whenCreated.ToString('yyyy-MM-dd')) | NeverUsed: $neverUsed | OU: $($user.DistinguishedName)"
         
         try {
             if ($DryRunBool) {
@@ -312,6 +315,10 @@ Write-Host "========================================`n" -ForegroundColor Cyan
 # Write summary to logs
 $summaryMessage = @"
 === EXECUTION SUMMARY ===
+Notes: lastLogonDate is a replicated attribute that AD syncs across DCs every 14 days, so there's an inherent staleness window. 
+       logonCount is per-DC and non-replicated, meaning an account that has logged on against a different DC could show 0 on the DC we're querying. 
+       lastLogonDate being null is the stronger signal to rely on
+       logonCount -eq 0 check acts as an additional visual report than the decision condition, which keeps our logic safe.
 Mode: $(if ($DryRunBool) { 'DRY-RUN' } else { 'LIVE' })
 Total Accounts Scanned: $totalUsers
 Excluded Accounts: $excludedCount
