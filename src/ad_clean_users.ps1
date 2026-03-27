@@ -199,7 +199,7 @@ try {
     # Get all user accounts from the specified OU and sub-OUs
     # MemberOf added to capture group membership for deletion logging
     Write-Host "Retrieving user accounts from $userOUFull..." -ForegroundColor Cyan
-    $allUsers = Get-ADUser -Filter * -SearchBase $userOUFull -SearchScope Subtree -Properties LastLogonDate, DistinguishedName, Enabled, MemberOf, whenCreated, LastLogon
+    $allUsers = Get-ADUser -Filter * -SearchBase $userOUFull -SearchScope Subtree -Properties LastLogonDate, logonCount, DistinguishedName, Enabled, MemberOf, whenCreated, LastLogon
     
     $totalUsers = $allUsers.Count
     Write-Host "Found $totalUsers user account(s) in OU structure.`n" -ForegroundColor Green
@@ -318,6 +318,7 @@ $summaryMessage = @"
 Notes: lastLogonDate is a replicated attribute that AD syncs across DCs every 14 days, so there's an inherent staleness window. 
        logonCount is per-DC and non-replicated, meaning an account that has logged on against a different DC could show 0 on the DC we're querying. 
        lastLogonDate being null is the stronger signal to rely on
+       logonCount -eq 0 check acts as an additional visual report than the decision condition, which keeps our logic safe.
 Mode: $(if ($DryRunBool) { 'DRY-RUN' } else { 'LIVE' })
 Total Accounts Scanned: $totalUsers
 Excluded Accounts: $excludedCount
