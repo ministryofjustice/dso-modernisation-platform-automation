@@ -76,7 +76,7 @@ jobs:
           echo "dryrun=${dryrun}" >> $GITHUB_OUTPUT
 
       - name: Upload aws cli commands artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: "aws_cli_commands.sh"
           path: aws_cli_commands.sh
@@ -135,7 +135,7 @@ jobs:
 
       - name: Download aws_cli_commands.sh Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: "aws_cli_commands.sh"
           path: dso-modernisation-platform-automation
@@ -155,7 +155,7 @@ jobs:
 
       - name: Upload aws_cli_commands.sh Artifact
         if: ${{ steps.check.outputs.cleanup == 1 }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: "aws_cli_commands.sh"
           path: dso-modernisation-platform-automation/aws_cli_commands.sh
@@ -170,7 +170,7 @@ jobs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
     steps:
       - name: Download Expiry Artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: "aws_cli_commands.sh"
 
@@ -231,7 +231,7 @@ jobs:
           aws-region: eu-west-2
 
       - name: Download Expiry Artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: "aws_cli_commands.sh"
 

@@ -148,7 +148,7 @@ jobs:
           exit $exitcode
 
       - name: Upload results for ${{ matrix.account_name }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
             name: account-${{ matrix.account_name }}
             path: |
@@ -161,7 +161,7 @@ jobs:
 
     steps:
         - name: Download all artifacts
-          uses: actions/download-artifact@v8
+          uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
           with:
             merge-multiple: true
         
@@ -196,7 +196,7 @@ jobs:
             cat ./all-alerts.txt
             
         - name: Upload consolidated results
-          uses: actions/upload-artifact@v7
+          uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
           with:
             name: consolidated-accounts
             path: |
