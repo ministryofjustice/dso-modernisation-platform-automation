@@ -14,6 +14,10 @@ on:
           - pp
           - pd
           - dr
+      filename:
+        type: string
+        description: "Optionally specify a given .dat file e.g. C_NOMIS_OFFENDER_DDMMYYYY_01.dat"
+        default: ''
       script_flags:
         type: string
         description: "Flags to pass to ndh-cdecopy script: a=Azure s=s3"
@@ -75,6 +79,9 @@ jobs:
             if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
               script_flags="$script_flags -d"
               dryrun=1
+            fi
+            if [[ -n "${{ github.event.inputs.filename }}" ]]; then
+              script_flags="$script_flags -f {{ github.event.inputs.filename }}"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             cron_time="${{ github.event.schedule }}"
