@@ -14,6 +14,10 @@ on:
           - pp
           - pd
           - dr
+      filename:
+        type: string
+        description: "Optionally specify a given .dat file e.g. C_NOMIS_OFFENDER_DDMMYYYY_01.dat"
+        default: ''
       script_flags:
         type: string
         description: "Flags to pass to ndh-cdecopy script: a=Azure s=s3"
@@ -28,8 +32,10 @@ on:
 
   schedule:
     # runs at 00:20 local time. 2 entries to deal with BST/GMT
+    # the 03:20 is a backup in case github doesn't trigger the 00:20 run for some reason
     - cron: "20 23 * * *"
     - cron: "20 00 * * *"
+    - cron: "20 03 * * *"
 
 permissions:
   id-token: write
@@ -74,6 +80,9 @@ jobs:
               script_flags="$script_flags -d"
               dryrun=1
             fi
+            if [[ -n "${{ github.event.inputs.filename }}" ]]; then
+              script_flags="$script_flags -f ${{ github.event.inputs.filename }}"
+            fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             cron_time="${{ github.event.schedule }}"
             script_flags="-as"
@@ -89,6 +98,8 @@ jobs:
               if ((is_bst == 0)); then
                 ndh_environments="t1 t2 pp pd dr"
               fi
+            elif [[ "${cron_time}" == '20 03 * * *' ]]; then
+              ndh_environments="t1 t2 pp pd dr"
             else
               echo "Unsupported schedule cron ${cron_time}"
               exit 1
