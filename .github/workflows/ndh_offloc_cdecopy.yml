@@ -81,7 +81,7 @@ jobs:
               dryrun=1
             fi
             if [[ -n "${{ github.event.inputs.filename }}" ]]; then
-              script_flags="$script_flags -f {{ github.event.inputs.filename }}"
+              script_flags="$script_flags -f ${{ github.event.inputs.filename }}"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             cron_time="${{ github.event.schedule }}"
