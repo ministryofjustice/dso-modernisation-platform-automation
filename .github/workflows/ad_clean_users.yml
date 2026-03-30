@@ -62,7 +62,7 @@
             ref: ${{ github.ref }}
 
         - name: Configure AWS credentials for Admin account
-          uses: aws-actions/configure-aws-credentials@v6
+          uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
           with:
             role-to-assume: >- 
               arn:aws:iam::${{ github.event.inputs.target_domain == 'PROD' && secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_ACCOUNT_ID || secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
@@ -164,7 +164,7 @@
               #   --output text > ssm-output/stderr.txt
 
         - name: Upload review Artifact
-          uses: actions/upload-artifact@v7
+          uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
           if: always()
           with:
             name: aduserscript-logs-approval-run-${{ github.run_number }}
@@ -229,7 +229,7 @@
             ref: ${{ github.ref }}
 
         - name: Configure AWS credentials for Admin account
-          uses: aws-actions/configure-aws-credentials@v6
+          uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
           with:
             role-to-assume: >- 
               arn:aws:iam::${{ github.event.inputs.target_domain == 'PROD' && secrets.AD_COMPUTER_MANAGEMENT_PROD_ADMIN_ACCOUNT_ID || secrets.AD_COMPUTER_MANAGEMENT_DEVTEST_ADMIN_ACCOUNT_ID }}:role/modernisation-platform-oidc-cicd
@@ -314,7 +314,7 @@
                 --output text > ssm-output/stdout.txt
               
         - name: Upload Final Artifact
-          uses: actions/upload-artifact@v7
+          uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
           if: always()
           with:
             name: aduserscript-logs-approved-run-${{ github.run_number }}

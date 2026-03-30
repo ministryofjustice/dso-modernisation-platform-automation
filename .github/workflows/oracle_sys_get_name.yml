@@ -131,7 +131,7 @@ jobs:
     steps:
 
       - name: Checkout Local Repo to get Composite Action
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup Database System Access
         id: setup_db_system_access
@@ -143,7 +143,7 @@ jobs:
           ModernisationPlatformEnvironmentManagement: "${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}"
 
       - name: Fetch Required Roles & Site
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           sparse-checkout-cone-mode: false
