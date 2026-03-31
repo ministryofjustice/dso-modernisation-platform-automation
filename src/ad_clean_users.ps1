@@ -199,7 +199,7 @@ try {
     # Get all user accounts from the specified OU and sub-OUs
     # MemberOf added to capture group membership for deletion logging
     Write-Host "Retrieving user accounts from $userOUFull..." -ForegroundColor Cyan
-    $allUsers = Get-ADUser -Filter * -SearchBase $userOUFull -SearchScope Subtree -Properties LastLogonDate, logonCount, DistinguishedName, Enabled, MemberOf, whenCreated, LastLogon
+    $allUsers = Get-ADUser -Filter * -SearchBase $userOUFull -SearchScope Subtree -Properties LastLogonDate, logonCount, DistinguishedName, givenName, sn, Enabled, MemberOf, whenCreated, LastLogon
     
     $totalUsers = $allUsers.Count
     Write-Host "Found $totalUsers user account(s) in OU structure.`n" -ForegroundColor Green
@@ -226,7 +226,7 @@ try {
         $lastLogon = if ($user.LastLogonDate) { $user.LastLogonDate.ToString('yyyy-MM-dd HH:mm:ss') } else { "Never" }
         $neverUsed = (-not $user.LastLogonDate -and $user.logonCount -eq 0)
         $groupMembership = Get-UserGroupMembership -MemberOf $user.MemberOf
-        $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | LogonCount: $($user.logonCount) | WhenCreated: $($user.whenCreated.ToString('yyyy-MM-dd')) | NeverUsed: $neverUsed | Groups: $groupMembership | OU: $($user.DistinguishedName)"
+        $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | LogonCount: $($user.logonCount) | WhenCreated: $($user.whenCreated.ToString('yyyy-MM-dd')) | NeverUsed: $neverUsed | FirstName: $($user.givenName) | Surname: $($user.sn) |Groups: $groupMembership | OU: $($user.DistinguishedName)"
         
         try {
             if ($DryRunBool) {
