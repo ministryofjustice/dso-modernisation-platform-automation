@@ -45,10 +45,10 @@ param(
     [string]$DryRun = "True",
     
     [Parameter(Mandatory = $false)]
-    [int]$DisableDays = 90,
+    [int]$DisableDays = 180,
     
     [Parameter(Mandatory = $false)]
-    [int]$DeleteDays = 180,
+    [int]$DeleteDays = 360,
     
     [Parameter(Mandatory = $false)]
     [string]$UserOU = "OU=Users,OU=NOMS RBAC",
