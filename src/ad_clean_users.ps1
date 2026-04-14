@@ -199,7 +199,7 @@ try {
     # Get all user accounts from the specified OU and sub-OUs
     # MemberOf added to capture group membership for deletion logging
     Write-Host "Retrieving user accounts from $userOUFull..." -ForegroundColor Cyan
-    $allUsers = Get-ADUser -Filter * -SearchBase $userOUFull -SearchScope Subtree -Properties LastLogonDate, logonCount, DistinguishedName, Enabled, MemberOf, whenCreated, LastLogon
+    $allUsers = Get-ADUser -Filter * -SearchBase $userOUFull -SearchScope Subtree -Properties LastLogonDate, logonCount, DistinguishedName, givenName, sn, Enabled, MemberOf, whenCreated, LastLogon
     
     $totalUsers = $allUsers.Count
     Write-Host "Found $totalUsers user account(s) in OU structure.`n" -ForegroundColor Green
@@ -218,15 +218,19 @@ try {
     Write-Host "Processing accounts for deletion (inactive > $DeleteDays days)..." -ForegroundColor Cyan
     
     $usersToDelete = $users | Where-Object {
-        ($_.LastLogonDate -and $_.LastLogonDate -lt $deleteThreshold) -or
-        (($_.LastLogon -eq 0 -or $_.LastLogon -eq $null) -and $_.whenCreated -lt $deleteThreshold)
-    }
+    ($_.LastLogonDate -and $_.LastLogonDate -lt $deleteThreshold) -or
+    (
+        (-not $_.LastLogonDate) -and   # only fall back if LastLogonDate is absent entirely
+        ($_.LastLogon -eq 0 -or $_.LastLogon -eq $null) -and
+        $_.whenCreated -lt $deleteThreshold
+    )
+}
     
     foreach ($user in $usersToDelete) {
         $lastLogon = if ($user.LastLogonDate) { $user.LastLogonDate.ToString('yyyy-MM-dd HH:mm:ss') } else { "Never" }
         $neverUsed = (-not $user.LastLogonDate -and $user.logonCount -eq 0)
         $groupMembership = Get-UserGroupMembership -MemberOf $user.MemberOf
-        $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | LogonCount: $($user.logonCount) | WhenCreated: $($user.whenCreated.ToString('yyyy-MM-dd')) | NeverUsed: $neverUsed | Groups: $groupMembership | OU: $($user.DistinguishedName)"
+        $logMessage = "Username: $($user.SamAccountName) | LastLogon: $lastLogon | LogonCount: $($user.logonCount) | WhenCreated: $($user.whenCreated.ToString('yyyy-MM-dd')) | NeverUsed: $neverUsed | FirstName: $($user.givenName) | Surname: $($user.sn) |Groups: $groupMembership | OU: $($user.DistinguishedName)"
         
         try {
             if ($DryRunBool) {
@@ -251,11 +255,16 @@ try {
     
     # Only process accounts that haven't been deleted and are currently enabled include unused aged accounts
     $usersToDisable = $users | Where-Object {
-        $_.Enabled -eq $true -and (
-            ($_.LastLogonDate -and $_.LastLogonDate -lt $disableThreshold -and $_.LastLogonDate -ge $deleteThreshold) -or
-            (($_.LastLogon -eq 0 -or $_.LastLogon -eq $null) -and $_.whenCreated -lt $disableThreshold -and $_.whenCreated -ge $deleteThreshold)
+    $_.Enabled -eq $true -and (
+        ($_.LastLogonDate -and $_.LastLogonDate -lt $disableThreshold -and $_.LastLogonDate -ge $deleteThreshold) -or
+        (
+            (-not $_.LastLogonDate) -and
+            ($_.LastLogon -eq 0 -or $_.LastLogon -eq $null) -and
+            $_.whenCreated -lt $disableThreshold -and
+            $_.whenCreated -ge $deleteThreshold
         )
-    }
+    )
+}
     
     foreach ($user in $usersToDisable) {
         $lastLogon = if ($user.LastLogonDate) { $user.LastLogonDate.ToString('yyyy-MM-dd HH:mm:ss') } else { "Never" }
