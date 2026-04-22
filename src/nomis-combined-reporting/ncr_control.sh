@@ -8,6 +8,8 @@
 DRYRUN=0
 VERBOSE=0
 FORCE=0
+QUICK_MODE=0
+GAP_SECS=0
 LBS=
 CMS_START_STOP_SEQUENTIAL_WAIT_SECS=
 APP_START_STOP_SEQUENTIAL_WAIT_SECS=
@@ -27,13 +29,15 @@ usage() {
   echo "Usage $0: <opts> <cmd>
 
 Where <opts>:
-  -a wait_secs              Start/Stop APP EC2s sequentially and leave wait_secs in between each
   -3 wait_secs              Override default pipeline stage 3 wait time
+  -a wait_secs              Start/Stop APP EC2s sequentially and leave wait_secs in between each
+  -c wait_secs              Start/Stop CMS EC2s sequentially and leave wait_secs in between each
   -d                        Enable dryrun for maintenance mode commands
   -e <env>                  Set nomis-combined-reporting environment
   -f                        Force start/stop
-  -c wait_secs              Start/Stop CMS EC2s sequentially and leave wait_secs in between each
+  -g <seconds>              The gap to wait between each ccm.sh command
   -l public|private|admin   Select LB endpoint(s)
+  -q                        Do quick stop in pipeline mode, i.e. only disable AdaptiveJobServer
   -v                        Enable verbose debug
   -w wait_secs              Start/Stop WEB EC2s sequentially and leave wait_secs in between each
 
@@ -57,6 +61,8 @@ For pipeline start, below steps are run in reverse order 8 through to 0:
   6          stop       or start    BIP processing servers
   7          stop       or start    all other servers
   8          stop       or start    SIA
+
+NOTE: in quick mode, only AdaptiveJobServers are disabled in stage 2, and stages 4-7 are skipped
 " >&2
   return 1
 }
@@ -962,8 +968,11 @@ pipeline_stage_bip() {
     if ((DRYRUN != 0)); then
       opts="$opts -d"
     fi
+    if ((QUICK_MODE == 1)); then
+      opts="$opts -q"
+    fi
     if [[ -n $waitsecs ]]; then
-      opts="$opts -3 $waitsecs"
+      opts="$opts -3 $waitsecs -g $GAP_SECS"
       echo "${logprefix}running:  bip_control.sh $opts pipeline $bipcmd $stage (waits for up to ${waitsecs}s)"
     else
       echo "${logprefix}running:  bip_control.sh $opts pipeline $bipcmd $stage"
@@ -1163,7 +1172,7 @@ do_pipeline() {
 
 main() {
   set -o pipefail
-  while getopts "3:a:c:de:fl:vw:" opt; do
+  while getopts "3:a:c:de:fg:l:qvw:" opt; do
       case $opt in
           3)
               STAGE3_WAIT_SECS=${OPTARG}
@@ -1183,8 +1192,14 @@ main() {
           f)
               FORCE=1
               ;;
+          g)
+              GAP_SECS=${OPTARG}
+              ;;
           l)
               LBS=${OPTARG}
+              ;;
+          q)
+              QUICK_MODE=1
               ;;
           v)
               VERBOSE=1
