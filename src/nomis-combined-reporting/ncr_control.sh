@@ -9,6 +9,7 @@ DRYRUN=0
 VERBOSE=0
 FORCE=0
 LBS=
+START_STOP_SEQUENTIAL_WAIT_SECS=
 EC2_RUN_SCRIPT=$(dirname "$0")/../run_script_on_ec2.sh
 STAGE3_WAIT_SECS=600
 STAGE1_TIMEOUT_SECS=900
@@ -28,6 +29,7 @@ Where <opts>:
   -d                        Enable dryrun for maintenance mode commands
   -e <env>                  Set nomis-combined-reporting environment
   -f                        Force start/stop
+  -s wait_secs              Start/Stop EC2s sequentially and leave wait_secs in between each
   -l public|private|admin   Select LB endpoint(s)
   -v                        Enable verbose debug
 
@@ -592,69 +594,141 @@ pipeline_stage_ec2_start() {
   else
     export SHOW_PROGRESS=1
   fi
-  for ec2 in $ec2s; do
-    ec2name=$(cut -d: -f1 <<< "$ec2")
-    ec2id=$(cut -d: -f2 <<< "$ec2")
-    ec2status=$(cut -d: -f3 <<< "$ec2")
-    if [[ $ec2status != 'running' ]]; then
-      if ((DRYRUN == 0 )); then
-        echo "${logprefix}${ec2name}: running:  aws ec2 start-instances --instance-ids $ec2id"
-        aws ec2 start-instances --instance-ids "$ec2id" >/dev/null
-        ec2wait="$ec2wait $ec2"
-      else
-        echo "${logprefix}${ec2name}: DRYRUN:   aws ec2 start-instances --instance-ids $ec2id"
-      fi
-    else
-      debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
-      output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
-      if [[ $output == active ]]; then
-        echo "${logprefix}${ec2name}: skipping: sapbobj service already active"
-      elif ((DRYRUN == 0 )); then
-        echo "${logprefix}${ec2name}: running:  systemctl start sapbobj"
-        debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl start sapbobj' 'sudo systemctl start sapbobj'"
-        $EC2_RUN_SCRIPT shell "$ec2id" "systemctl start sapbobj" "sudo systemctl start sapbobj" "${logprefix}${ec2name}: " || true
-      else
-        echo "${logprefix}${ec2name}: DRYRUN:   systemctl start sapbobj"
-      fi
-    fi
-  done
-  n=15
-  for i in $(seq 1 $n); do
-    if [[ -z $ec2wait ]]; then
-      return 0
-    fi
-    echo "${logprefix}[$i/$n]: waiting for active sapbobj service on $ec2wait"
-    sleep 60
-    ec2s="$ec2wait"
-    ec2wait=
+  if [[ -z $START_STOP_SEQUENTIAL_WAIT_SECS ]]; then
+    # start in parallel
     for ec2 in $ec2s; do
       ec2name=$(cut -d: -f1 <<< "$ec2")
       ec2id=$(cut -d: -f2 <<< "$ec2")
       ec2status=$(cut -d: -f3 <<< "$ec2")
-
-      if [[ $ec2status != "running" ]]; then
-        if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
-          ec2name=$(cut -d: -f1 <<< "$ec2update")
-          ec2id=$(cut -d: -f2 <<< "$ec2update")
-          ec2status=$(cut -d: -f3 <<< "$ec2update")
-        fi
-      fi
-      if [[ $ec2status == "running" ]]; then
-        # check sapbobj status
-        debug "${logprefix}run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
-        output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
-        if [[ $output != "active" ]]; then
+      if [[ $ec2status != 'running' ]]; then
+        if ((DRYRUN == 0 )); then
+          echo "${logprefix}${ec2name}: running:  aws ec2 start-instances --instance-ids $ec2id"
+          aws ec2 start-instances --instance-ids "$ec2id" >/dev/null
           ec2wait="$ec2wait $ec2"
         else
-          echo "${logprefix}${ec2name}: complete: sapbobj service is active"
+          echo "${logprefix}${ec2name}: DRYRUN:   aws ec2 start-instances --instance-ids $ec2id"
         fi
       else
-        ec2wait="$ec2wait $ec2"
+        debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+        output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
+        if [[ $output == active ]]; then
+          echo "${logprefix}${ec2name}: skipping: sapbobj service already active"
+        elif ((DRYRUN == 0 )); then
+          echo "${logprefix}${ec2name}: running:  systemctl start sapbobj"
+          debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl start sapbobj' 'sudo systemctl start sapbobj'"
+          $EC2_RUN_SCRIPT shell "$ec2id" "systemctl start sapbobj" "sudo systemctl start sapbobj" "${logprefix}${ec2name}: " || true
+        else
+          echo "${logprefix}${ec2name}: DRYRUN:   systemctl start sapbobj"
+        fi
       fi
     done
-  done
-  error "${logprefix}timed out waiting for EC2/sapbobj to start: $ec2wait"
-  return 1
+    n=15
+    for i in $(seq 1 $n); do
+      if [[ -z $ec2wait ]]; then
+        return 0
+      fi
+      echo "${logprefix}[$i/$n]: waiting for active sapbobj service on $ec2wait"
+      sleep 60
+      ec2s="$ec2wait"
+      ec2wait=
+      for ec2 in $ec2s; do
+        ec2name=$(cut -d: -f1 <<< "$ec2")
+        ec2id=$(cut -d: -f2 <<< "$ec2")
+        ec2status=$(cut -d: -f3 <<< "$ec2")
+
+        if [[ $ec2status != "running" ]]; then
+          if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
+            ec2name=$(cut -d: -f1 <<< "$ec2update")
+            ec2id=$(cut -d: -f2 <<< "$ec2update")
+            ec2status=$(cut -d: -f3 <<< "$ec2update")
+          fi
+        fi
+        if [[ $ec2status == "running" ]]; then
+          # check sapbobj status
+          debug "${logprefix}run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+          output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
+          if [[ $output != "active" ]]; then
+            ec2wait="$ec2wait $ec2"
+          else
+            echo "${logprefix}${ec2name}: complete: sapbobj service is active"
+          fi
+        else
+          ec2wait="$ec2wait $ec2"
+        fi
+      done
+    done
+    error "${logprefix}timed out waiting for EC2/sapbobj to start: $ec2wait"
+    return 1
+  else
+    # start sequentially
+    ec2_exitcode=0
+    for ec2 in $ec2s; do
+      ec2update="$ec2"
+      ec2name=$(cut -d: -f1 <<< "$ec2update")
+      ec2id=$(cut -d: -f2 <<< "$ec2update")
+      ec2status=$(cut -d: -f3 <<< "$ec2update")
+      if [[ $ec2status != 'running' ]]; then
+        if ((DRYRUN == 0 )); then
+          echo "${logprefix}${ec2name}: running:  aws ec2 start-instances --instance-ids $ec2id"
+          aws ec2 start-instances --instance-ids "$ec2id" >/dev/null
+
+          n=30
+          for i in $(seq 1 $n); do
+            echo "${logprefix}[$i/$n]: waiting for running status on $ec2update"
+            sleep 30
+            if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
+              ec2name=$(cut -d: -f1 <<< "$ec2update")
+              ec2id=$(cut -d: -f2 <<< "$ec2update")
+              ec2status=$(cut -d: -f3 <<< "$ec2update")
+            else
+              ec2update="$ec2"
+            fi
+            if [[ $ec2status == "running" ]]; then
+              break
+            fi
+          done
+        else
+          echo "${logprefix}${ec2name}: DRYRUN:   aws ec2 start-instances --instance-ids $ec2id"
+        fi
+      fi
+      if [[ $ec2status == 'running' ]]; then
+        debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+        output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
+        if [[ $output == active ]]; then
+          echo "${logprefix}${ec2name}: skipping: sapbobj service already active"
+        elif ((DRYRUN == 0 )); then
+          echo "${logprefix}${ec2name}: running:  systemctl start sapbobj"
+          debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl start sapbobj' 'sudo systemctl start sapbobj'"
+          $EC2_RUN_SCRIPT shell "$ec2id" "systemctl start sapbobj" "sudo systemctl start sapbobj" "${logprefix}${ec2name}: " || true
+
+          n=30
+          for i in $(seq 1 $n); do
+            echo "${logprefix}[$i/$n]: waiting for active sapbobj service on $ec2update"
+            sleep 30
+            # check sapbobj status
+            debug "${logprefix}run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+            output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
+            if [[ $output == "active" ]]; then
+              echo "${logprefix}${ec2name}: complete: sapbobj service is active"
+              break
+            fi
+          done
+          if [[ $output != "active" ]]; then
+            error "${logprefix}timed out waiting for sapbobj to start: $ec2update"
+            ec2_exitcode=1
+          fi
+        else
+          echo "${logprefix}${ec2name}: DRYRUN:   systemctl start sapbobj"
+        fi
+      elif ((DRYRUN == 0 )); then
+        error "${logprefix}timed out waiting for EC2 to start: $ec2update"
+        ec2_exitcode=1
+      fi
+      echo "${logprefix}${ec2name}: waiting ${START_STOP_SEQUENTIAL_WAIT_SECS}s between EC2s"
+      sleep "$START_STOP_SEQUENTIAL_WAIT_SECS"
+    done
+    return $ec2_exitcode
+  fi
 }
 
 pipeline_stage_ec2_stop_or_shutdown() {
@@ -1006,7 +1080,7 @@ do_pipeline() {
 
 main() {
   set -o pipefail
-  while getopts "3:de:fl:v" opt; do
+  while getopts "3:de:fl:s:v" opt; do
       case $opt in
           3)
               STAGE3_WAIT_SECS=${OPTARG}
@@ -1022,6 +1096,9 @@ main() {
               ;;
           l)
               LBS=${OPTARG}
+              ;;
+          s)
+              START_STOP_SEQUENTIAL_WAIT_SECS=${OPTARG}
               ;;
           v)
               VERBOSE=1
