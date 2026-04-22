@@ -645,7 +645,7 @@ pipeline_stage_ec2_start() {
         fi
         if [[ $ec2status == "running" ]]; then
           # check sapbobj status
-          debug "${logprefix}run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+          debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
           output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
           if [[ $output != "active" ]]; then
             ec2wait="$ec2wait $ec2"
@@ -674,7 +674,7 @@ pipeline_stage_ec2_start() {
 
           n=30
           for i in $(seq 1 $n); do
-            echo "${logprefix}[$i/$n]: waiting for running status on $ec2update"
+            echo "${logprefix}${ec2name}: [$i/$n]: waiting for running status on $ec2id $ec2status"
             sleep 30
             if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
               ec2name=$(cut -d: -f1 <<< "$ec2update")
@@ -703,10 +703,10 @@ pipeline_stage_ec2_start() {
 
           n=30
           for i in $(seq 1 $n); do
-            echo "${logprefix}[$i/$n]: waiting for active sapbobj service on $ec2update"
+            echo "${logprefix}${ec2name}: [$i/$n]: waiting for active sapbobj service"
             sleep 30
             # check sapbobj status
-            debug "${logprefix}run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+            debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
             output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
             if [[ $output == "active" ]]; then
               echo "${logprefix}${ec2name}: complete: sapbobj service is active"
@@ -714,14 +714,14 @@ pipeline_stage_ec2_start() {
             fi
           done
           if [[ $output != "active" ]]; then
-            error "${logprefix}timed out waiting for sapbobj to start: $ec2update"
+            error "${logprefix}${ec2name}: timed out waiting for sapbobj to start [$output]"
             ec2_exitcode=1
           fi
         else
           echo "${logprefix}${ec2name}: DRYRUN:   systemctl start sapbobj"
         fi
       elif ((DRYRUN == 0 )); then
-        error "${logprefix}timed out waiting for EC2 to start: $ec2update"
+        error "${logprefix}${ec2name}: timed out waiting for EC2 to start: $ec2id $ec2status"
         ec2_exitcode=1
       fi
       echo "${logprefix}${ec2name}: waiting ${START_STOP_SEQUENTIAL_WAIT_SECS}s between EC2s"
