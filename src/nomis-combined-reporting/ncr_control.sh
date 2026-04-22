@@ -842,7 +842,78 @@ pipeline_stage_ec2_stop_or_shutdown() {
     error "${logprefix}timed out waiting for EC2 to stop: $ec2wait"
     return 1
   else
-    return 1
+    ec2_exitcode=0
+    for ec2 in $ec2s; do
+      ec2name=$(cut -d: -f1 <<< "$ec2")
+      ec2id=$(cut -d: -f2 <<< "$ec2")
+      ec2status=$(cut -d: -f3 <<< "$ec2")
+      if [[ $ec2status == "running" ]]; then
+        debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+        output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
+        if [[ $output == "active" ]]; then
+          if ((DRYRUN == 0 )); then
+            echo "${logprefix}${ec2name}: running:  systemctl stop sapbobj"
+            debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl stop sapbobj' 'sudo systemctl stop sapbobj'"
+            $EC2_RUN_SCRIPT shell "$ec2id" "systemctl stop sapbobj" "sudo systemctl stop sapbobj" "${logprefix}${ec2name}: " || true
+
+            n=30
+            for i in $(seq 1 $n); do
+              echo "${logprefix}${ec2name}: [$i/$n]: waiting for inactive sapbobj service"
+              sleep 30
+              # check sapbobj status
+              debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+              output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
+              if [[ $output == "inactive" ]]; then
+                echo "${logprefix}${ec2name}: complete: sapbobj service is $output"
+                break
+              fi
+            done
+            if [[ $output != "inactive" ]]; then
+              error "${logprefix}${ec2name}: timed out waiting for sapbobj to stop [$output]"
+              ec2_exitcode=1
+            fi
+            echo "${logprefix}${ec2name}: waiting ${START_STOP_SEQUENTIAL_WAIT_SECS}s between EC2s"
+            sleep "$START_STOP_SEQUENTIAL_WAIT_SECS"
+          else
+            echo "${logprefix}${ec2name}: DRYRUN:   systemctl stop sapbobj"
+          fi
+        elif [[ $output == "inactive" ]]; then
+          echo "${logprefix}${ec2name}: skipping: sapbobj service already stopped"
+        else
+          echo "${logprefix}${ec2name}: skipping: sapbobj service state unknown: $output"
+        fi
+
+        if [[ $stop_or_shutdown == "shutdown" ]]; then
+          if ((DRYRUN == 0 )); then
+            echo "${logprefix}${ec2name}: running:  aws ec2 stop-instances --instance-ids $ec2id"
+            aws ec2 "stop-instances" --instance-ids "$ec2id" >/dev/null
+
+            n=90
+            ec2update="$ec2"
+            for i in $(seq 1 $n); do
+              echo "${logprefix}${ec2name}: [$i/$n]: Waiting for EC2 to stop $ec2id $ec2status"
+              sleep 10
+              if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
+                ec2status=$(cut -d: -f3 <<< "$ec2update")
+              else
+                ec2update="$ec2"
+              fi
+              if [[ $ec2status == "stopped" ]]; then
+                echo "${logprefix}${ec2name}: complete: EC2 is stopped"
+                break
+              fi
+            done
+            if [[ $ec2status != "stopped" ]]; then
+              error "${logprefix}${ec2update}: timed out waiting for EC2 to stop"
+              ec2_exitcode=1
+            fi
+          fi
+        fi
+      else
+        echo "${logprefix}${ec2name}: skipping: EC2 not running [$ec2status]"
+      fi
+    done
+    return $ec2_exitcode
   fi
 }
 
