@@ -632,15 +632,16 @@ pipeline_stage_ec2_start() {
       ec2s="$ec2wait"
       ec2wait=
       for ec2 in $ec2s; do
-        ec2name=$(cut -d: -f1 <<< "$ec2")
-        ec2id=$(cut -d: -f2 <<< "$ec2")
-        ec2status=$(cut -d: -f3 <<< "$ec2")
+        ec2update="$ec2"
+        ec2name=$(cut -d: -f1 <<< "$ec2update")
+        ec2id=$(cut -d: -f2 <<< "$ec2update")
+        ec2status=$(cut -d: -f3 <<< "$ec2update")
 
         if [[ $ec2status != "running" ]]; then
           if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
-            ec2name=$(cut -d: -f1 <<< "$ec2update")
-            ec2id=$(cut -d: -f2 <<< "$ec2update")
             ec2status=$(cut -d: -f3 <<< "$ec2update")
+          else
+            ec2update="$ec2"
           fi
         fi
         if [[ $ec2status == "running" ]]; then
@@ -648,7 +649,7 @@ pipeline_stage_ec2_start() {
           debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
           output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
           if [[ $output != "active" ]]; then
-            ec2wait="$ec2wait $ec2"
+            ec2wait="$ec2wait $ec2update"
           else
             echo "${logprefix}${ec2name}: complete: sapbobj service is active"
           fi
@@ -677,8 +678,6 @@ pipeline_stage_ec2_start() {
             echo "${logprefix}${ec2name}: [$i/$n]: waiting for running status on $ec2id $ec2status"
             sleep 30
             if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
-              ec2name=$(cut -d: -f1 <<< "$ec2update")
-              ec2id=$(cut -d: -f2 <<< "$ec2update")
               ec2status=$(cut -d: -f3 <<< "$ec2update")
             else
               ec2update="$ec2"
@@ -822,18 +821,19 @@ pipeline_stage_ec2_stop_or_shutdown() {
       ec2s="$ec2wait"
       ec2wait=
       for ec2 in $ec2s; do
-        ec2name=$(cut -d: -f1 <<< "$ec2")
-        ec2id=$(cut -d: -f2 <<< "$ec2")
-        ec2status=$(cut -d: -f3 <<< "$ec2")
+        ec2update="$ec2"
+        ec2name=$(cut -d: -f1 <<< "$ec2update")
+        ec2id=$(cut -d: -f2 <<< "$ec2update")
+        ec2status=$(cut -d: -f3 <<< "$ec2update")
         if [[ $ec2status != "stopped" ]]; then
           if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
-            ec2name=$(cut -d: -f1 <<< "$ec2update")
-            ec2id=$(cut -d: -f2 <<< "$ec2update")
             ec2status=$(cut -d: -f3 <<< "$ec2update")
+          else
+            ec2update="$ec2"
           fi
         fi
         if [[ $ec2status != "stopped" ]]; then
-          ec2wait="$ec2wait $ec2"
+          ec2wait="$ec2wait $ec2update"
         else
           echo "${logprefix}${ec2name}: complete: EC2 is stopped"
         fi
