@@ -9,7 +9,9 @@ DRYRUN=0
 VERBOSE=0
 FORCE=0
 LBS=
-START_STOP_SEQUENTIAL_WAIT_SECS=
+CMS_START_STOP_SEQUENTIAL_WAIT_SECS=
+APP_START_STOP_SEQUENTIAL_WAIT_SECS=
+WEB_START_STOP_SEQUENTIAL_WAIT_SECS=
 EC2_RUN_SCRIPT=$(dirname "$0")/../run_script_on_ec2.sh
 STAGE3_WAIT_SECS=600
 STAGE1_TIMEOUT_SECS=900
@@ -25,13 +27,15 @@ usage() {
   echo "Usage $0: <opts> <cmd>
 
 Where <opts>:
+  -a wait_secs              Start/Stop APP EC2s sequentially and leave wait_secs in between each
   -3 wait_secs              Override default pipeline stage 3 wait time
   -d                        Enable dryrun for maintenance mode commands
   -e <env>                  Set nomis-combined-reporting environment
   -f                        Force start/stop
-  -s wait_secs              Start/Stop EC2s sequentially and leave wait_secs in between each
+  -c wait_secs              Start/Stop CMS EC2s sequentially and leave wait_secs in between each
   -l public|private|admin   Select LB endpoint(s)
   -v                        Enable verbose debug
+  -w wait_secs              Start/Stop WEB EC2s sequentially and leave wait_secs in between each
 
 Where <cmd>:
   ec2        display                                  - display status of ec2s
@@ -581,12 +585,14 @@ pipeline_stage_ec2_start() {
   local i
   local n
   local logprefix
+  local sequential_wait_secs
 
   set -o pipefail
 
   logprefix="$1"
-  export TIMEOUT_SECS=$2
-  ec2s=$3
+  sequential_wait_secs="$2"
+  export TIMEOUT_SECS=$3
+  ec2s=$4
   ec2wait=
 
   if ((VERBOSE == 0)); then
@@ -594,7 +600,7 @@ pipeline_stage_ec2_start() {
   else
     export SHOW_PROGRESS=1
   fi
-  if [[ -z $START_STOP_SEQUENTIAL_WAIT_SECS ]]; then
+  if [[ -z $sequential_wait_secs ]]; then
     # start in parallel
     for ec2 in $ec2s; do
       ec2name=$(cut -d: -f1 <<< "$ec2")
@@ -723,8 +729,8 @@ pipeline_stage_ec2_start() {
         error "${logprefix}${ec2name}: timed out waiting for EC2 to start: $ec2id $ec2status"
         ec2_exitcode=1
       fi
-      echo "${logprefix}${ec2name}: waiting ${START_STOP_SEQUENTIAL_WAIT_SECS}s between EC2s"
-      sleep "$START_STOP_SEQUENTIAL_WAIT_SECS"
+      echo "${logprefix}${ec2name}: waiting ${sequential_wait_secs}s between EC2s"
+      sleep "$sequential_wait_secs"
     done
     return $ec2_exitcode
   fi
@@ -742,13 +748,15 @@ pipeline_stage_ec2_stop_or_shutdown() {
   local i
   local n
   local stop_or_shutdown
+  local sequential_wait_secs
 
   set -o pipefail
 
   logprefix="$1"
   stop_or_shutdown=$2
-  export TIMEOUT_SECS=$3
-  ec2s=$4
+  sequential_wait_secs="$3"
+  export TIMEOUT_SECS=$4
+  ec2s=$5
   ec2wait=
 
   if ((VERBOSE == 0)); then
@@ -757,7 +765,7 @@ pipeline_stage_ec2_stop_or_shutdown() {
     export SHOW_PROGRESS=1
   fi
 
-  if [[ -z $START_STOP_SEQUENTIAL_WAIT_SECS ]]; then
+  if [[ -z $sequential_wait_secs ]]; then
     for ec2 in $ec2s; do
       ec2name=$(cut -d: -f1 <<< "$ec2")
       ec2id=$(cut -d: -f2 <<< "$ec2")
@@ -872,8 +880,8 @@ pipeline_stage_ec2_stop_or_shutdown() {
               error "${logprefix}${ec2name}: timed out waiting for sapbobj to stop [$output]"
               ec2_exitcode=1
             fi
-            echo "${logprefix}${ec2name}: waiting ${START_STOP_SEQUENTIAL_WAIT_SECS}s between EC2s"
-            sleep "$START_STOP_SEQUENTIAL_WAIT_SECS"
+            echo "${logprefix}${ec2name}: waiting ${sequential_wait_secs}s between EC2s"
+            sleep "$sequential_wait_secs"
           else
             echo "${logprefix}${ec2name}: DRYRUN:   systemctl stop sapbobj"
           fi
@@ -985,11 +993,11 @@ do_pipeline() {
 
   if [[ $1 == "start" ]]; then
     if [[ $2 == "all" || $2 == *8* ]]; then
-      if ! pipeline_stage_ec2_start "STAGE 8: " "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"; then
+      if ! pipeline_stage_ec2_start "STAGE 8: " "$CMS_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"; then
         return 1
       fi
       if [[ -n $APP_EC2_INFO ]]; then
-        if ! pipeline_stage_ec2_start "STAGE 8: " "$STAGE8_TIMEOUT_SECS" "$APP_EC2_INFO"; then
+        if ! pipeline_stage_ec2_start "STAGE 8: " "$APP_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE8_TIMEOUT_SECS" "$APP_EC2_INFO"; then
           return 1
         fi
       fi
@@ -1034,7 +1042,7 @@ do_pipeline() {
       fi
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
-      pipeline_stage_ec2_start "STAGE 1: " "$STAGE1_TIMEOUT_SECS" "$WEB_EC2_INFO $WEBADMIN_EC2_INFO" || stage1_exitcode=$?
+      pipeline_stage_ec2_start "STAGE 1: " "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS" "$WEB_EC2_INFO $WEBADMIN_EC2_INFO" || stage1_exitcode=$?
       if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
         return $stage1_exitcode
       fi
@@ -1073,7 +1081,7 @@ do_pipeline() {
       # fi
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
-      pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO $WEBADMIN_EC2_INFO" || stage1_exitcode=$?
+      pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO $WEBADMIN_EC2_INFO" || stage1_exitcode=$?
       if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
         return $stage1_exitcode
       fi
@@ -1132,11 +1140,11 @@ do_pipeline() {
 
     if [[ $2 == "all" || $2 == *8* ]]; then
       if [[ -n $APP_EC2_INFO ]]; then
-        if ! pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$STAGE8_TIMEOUT_SECS" "$APP_EC2_INFO"; then
+        if ! pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$APP_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE8_TIMEOUT_SECS" "$APP_EC2_INFO"; then
           return 1
         fi
       fi
-      if ! pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"; then
+      if ! pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$CMS_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"; then
         return 1
       fi
       if ! set_env_ec2_info; then
@@ -1155,10 +1163,16 @@ do_pipeline() {
 
 main() {
   set -o pipefail
-  while getopts "3:de:fl:s:v" opt; do
+  while getopts "3:a:c:de:fl:vw:" opt; do
       case $opt in
           3)
               STAGE3_WAIT_SECS=${OPTARG}
+              ;;
+          a)
+              APP_START_STOP_SEQUENTIAL_WAIT_SECS=${OPTARG}
+              ;;
+          c)
+              CMS_START_STOP_SEQUENTIAL_WAIT_SECS=${OPTARG}
               ;;
           d)
               DRYRUN=1
@@ -1172,11 +1186,11 @@ main() {
           l)
               LBS=${OPTARG}
               ;;
-          s)
-              START_STOP_SEQUENTIAL_WAIT_SECS=${OPTARG}
-              ;;
           v)
               VERBOSE=1
+              ;;
+          w)
+              WEB_START_STOP_SEQUENTIAL_WAIT_SECS=${OPTARG}
               ;;
           :)
               error "Error: option ${OPTARG} requires an argument"
