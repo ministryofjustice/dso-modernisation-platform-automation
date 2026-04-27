@@ -22,7 +22,7 @@ on:
       pipeline_stages:
         type: string
         description: Limit which stages of the stop process to run, 0-8 or all
-        default: all
+        default: "012389"
       pipeline_stage3_wait_secs:
         type: number
         description: How many seconds to wait in stage 3 after disabling of services
