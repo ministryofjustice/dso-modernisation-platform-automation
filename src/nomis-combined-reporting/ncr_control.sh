@@ -971,8 +971,11 @@ pipeline_stage_bip() {
     if ((QUICK_MODE == 1)); then
       opts="$opts -q"
     fi
+    if ((GAP_SECS != 0)); then
+      opts="$opts -g $GAP_SECS"
+    fi
     if [[ -n $waitsecs ]]; then
-      opts="$opts -3 $waitsecs -g $GAP_SECS"
+      opts="$opts -3 $waitsecs"
       echo "${logprefix}running:  bip_control.sh $opts pipeline $bipcmd $stage (waits for up to ${waitsecs}s)"
     else
       echo "${logprefix}running:  bip_control.sh $opts pipeline $bipcmd $stage"
