@@ -29,7 +29,7 @@ on:
         default: 600
       force:
         type: choice
-        description: Force run all stages
+        description: Force run all stages (i.e. don't stop on error)
         default: false
         options:
           - true
