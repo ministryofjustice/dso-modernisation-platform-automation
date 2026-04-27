@@ -61,7 +61,7 @@ on:
         default: 2
       ec2_gap_secs:
         type: number
-        description: Leave a gap between starting each CMS/APP EC2 sequentially
+        description: Leave a gap between stopping each CMS/APP EC2 sequentially
         default: 30
 
   schedule:
