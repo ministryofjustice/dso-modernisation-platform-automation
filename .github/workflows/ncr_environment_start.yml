@@ -38,11 +38,11 @@ on:
           - true
           - false
       ccm_gap_secs:
-        type: choice
+        type: number
         description: Leave a gap between each ccm command
         default: 2
       ec2_gap_secs:
-        type: choice
+        type: number
         description: Leave a gap between starting each CMS/APP EC2
         default: 30
 
