@@ -50,7 +50,7 @@ on:
           - false
       quick_mode:
         type: choice
-        description: Only disable AdaptiveJobServers during the shutdown process
+        description: Enable quick mode (Only disable AdaptiveJobServers)
         default: true
         options:
           - true
