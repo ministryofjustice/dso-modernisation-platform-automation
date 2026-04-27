@@ -44,7 +44,7 @@ on:
       ec2_gap_secs:
         type: choice
         description: Leave a gap between starting each CMS/APP EC2
-        default: 60
+        default: 30
 
   schedule:
     # runs at 06:45 local time, 2 entries to deal with BST/GMT
