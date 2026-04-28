@@ -29,7 +29,7 @@ on:
         default: 600
       force:
         type: choice
-        description: Force run all stages
+        description: Force run all stages (i.e. don't stop on error)
         default: false
         options:
           - true
@@ -48,6 +48,21 @@ on:
         options:
           - true
           - false
+      quick_mode:
+        type: choice
+        description: Enable quick mode (Only disable AdaptiveJobServers)
+        default: true
+        options:
+          - true
+          - false
+      ccm_gap_secs:
+        type: number
+        description: Leave a gap between each ccm command
+        default: 2
+      ec2_gap_secs:
+        type: number
+        description: Leave a gap between stopping each CMS/APP EC2 sequentially
+        default: 30
 
   schedule:
     # runs at 7pm local time. 2 entries to deal with BST/GMT
@@ -109,10 +124,21 @@ jobs:
             if [[ "${{ github.event.inputs.verbose }}" == "true" ]]; then
               script_flags="$script_flags -v"
             fi
+            if [[ "${{ github.event.inputs.quick_mode }}" == "true" ]]; then
+              script_flags="$script_flags -q"
+            fi
+            if [[ -n "${{ github.event.inputs.ccm_gap_secs }}" ]]; then
+              script_flags="$script_flags -g ${{ github.event.inputs.ccm_gap_secs }}"
+            fi
+            if [[ -n "${{ github.event.inputs.ec2_gap_secs }}" ]]; then
+              script_flags="$script_flags -c ${{ github.event.inputs.ec2_gap_secs }}"
+              script_flags="$script_flags -a ${{ github.event.inputs.ec2_gap_secs }}"
+            fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             cron_time="${{ github.event.schedule }}"
             is_bst=1
             gha_environment="oasys-national-reporting-schedule"
+            script_flags="-c 30 -a 30 -g 2 -q"
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
             fi
