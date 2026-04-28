@@ -132,13 +132,12 @@ jobs:
             fi
             if [[ -n "${{ github.event.inputs.ec2_gap_secs }}" ]]; then
               script_flags="$script_flags -c ${{ github.event.inputs.ec2_gap_secs }}"
-              script_flags="$script_flags -a ${{ github.event.inputs.ec2_gap_secs }}"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             cron_time="${{ github.event.schedule }}"
             is_bst=1
             gha_environment="oasys-national-reporting-schedule"
-            script_flags="-c 30 -a 30 -g 2 -q"
+            script_flags="-c 30 -g 2 -q"
             if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
               is_bst=0
             fi
