@@ -1117,27 +1117,43 @@ do_pipeline() {
       fi
     fi
     if [[ $2 == "all" || $2 == *4* ]]; then
-      pipeline_stage_bip "STAGE 4: " stop 4 "$STAGE4_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage4_exitcode=$?
-      if [[ $stage4_exitcode != 0 && $FORCE != 1 ]]; then
-        return $stage4_exitcode
+      if ((QUICK_MODE == 1)); then
+        echo "STAGE 4: skipping in quick mode"
+      else
+        pipeline_stage_bip "STAGE 4: " stop 4 "$STAGE4_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage4_exitcode=$?
+        if [[ $stage4_exitcode != 0 && $FORCE != 1 ]]; then
+          return $stage4_exitcode
+        fi
       fi
     fi
     if [[ $2 == "all" || $2 == *5* ]]; then
-      pipeline_stage_bip "STAGE 5: " stop 5 "$STAGE5_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage5_exitcode=$?
-      if [[ $stage5_exitcode != 0 && $FORCE != 1 ]]; then
-        return $stage5_exitcode
+      if ((QUICK_MODE == 1)); then
+        echo "STAGE 5: skipping in quick mode"
+      else
+        pipeline_stage_bip "STAGE 5: " stop 5 "$STAGE5_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage5_exitcode=$?
+        if [[ $stage5_exitcode != 0 && $FORCE != 1 ]]; then
+          return $stage5_exitcode
+        fi
       fi
     fi
     if [[ $2 == "all" || $2 == *6* ]]; then
-      pipeline_stage_bip "STAGE 6: " stop 6 "$STAGE6_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage6_exitcode=$?
-      if [[ $stage6_exitcode != 0 && $FORCE != 1 ]]; then
-        return $stage6_exitcode
+      if ((QUICK_MODE == 1)); then
+        echo "STAGE 6: skipping in quick mode"
+      else
+        pipeline_stage_bip "STAGE 6: " stop 6 "$STAGE6_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage6_exitcode=$?
+        if [[ $stage6_exitcode != 0 && $FORCE != 1 ]]; then
+          return $stage6_exitcode
+        fi
       fi
     fi
     if [[ $2 == "all" || $2 == *7* ]]; then
-      pipeline_stage_bip "STAGE 7: " stop 7 "$STAGE7_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage7_exitcode=$?
-      if [[ $stage7_exitcode != 0 && $FORCE != 1 ]]; then
-        return $stage7_exitcode
+      if ((QUICK_MODE == 1)); then
+        echo "STAGE 7: skipping in quick mode"
+      else
+        pipeline_stage_bip "STAGE 7: " stop 7 "$STAGE7_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage7_exitcode=$?
+        if [[ $stage7_exitcode != 0 && $FORCE != 1 ]]; then
+          return $stage7_exitcode
+        fi
       fi
     fi
 
