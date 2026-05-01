@@ -20,6 +20,11 @@ on:
         description: 'Target database name'
         required: true
         type: string
+      source_config_version:
+        description: "Source version for the modernisation-platform-configuration-management. Enter a branch or commit ID."
+        type: string
+        required: true
+        default: "main"
 
   # Each scheduled job requires a unique time
   schedule:
@@ -91,6 +96,7 @@ jobs:
       target_db_hostname: "${{ needs.parse_input.outputs.target_db_hostname }}"
       target_db_name: "${{ needs.parse_input.outputs.target_db_name }}"
       alternate_week: 0
+      source_config_version: "${{ github.event.inputs.source_config_version }}"
     secrets:
       environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
