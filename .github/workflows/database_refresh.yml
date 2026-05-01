@@ -36,7 +36,7 @@ on:
         required: true
         type: number
       source_config_version:
-        description: "Source version for the modernisation-platform-configuration-management. Enter a pull request, branch, commit ID, tag, or reference."
+        description: "Source version for the modernisation-platform-configuration-management. Enter a branch or commit ID."
         type: string
         default: "main"
     secrets:
@@ -58,6 +58,29 @@ jobs:
     name: Run ansible against OEM EC2
     runs-on: ubuntu-latest
     steps:
+      # validating/disallowing refs/pull/* (and similar) before checkout.
+      - name: Validate Source Config Version
+        run: |
+          if [[ "${{ env.SOURCE_CONFIG_VERSION }}" == refs/pull/* ]]; then
+            echo "ERROR: Refusing to use pull request ref for SourceConfigVersion input for security reasons."
+            exit 1
+          fi
+          if [[ "${{ env.SOURCE_CONFIG_VERSION }}" == refs/heads/* ]]; then
+            echo "ERROR: Refusing to use branch ref for SourceConfigVersion input for security reasons."
+            exit 1
+          fi
+          if [[ "${{ env.SOURCE_CONFIG_VERSION }}" == refs/tags/* ]]; then
+            echo "ERROR: Refusing to use tag ref for SourceConfigVersion input for security reasons."
+            exit 1
+          fi
+      - name: Validate Source Config Version format
+        run: |
+          if ! [[ "${{ env.SOURCE_CONFIG_VERSION }}" =~ ^[a-f0-9]{40}$|^[a-zA-Z0-9._-]+$ ]]; then
+            echo "ERROR: SourceConfigVersion input must be a branch name, tag, or 40-character commit ID."
+            exit 1
+          fi
+      - name: Show Source Config Version in logs
+        run: echo "Using Source Config Version: ${{ env.SOURCE_CONFIG_VERSION }}"
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0
         with:

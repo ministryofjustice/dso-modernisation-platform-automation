@@ -30,7 +30,7 @@ on:
           - "PPCNOM"
           - "PPMIS"
       source_config_version:
-        description: "Source version for the modernisation-platform-configuration-management. Enter a pull request, branch, commit ID, tag, or reference."
+        description: "Source version for the modernisation-platform-configuration-management. Enter a branch or commit ID."
         type: string
         required: true
         default: "main"
