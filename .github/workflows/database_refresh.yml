@@ -35,6 +35,10 @@ on:
         description: 'Alternate week refresh flag'
         required: true
         type: number
+      source_config_version:
+        description: "Source version for the modernisation-platform-configuration-management. Enter a pull request, branch, commit ID, tag, or reference."
+        type: string
+        default: "main"
     secrets:
       environment_management:
         description: 'copy of environment_management secret'
@@ -46,6 +50,7 @@ on:
 env:
   SOURCE_OEM_ACCOUNT_NUMBER: "${{ fromJSON(secrets.environment_management).account_ids[inputs.source_oem_account_name] }}"
   TARGET_DB_ACCOUNT_NUMBER: "${{ fromJSON(secrets.environment_management).account_ids[inputs.target_db_account_name] }}"
+  SOURCE_CONFIG_VERSION: "${{ inputs.source_config_version != '' && inputs.source_config_version || 'main' }}"
 
 jobs:
 
@@ -64,7 +69,7 @@ jobs:
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           token: ${{ secrets.dso_github_pat }}
-          ref: main
+          ref: ${{ env.SOURCE_CONFIG_VERSION }}
           path: configuration-management
           fetch-depth: 1
       - name: Setup Ansible
@@ -112,7 +117,7 @@ jobs:
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           token: ${{ secrets.dso_github_pat }}
-          ref: main
+          ref: ${{ env.SOURCE_CONFIG_VERSION }}
           path: configuration-management
           fetch-depth: 1
       - name: Setup Ansible
