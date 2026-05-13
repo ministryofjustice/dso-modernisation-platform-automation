@@ -43,10 +43,6 @@ on:
           - ''
           - 'databases'
           - 'weblogic'
-      SourceCodeVersion:
-        description: 'Branch/tag/commit for hmpps-delius-operational-automation'
-        type: string
-        default: 'main'
       SourceConfigVersion:
         description: 'Branch/tag/commit for modernisation-platform-configuration-management'
         type: string
@@ -100,7 +96,7 @@ jobs:
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           path: ansible
-          ref: ${{ github.event.inputs.SourceCodeVersion }}
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
           fetch-depth: 0
 
       - name: Checkout Inventory & Roles
@@ -350,7 +346,7 @@ jobs:
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           path: ansible
-          ref: ${{ github.event.inputs.SourceCodeVersion }}
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
           fetch-depth: 0
 
       - name: Checkout Inventory & Roles
