@@ -291,5 +291,5 @@ runs:
       uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
       with:
         role-to-assume: "${{ steps.account.outputs.role_arn }}"
-        role-session-name: "setup-oracle-target-access-${{ substring(steps.prepareinventorynames.outputs.account_name, 0, 25) }}-${{ github.run_number }}"
+        role-session-name: "setup-oracle-target-access-${{ steps.prepareinventorynames.outputs.account_name | slice(0, 30) }}-${{ github.run_number }}"
         aws-region: eu-west-2
