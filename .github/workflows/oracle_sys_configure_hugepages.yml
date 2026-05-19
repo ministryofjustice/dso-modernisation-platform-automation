@@ -10,9 +10,6 @@ description: "Workflow to configure HugePages for all Databases in a Database Sy
 # using the "system" option
 
 on:
-  push:
-    branches:
-      - DBA-1212
   workflow_dispatch:
     inputs:
       TargetSystem:
