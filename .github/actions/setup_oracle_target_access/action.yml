@@ -1,3 +1,4 @@
+
 name: "Setup Oracle Target Action"
 description: "Set up Access to Oracle Targets (either Primary Databases or comma-separated list of System Members)"
 
@@ -255,9 +256,7 @@ runs:
           echo "application_tier=${APPLICATION_TIER}"            >> $GITHUB_OUTPUT
           echo "application=${APPLICATION}"                      >> $GITHUB_OUTPUT
           echo "environment_type=${ENVIRONMENT_TYPE}"            >> $GITHUB_OUTPUT
-          # Truncate account_name to 30 characters to ensure role-session-name stays within limits
-          TRUNCATED_ACCOUNT_NAME=$(echo "${APPLICATION}-${ENVIRONMENT_TYPE}" | cut -c1-30)
-          echo "account_name=${TRUNCATED_ACCOUNT_NAME}" >> $GITHUB_OUTPUT
+          echo "account_name=${APPLICATION}-${ENVIRONMENT_TYPE}" >> $GITHUB_OUTPUT
           echo "batched_target_pairs=${BATCHED_TARGET_PAIRS}"    >> $GITHUB_OUTPUT
           echo "batch_count=${BATCH_COUNT}"                      >> $GITHUB_OUTPUT
 
@@ -287,10 +286,13 @@ runs:
             account_id="${{ fromJSON(inputs.ModernisationPlatformEnvironmentManagement).account_ids[steps.prepareinventorynames.outputs.account_name] }}"
             role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
             echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+            # The role session name is capped at 64 characters so limit the lengthof the account name
+            TRUNCATED_ACCOUNT_NAME=$(echo "${{ steps.prepareinventorynames.outputs.account_name }}" | cut -c1-30)
+            echo "role_session_name=setup-oracle-target-access-${TRUNCATED_ACCOUNT_NAME}-${{ github.run_number }}" >> $GITHUB_OUTPUT
 
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
       with:
         role-to-assume: "${{ steps.account.outputs.role_arn }}"
-        role-session-name: "setup-oracle-target-access-${{ steps.prepareinventorynames.outputs.account_name }}-${{ github.run_number }}"
+        role-session-name: "${{ steps.account.outputs.role_session_name }}"
         aws-region: eu-west-2
