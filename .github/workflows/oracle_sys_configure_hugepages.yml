@@ -26,6 +26,7 @@ on:
           - 'delius_core_development_dev_delius                             '
           - 'delius_core_preproduction_preprod_delius                       '
           - 'delius_core_preproduction_stage_delius                         '
+          - 'delius_core_production_prod_delius                             '
           - 'delius_core_test_test_delius                                   '
           - 'delius_mis_development_dev_boe                                 '
           - 'delius_mis_development_dev_dsd                                 '
