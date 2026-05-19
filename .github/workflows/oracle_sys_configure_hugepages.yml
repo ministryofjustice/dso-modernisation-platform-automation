@@ -164,4 +164,7 @@ jobs:
             # pairs (since there is potentially more than one database per host, the 
             # database name must be supplied).  Additionally these lists are batched to 
             # prevent attempting to run Ansible on the same host more than once concurrently.
+            echo "Here are the Batched Target Pairs"
+            echo "---------------------------------"
             echo "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}"
+            echo "---------------------------------"
