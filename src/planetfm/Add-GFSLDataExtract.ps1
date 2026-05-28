@@ -51,27 +51,54 @@ Write-Output "Running PSScriptBlock under domain user"
 Invoke-Command -ComputerName localhost -Credential $credentials -Authentication CredSSP -ArgumentList $sourcePath, $destinationUrl -ScriptBlock  {
   param ($sourcePath, $destinationUrl)
 
+  $cacheFile = "$env:TEMP\planetfm-gfsl-pipeline-cache.json"
+  Write-Output "Reading cache $cacheFile"
+  if (Test-Path $cacheFile) {
+    $rawCache = Get-Content $cacheFile -Raw | ConvertFrom-Json
+    $cache = @{}
+    foreach ($prop in $rawCache.PSObject.Properties) {
+      $cache[$prop.Name] = $prop.Value
+    }
+  } else {
+    $cache = @{}
+  }
+
   # Get list of files in source directory
   Write-Output "Getting list of files from $sourcePath"
   $files = Get-ChildItem -Path $sourcePath
 
   foreach ($file in $files) {
     if ($file.Extension -eq ".txt") {
-      $filePath = $file.FullName
+      $filePath           = $file.FullName
+      $fileName           = $file.Name
 
-      # URL-encode the file name if necessary
-      $fileName = [System.Net.WebUtility]::UrlEncode($file.Name)
-      $uri = "$destinationUrl/$fileName"
+      $fileNameURLEncoded = [System.Net.WebUtility]::UrlEncode($fileName)
+      $uri                = "$destinationUrl/$fileNameURLEncoded"
 
-      try {
-        Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream"
-        Write-Host "Uploaded $fileName successfully."
+      $uploadRequired = $true
+      $hash           = (Get-FileHash -Path $filePath -Algorithm SHA256).Hash
+
+      if ($cache.ContainsKey($fileName)) {
+        if ($cache[$fileName] -eq $hash) {
+          Write-Output "$fileName $hash skipping - already uploaded"
+          $uploadRequired = $false
+        }
       }
-      catch {
-        Write-Error "Failed to upload $fileName. Error: $_"
+      if ($file.LastWriteTime -gt (Get-Date).AddSeconds(-60)) {
+        Write-Output "$fileName $hash skipping - last updated < 60s"
+        $uploadRequired = $false
       }
-    } else {
-      Write-Output ("Ignoring " + $file.Name)
+
+      if ($uploadRequired) {
+        try {
+          Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream" | Out-Null
+          Write-Output "$fileName $hash uploaded to S3"
+          $cache[$fileName] = $hash
+        }
+        catch {
+          Write-Error "$fileName $hash upload error: $_"
+        }
+      }
     }
   }
 
@@ -81,22 +108,45 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
   foreach ($file in $files) {
     if ($file.Extension -eq ".txt") {
       $filePath = $file.FullName
+      $fileName = $file.Name
+
+      $fileNameUtf8 = [io.path]::ChangeExtension($fileName, "utf8")
       $filePathUtf8 = [io.path]::ChangeExtension($filePath, "utf8")
 
-      # URL-encode the file name if necessary
-      $fileName = [System.Net.WebUtility]::UrlEncode([io.path]::ChangeExtension($file.Name, "utf8"))
-      $uri = "$destinationUrl/$fileName"
+      $fileNameUtf8URLEncoded = [System.Net.WebUtility]::UrlEncode($fileNameUtf8)
+      $uriUtf8 = "$destinationUrl/$fileNameUtf8URLEncoded"
 
-      try {
-        $content = [System.IO.File]::ReadAllText($filePath, $ansi)
-        [System.IO.File]::WriteAllText($filePathUtf8, $content, $utf8)
-        Invoke-RestMethod -Uri $uri -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream"
-        Write-Host "Uploaded $fileName successfully."
-        Remove-Item $filePathUtf8
+      $content = [System.IO.File]::ReadAllText($filePath, $ansi)
+      [System.IO.File]::WriteAllText($filePathUtf8, $content, $utf8)
+
+      $uploadRequired = $true
+      $hash           = (Get-FileHash -Path $filePathUtf8 -Algorithm SHA256).Hash
+
+      if ($cache.ContainsKey($fileNameUtf8)) {
+        if ($cache[$fileNameUtf8] -eq $hash) {
+          Write-Output "$fileNameUtf8 $hash skipping - already uploaded"
+          $uploadRequired = $false
+        }
       }
-      catch {
-        Write-Error "Failed to upload $fileName. Error: $_"
+      if ($file.LastWriteTime -gt (Get-Date).AddSeconds(-60)) {
+        Write-Output "$fileNameUtf8 $hash skipping - last updated < 60s"
+        $uploadRequired = $false
       }
+
+      if ($uploadRequired) {
+        try {
+          Invoke-RestMethod -Uri $uriUtf8 -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream" | Out-Null
+          Write-Output "$fileNameUtf8 $hash uploaded to S3"
+          $cache[$fileNameUtf8] = $hash
+        }
+        catch {
+          Write-Error "$fileNameUtf8 $hash upload error: $_"
+        }
+      }
+      Remove-Item $filePathUtf8
     }
   }
+  Write-Output "Writing cache $cacheFile"
+  $cache | ConvertTo-Json | Set-Content $cacheFile
+
 }
