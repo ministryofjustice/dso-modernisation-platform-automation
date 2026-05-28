@@ -4,12 +4,14 @@ name: PlanetFM GFSL Data Extract
 on:
   workflow_dispatch:
   schedule:
-    # files are created on share just after 05:00 localtime
-    # schedule pipeline at 06:00 and 12:20 localtime - 2 entries to deal with BST/GMT
-    - cron: "00 5 * * *"
-    - cron: "00 6 * * *"
-    - cron: "20 11 * * *"
-    - cron: "20 12 * * *"
+    # files are created on share just after 04:00 and 12:20 localtime
+    # multiple crons to deal with BST/GMT and GitHub delays
+    - cron: "10 4 * * *"
+    - cron: "10 5 * * *"
+    - cron: "10 6 * * *"
+    - cron: "30 10 * * *"
+    - cron: "30 11 * * *"
+    - cron: "30 12 * * *"
 
 permissions:
   id-token: write
@@ -29,25 +31,6 @@ jobs:
         run: |
           account_name="hmpps-domain-services-production"
           ec2_name_tag="pd-jump2022-1"
-
-          if [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            cron_time="${{ github.event.schedule }}"
-            is_bst=1
-            if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
-              is_bst=0
-            fi
-            if [[ "${cron_time}" == '00 5 * * *' || "${cron_time}" == '20 11 * * *' ]]; then
-              if ((is_bst == 0)); then
-                account_name=
-                ec2_name_tag=
-              fi
-            elif [[ "${cron_time}" == '00 6 * * *' || "${cron_time}" == '20 12 * * *' ]]; then
-              if ((is_bst == 1)); then
-                account_name=
-                ec2_name_tag=
-              fi
-            fi
-          fi
           echo "account_name=${account_name} ec2_name_tag=${ec2_name_tag}"
           echo "account_name=${account_name}" >> $GITHUB_OUTPUT
           echo "ec2_name_tag=${ec2_name_tag}" >> $GITHUB_OUTPUT
