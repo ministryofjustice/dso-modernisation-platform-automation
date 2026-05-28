@@ -72,23 +72,33 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
         $response   = Invoke-WebRequest -Uri $uri -Method Head -ErrorAction Stop
         $remoteHash = $response.Headers["x-amz-meta-sha256"]
 
-        if ($remoteHash -and $remoteHash -eq $hash) {
-          $uploadRequired = $false
+        if ($remoteHash) {
+          if ($remoteHash -eq $hash) {
+            Write-Output "$fileName skipping - already uploaded to S3"
+            $uploadRequired = $false
+          } else {
+            Write-Output "$fileName exists but changed - reuploading"
+          }
+        } else {
+          Write-Output "$fileName exists but no hash metadata - reuploading"
         }
       }
       catch {
+        if ($_.Exception.Response -and $_.Exception.Response.StatusCode -eq 404) {
+          Write-Output "$fileName not found in S3 - uploading"
+        } else {
+          Write-Output "$fileName HEAD check failed - assuming upload needed"
+        }
       }
 
       if ($uploadRequired) {
         try {
-          Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream" -Headers @{ "x-amz-meta-sha256" = $hash }
+          # Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream" -Headers @{ "x-amz-meta-sha256" = $hash }
           Write-Output "$fileName uploaded to S3"
         }
         catch {
           Write-Error "$fileName Failed to upload to S3. Error: $_"
         }
-      } else {
-        Write-Output "$fileName skipping - already uploaded to S3"
       }
     }
   }
@@ -118,23 +128,33 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
         $response   = Invoke-WebRequest -Uri $uriUtf8 -Method Head
         $remoteHash = $response.Headers["x-amz-meta-sha256"]
 
-        if ($remoteHash -and $remoteHash -eq $hash) {
-          $uploadRequired = $false
+        if ($remoteHash) {
+          if ($remoteHash -eq $hash) {
+            Write-Output "$fileNameUtf8 skipping - already uploaded to S3"
+            $uploadRequired = $false
+          } else {
+            Write-Output "$fileNameUtf8 exists but changed - reuploading"
+          }
+        } else {
+          Write-Output "$fileNameUtf8 exists but no hash metadata - reuploading"
         }
       }
       catch {
+        if ($_.Exception.Response -and $_.Exception.Response.StatusCode -eq 404) {
+          Write-Output "$fileNameUtf8 not found in S3 - uploading"
+        } else {
+          Write-Output "$fileNameUtf8 HEAD check failed - assuming upload needed"
+        }
       }
 
       if ($uploadRequired) {
         try {
-          Invoke-RestMethod -Uri $uriUtf8 -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream" -Headers @{ "x-amz-meta-sha256" = $hash }
+          # Invoke-RestMethod -Uri $uriUtf8 -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream" -Headers @{ "x-amz-meta-sha256" = $hash }
           Write-Output "$fileNameUtf8 uploaded to S3"
         }
         catch {
           Write-Error "$fileNameUtf8 Failed to upload to S3. Error: $_"
         }
-      } else {
-        Write-Output "$fileNameUtf8 skipping - already uploaded to S3"
       }
       Remove-Item $filePathUtf8
     }
