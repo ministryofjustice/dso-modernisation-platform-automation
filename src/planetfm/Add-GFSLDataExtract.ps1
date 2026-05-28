@@ -84,6 +84,10 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
           $uploadRequired = $false
         }
       }
+      if ($file.LastWriteTime -gt (Get-Date).AddSeconds(-60)) {
+        Write-Output "$fileName $hash skipping - last updated < 60s"
+        $uploadRequired = $false
+      }
 
       if ($uploadRequired) {
         try {
@@ -123,6 +127,10 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
           Write-Output "$fileNameUtf8 $hash skipping - already uploaded"
           $uploadRequired = $false
         }
+      }
+      if ($file.LastWriteTime -gt (Get-Date).AddSeconds(-60)) {
+        Write-Output "$fileNameUtf8 $hash skipping - last updated < 60s"
+        $uploadRequired = $false
       }
 
       if ($uploadRequired) {
