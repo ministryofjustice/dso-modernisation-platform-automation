@@ -69,7 +69,7 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
       Write-Output "$fileName checking for existing S3 file $hash"
 
       try {
-        $response   = Invoke-WebRequest -Uri $uri -Method Head
+        $response   = Invoke-WebRequest -Uri $uri -Method Head -ErrorAction Stop
         $remoteHash = $response.Headers["x-amz-meta-sha256"]
 
         if ($remoteHash -and $remoteHash -eq $hash) {
@@ -77,12 +77,11 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
         }
       }
       catch {
-        continue
       }
 
       if ($uploadRequired) {
         try {
-          Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream"
+          Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream" -Headers @{ "x-amz-meta-sha256" = $hash }
           Write-Output "$fileName uploaded to S3"
         }
         catch {
@@ -124,12 +123,11 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
         }
       }
       catch {
-        continue
       }
 
       if ($uploadRequired) {
         try {
-          Invoke-RestMethod -Uri $uriUtf8 -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream"
+          Invoke-RestMethod -Uri $uriUtf8 -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream" -Headers @{ "x-amz-meta-sha256" = $hash }
           Write-Output "$fileNameUtf8 uploaded to S3"
         }
         catch {
