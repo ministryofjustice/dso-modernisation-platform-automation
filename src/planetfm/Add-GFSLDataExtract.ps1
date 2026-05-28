@@ -54,7 +54,11 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
   $cacheFile = "$env:TEMP\planetfm-gfsl-pipeline-cache.json"
   Write-Output "Reading cache $cacheFile"
   if (Test-Path $cacheFile) {
-    $cache = Get-Content $cacheFile | ConvertFrom-Json
+    $rawCache = Get-Content $cacheFile -Raw | ConvertFrom-Json
+    $cache = @{}
+    foreach ($prop in $rawCache.PSObject.Properties) {
+      $cache[$prop.Name] = $prop.Value
+    }
   } else {
     $cache = @{}
   }
