@@ -57,15 +57,16 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
 
   foreach ($file in $files) {
     if ($file.Extension -eq ".txt") {
-      $filePath = $file.FullName
+      $filePath           = $file.FullName
+      $fileName           = $file.Name
 
-      # URL-encode the file name if necessary
-      $fileName = [System.Net.WebUtility]::UrlEncode($file.Name)
-      $uri = "$destinationUrl/$fileName"
+      $fileNameURLEncoded = [System.Net.WebUtility]::UrlEncode($fileName)
+      $uri                = "$destinationUrl/$fileNameURLEncoded"
 
       $uploadRequired = $true
       $hash           = (Get-FileHash -Path $filePath -Algorithm SHA256).Hash
-      Write-Output ("Checking " + $file.Name + ": $hash")
+
+      Write-Output "$fileName checking for existing S3 file $hash"
 
       try {
         $response   = Invoke-WebRequest -Uri $uri -Method Head
@@ -82,13 +83,13 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
       if ($uploadRequired) {
         try {
           Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream"
-          Write-Host "Uploaded $fileName successfully."
+          Write-Output "$fileName uploaded to S3"
         }
         catch {
-          Write-Error "Failed to upload $fileName. Error: $_"
+          Write-Error "$fileName Failed to upload to S3. Error: $_"
         }
       } else {
-        Write-Host "Skipping $fileName as no change"
+        Write-Output "$fileName skipping - already uploaded to S3"
       }
     }
   }
@@ -99,20 +100,23 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
   foreach ($file in $files) {
     if ($file.Extension -eq ".txt") {
       $filePath = $file.FullName
+      $fileName = $file.Name
+
+      $fileNameUtf8 = [io.path]::ChangeExtension($fileName, "utf8")
       $filePathUtf8 = [io.path]::ChangeExtension($filePath, "utf8")
 
-      # URL-encode the file name if necessary
-      $fileName = [System.Net.WebUtility]::UrlEncode([io.path]::ChangeExtension($file.Name, "utf8"))
-      $uri = "$destinationUrl/$fileName"
+      $fileNameUtf8URLEncoded = [System.Net.WebUtility]::UrlEncode($fileNameUtf8)
+      $uriUtf8 = "$destinationUrl/$fileNameUtf8URLEncoded"
 
       $content = [System.IO.File]::ReadAllText($filePath, $ansi)
       [System.IO.File]::WriteAllText($filePathUtf8, $content, $utf8)
 
       $uploadRequired = $true
       $hash           = (Get-FileHash -Path $filePathUtf8 -Algorithm SHA256).Hash
+      Write-Output "$fileNameUtf8 checking for existing S3 file $hash"
 
       try {
-        $response   = Invoke-WebRequest -Uri $uri -Method Head
+        $response   = Invoke-WebRequest -Uri $uriUtf8 -Method Head
         $remoteHash = $response.Headers["x-amz-meta-sha256"]
 
         if ($remoteHash -and $remoteHash -eq $hash) {
@@ -125,14 +129,14 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
 
       if ($uploadRequired) {
         try {
-          Invoke-RestMethod -Uri $uri -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream"
-          Write-Host "Uploaded $fileName successfully."
+          Invoke-RestMethod -Uri $uriUtf8 -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream"
+          Write-Output "$fileNameUtf8 uploaded to S3"
         }
         catch {
-          Write-Error "Failed to upload $fileName. Error: $_"
+          Write-Error "$fileNameUtf8 Failed to upload to S3. Error: $_"
         }
       } else {
-        Write-Host "Skipping $fileName as no change"
+        Write-Output "$fileNameUtf8 skipping - already uploaded to S3"
       }
       Remove-Item $filePathUtf8
     }
