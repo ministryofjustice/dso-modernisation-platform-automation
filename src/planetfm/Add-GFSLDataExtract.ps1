@@ -65,6 +65,7 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
 
       $uploadRequired = $true
       $hash           = (Get-FileHash -Path $filePath -Algorithm SHA256).Hash
+      Write-Output ("Checking " + $file.Name + ": $hash")
 
       try {
         $response   = Invoke-WebRequest -Uri $uri -Method Head
