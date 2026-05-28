@@ -63,15 +63,32 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
       $fileName = [System.Net.WebUtility]::UrlEncode($file.Name)
       $uri = "$destinationUrl/$fileName"
 
+      $uploadRequired = $true
+      $hash           = (Get-FileHash -Path $filePath -Algorithm SHA256).Hash
+
       try {
-        Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream"
-        Write-Host "Uploaded $fileName successfully."
+        $response   = Invoke-WebRequest -Uri $uri -Method Head
+        $remoteHash = $response.Headers["x-amz-meta-sha256"]
+
+        if ($remoteHash -and $remoteHash -eq $hash) {
+          $uploadRequired = $false
+        }
       }
       catch {
-        Write-Error "Failed to upload $fileName. Error: $_"
+        continue
       }
-    } else {
-      Write-Output ("Ignoring " + $file.Name)
+
+      if ($uploadRequired) {
+        try {
+          Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream"
+          Write-Host "Uploaded $fileName successfully."
+        }
+        catch {
+          Write-Error "Failed to upload $fileName. Error: $_"
+        }
+      } else {
+        Write-Host "Skipping $fileName as no change"
+      }
     }
   }
 
@@ -87,16 +104,36 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
       $fileName = [System.Net.WebUtility]::UrlEncode([io.path]::ChangeExtension($file.Name, "utf8"))
       $uri = "$destinationUrl/$fileName"
 
+      $content = [System.IO.File]::ReadAllText($filePath, $ansi)
+      [System.IO.File]::WriteAllText($filePathUtf8, $content, $utf8)
+
+      $uploadRequired = $true
+      $hash           = (Get-FileHash -Path $filePathUtf8 -Algorithm SHA256).Hash
+
       try {
-        $content = [System.IO.File]::ReadAllText($filePath, $ansi)
-        [System.IO.File]::WriteAllText($filePathUtf8, $content, $utf8)
-        Invoke-RestMethod -Uri $uri -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream"
-        Write-Host "Uploaded $fileName successfully."
-        Remove-Item $filePathUtf8
+        $response   = Invoke-WebRequest -Uri $uri -Method Head
+        $remoteHash = $response.Headers["x-amz-meta-sha256"]
+
+        if ($remoteHash -and $remoteHash -eq $hash) {
+          $uploadRequired = $false
+        }
       }
       catch {
-        Write-Error "Failed to upload $fileName. Error: $_"
+        continue
       }
+
+      if ($uploadRequired) {
+        try {
+          Invoke-RestMethod -Uri $uri -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream"
+          Write-Host "Uploaded $fileName successfully."
+        }
+        catch {
+          Write-Error "Failed to upload $fileName. Error: $_"
+        }
+      } else {
+        Write-Host "Skipping $fileName as no change"
+      }
+      Remove-Item $filePathUtf8
     }
   }
 }
