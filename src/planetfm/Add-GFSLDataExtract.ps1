@@ -51,6 +51,14 @@ Write-Output "Running PSScriptBlock under domain user"
 Invoke-Command -ComputerName localhost -Credential $credentials -Authentication CredSSP -ArgumentList $sourcePath, $destinationUrl -ScriptBlock  {
   param ($sourcePath, $destinationUrl)
 
+  $cacheFile = "$env:TEMP\planetfm-gfsl-pipeline-cache.json"
+  Write-Output "Reading cache $cacheFile"
+  if (Test-Path $cacheFile) {
+    $cache = Get-Content $cacheFile | ConvertFrom-Json
+  } else {
+    $cache = @{}
+  }
+
   # Get list of files in source directory
   Write-Output "Getting list of files from $sourcePath"
   $files = Get-ChildItem -Path $sourcePath
@@ -66,38 +74,21 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
       $uploadRequired = $true
       $hash           = (Get-FileHash -Path $filePath -Algorithm SHA256).Hash
 
-      Write-Output "$fileName checking for existing S3 file $hash"
-
-      try {
-        $response   = Invoke-WebRequest -Uri $uri -Method Head -ErrorAction Stop
-        $remoteHash = $response.Headers["x-amz-meta-sha256"]
-
-        if ($remoteHash) {
-          if ($remoteHash -eq $hash) {
-            Write-Output "$fileName skipping - already uploaded to S3"
-            $uploadRequired = $false
-          } else {
-            Write-Output "$fileName exists but changed - reuploading"
-          }
-        } else {
-          Write-Output "$fileName exists but no hash metadata - reuploading"
-        }
-      }
-      catch {
-        if ($_.Exception.Response -and $_.Exception.Response.StatusCode -eq 404) {
-          Write-Output "$fileName not found in S3 - uploading"
-        } else {
-          Write-Output "$fileName HEAD check failed - assuming upload needed"
+      if ($cache.ContainsKey($fileName)) {
+        if ($cache[$fileName] -eq $hash) {
+          Write-Output "$fileName $hash skipping - already uploaded"
+          $uploadRequired = $false
         }
       }
 
       if ($uploadRequired) {
         try {
-          # Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream" -Headers @{ "x-amz-meta-sha256" = $hash }
-          Write-Output "$fileName uploaded to S3"
+          Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream"
+          Write-Output "$fileName $hash uploaded to S3"
+          $cache[$fileName] = $hash
         }
         catch {
-          Write-Error "$fileName Failed to upload to S3. Error: $_"
+          Write-Error "$fileName $hash upload error: $_"
         }
       }
     }
@@ -122,41 +113,28 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
 
       $uploadRequired = $true
       $hash           = (Get-FileHash -Path $filePathUtf8 -Algorithm SHA256).Hash
-      Write-Output "$fileNameUtf8 checking for existing S3 file $hash"
 
-      try {
-        $response   = Invoke-WebRequest -Uri $uriUtf8 -Method Head
-        $remoteHash = $response.Headers["x-amz-meta-sha256"]
-
-        if ($remoteHash) {
-          if ($remoteHash -eq $hash) {
-            Write-Output "$fileNameUtf8 skipping - already uploaded to S3"
-            $uploadRequired = $false
-          } else {
-            Write-Output "$fileNameUtf8 exists but changed - reuploading"
-          }
-        } else {
-          Write-Output "$fileNameUtf8 exists but no hash metadata - reuploading"
-        }
-      }
-      catch {
-        if ($_.Exception.Response -and $_.Exception.Response.StatusCode -eq 404) {
-          Write-Output "$fileNameUtf8 not found in S3 - uploading"
-        } else {
-          Write-Output "$fileNameUtf8 HEAD check failed - assuming upload needed"
+      if ($cache.ContainsKey($fileNameUtf8)) {
+        if ($cache[$fileNameUtf8] -eq $hash) {
+          Write-Output "$fileNameUtf8 $hash skipping - already uploaded"
+          $uploadRequired = $false
         }
       }
 
       if ($uploadRequired) {
         try {
-          # Invoke-RestMethod -Uri $uriUtf8 -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream" -Headers @{ "x-amz-meta-sha256" = $hash }
-          Write-Output "$fileNameUtf8 uploaded to S3"
+          Invoke-RestMethod -Uri $uriUtf8 -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream"
+          Write-Output "$fileNameUtf8 $hash uploaded to S3"
+          $cache[$fileNameUtf8] = $hash
         }
         catch {
-          Write-Error "$fileNameUtf8 Failed to upload to S3. Error: $_"
+          Write-Error "$fileNameUtf8 $hash upload error: $_"
         }
       }
       Remove-Item $filePathUtf8
     }
   }
+  Write-Output "Writing cache $cacheFile"
+  $cache | ConvertTo-Json | Set-Content $cacheFile
+
 }
