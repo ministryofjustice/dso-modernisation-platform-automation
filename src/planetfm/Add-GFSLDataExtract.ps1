@@ -83,7 +83,7 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
 
       if ($uploadRequired) {
         try {
-          Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream"
+          Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream" | Out-Null
           Write-Output "$fileName $hash uploaded to S3"
           $cache[$fileName] = $hash
         }
@@ -123,7 +123,7 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
 
       if ($uploadRequired) {
         try {
-          Invoke-RestMethod -Uri $uriUtf8 -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream"
+          Invoke-RestMethod -Uri $uriUtf8 -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream" | Out-Null
           Write-Output "$fileNameUtf8 $hash uploaded to S3"
           $cache[$fileNameUtf8] = $hash
         }
