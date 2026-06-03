@@ -1,3 +1,10 @@
+# Uploads files from a Windows Share to S3. Safe to be run multiple times
+# Configuration details are stored in a SecretsManager secret
+# Files are only uploaded if:
+# - The file has changed
+# - It's been over 12 hours since the last upload (to prevent S3 lifecycle archiving the file)
+# A local cache json file is used to store the file hash and last upload timestamp
+
 $ErrorActionPreference = "Stop"
 
 Write-Output "Debug PSVersionTable"
