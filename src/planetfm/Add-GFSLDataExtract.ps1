@@ -52,15 +52,23 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
   param ($sourcePath, $destinationUrl)
 
   $cacheFile = "$env:TEMP\planetfm-gfsl-pipeline-cache.json"
-  Write-Output "Reading cache $cacheFile"
+
+  $cache = @{}
   if (Test-Path $cacheFile) {
-    $rawCache = Get-Content $cacheFile -Raw | ConvertFrom-Json
-    $cache = @{}
-    foreach ($prop in $rawCache.PSObject.Properties) {
-      $cache[$prop.Name] = $prop.Value
+    Write-Output "Reading cache $cacheFile"
+    try {
+      $rawCache = Get-Content $cacheFile -Raw | ConvertFrom-Json
+      if ($null -ne $rawCache) {
+        foreach ($prop in $rawCache.PSObject.Properties) {
+          $cache[$prop.Name] = $prop.Value
+        }
+      }
     }
-  } else {
-    $cache = @{}
+    catch {
+      Write-Warning "Cache file was corrupted or unreadable. Resetting cache and forcing re-uploads. Error: $_"
+      Remove-Item $cacheFile -Force -ErrorAction SilentlyContinue
+      $cache = @{}
+    }
   }
 
   # Get list of files in source directory
@@ -79,11 +87,15 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
       $hash           = (Get-FileHash -Path $filePath -Algorithm SHA256).Hash
 
       if ($cache.ContainsKey($fileName)) {
-        if ($cache[$fileName] -eq $hash) {
-          Write-Output "$fileName $hash skipping - already uploaded"
+        $cachedItem = $cache[$fileName]
+        $lastUpload = if ($cachedItem.LastUpload) { [DateTime]$cachedItem.LastUpload } else { [DateTime]::MinValue }
+
+        if (($cachedItem.Hash -eq $hash) -and ($lastUpload -gt (Get-Date).AddHours(-12))) {
+          Write-Output "$fileName $hash skipping - already uploaded within 12 hours"
           $uploadRequired = $false
         }
       }
+
       if ($file.LastWriteTime -gt (Get-Date).AddSeconds(-60)) {
         Write-Output "$fileName $hash skipping - last updated < 60s"
         $uploadRequired = $false
@@ -93,7 +105,7 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
         try {
           Invoke-RestMethod -Uri $uri -Method Put -InFile $filePath -ContentType "application/octet-stream" | Out-Null
           Write-Output "$fileName $hash uploaded to S3"
-          $cache[$fileName] = $hash
+          $cache[$fileName] = @{ Hash = $hash; LastUpload = (Get-Date).ToString("o") }
         }
         catch {
           Write-Error "$fileName $hash upload error: $_"
@@ -123,11 +135,15 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
       $hash           = (Get-FileHash -Path $filePathUtf8 -Algorithm SHA256).Hash
 
       if ($cache.ContainsKey($fileNameUtf8)) {
-        if ($cache[$fileNameUtf8] -eq $hash) {
-          Write-Output "$fileNameUtf8 $hash skipping - already uploaded"
+        $cachedItem = $cache[$fileNameUtf8]
+        $lastUpload = if ($cachedItem.LastUpload) { [DateTime]$cachedItem.LastUpload } else { [DateTime]::MinValue }
+
+        if (($cachedItem.Hash -eq $hash) -and ($lastUpload -gt (Get-Date).AddHours(-12))) {
+          Write-Output "$fileNameUtf8 $hash skipping - already uploaded within 12 hours"
           $uploadRequired = $false
         }
       }
+
       if ($file.LastWriteTime -gt (Get-Date).AddSeconds(-60)) {
         Write-Output "$fileNameUtf8 $hash skipping - last updated < 60s"
         $uploadRequired = $false
@@ -137,7 +153,7 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
         try {
           Invoke-RestMethod -Uri $uriUtf8 -Method Put -InFile $filePathUtf8 -ContentType "application/octet-stream" | Out-Null
           Write-Output "$fileNameUtf8 $hash uploaded to S3"
-          $cache[$fileNameUtf8] = $hash
+          $cache[$fileNameUtf8] = @{ Hash = $hash; LastUpload = (Get-Date).ToString("o") }
         }
         catch {
           Write-Error "$fileNameUtf8 $hash upload error: $_"
@@ -147,6 +163,5 @@ Invoke-Command -ComputerName localhost -Credential $credentials -Authentication 
     }
   }
   Write-Output "Writing cache $cacheFile"
-  $cache | ConvertTo-Json | Set-Content $cacheFile
-
+  $cache | ConvertTo-Json -Depth 5 | Set-Content $cacheFile
 }
