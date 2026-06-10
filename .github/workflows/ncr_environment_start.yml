@@ -110,24 +110,9 @@ jobs:
               script_flags="$script_flags -a ${{ github.event.inputs.ec2_gap_secs }}"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            cron_time="${{ github.event.schedule }}"
-            is_bst=1
             script_flags="-c 30 -a 30 -g 2"
-            if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
-              is_bst=0
-            fi
-            if [[ "${cron_time}" == '45 5 * * 1-5' || "${cron_time}" == '50 6 * * 1-5' ]]; then
-              if ((is_bst == 1)); then
-                ncr_environments="pp" # space separated list
-              fi
-            elif [[ "${cron_time}" == '45 6 * * 1-5' || "${cron_time}" == '50 7 * * 1-5' ]]; then
-              if ((is_bst == 0)); then
-                ncr_environments="pp" # space separated list
-              fi
-            else
-              echo "Unsupported schedule cron ${cron_time}"
-              exit 1
-            fi
+            ncr_environments="pp" # space separated list
+          fi
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
