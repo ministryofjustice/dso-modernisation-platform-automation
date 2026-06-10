@@ -43,10 +43,6 @@ on:
           - ''
           - 'databases'
           - 'weblogic'
-      SourceCodeVersion:
-        description: 'Branch/tag/commit for hmpps-delius-operational-automation'
-        type: string
-        default: 'main'
       SourceConfigVersion:
         description: 'Branch/tag/commit for modernisation-platform-configuration-management'
         type: string
@@ -100,7 +96,7 @@ jobs:
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           path: ansible
-          ref: ${{ github.event.inputs.SourceCodeVersion }}
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
           fetch-depth: 0
 
       - name: Checkout Inventory & Roles
@@ -184,7 +180,7 @@ jobs:
 
       - name: Configure AWS Credentials
         if: steps.databasetargets.outputs.targets != ''
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "oracle-licence-audit-${{ matrix.account_name }}-${{ github.run_number }}"
@@ -279,7 +275,7 @@ jobs:
 
       - name: Configure AWS Credentials
         if: steps.weblogic_targets.outputs.targets != ''
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: "${{ steps.account_web.outputs.role_arn }}"
           role-session-name: "oracle-licence-audit-${{ matrix.account_name }}-${{ github.run_number }}"
@@ -350,7 +346,7 @@ jobs:
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           path: ansible
-          ref: ${{ github.event.inputs.SourceCodeVersion }}
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
           fetch-depth: 0
 
       - name: Checkout Inventory & Roles
@@ -391,7 +387,7 @@ jobs:
           echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "oracle-licence-audit-${{ env.environment_name }}-${{ github.run_number }}"

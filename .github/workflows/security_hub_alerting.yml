@@ -93,7 +93,7 @@ jobs:
           echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
@@ -149,7 +149,7 @@ jobs:
           exit $exitcode
 
       - name: Upload results for ${{ matrix.account_name }}
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
             name: account-${{ matrix.account_name }}
             path: |
@@ -197,7 +197,7 @@ jobs:
             cat ./all-alerts.txt
             
         - name: Upload consolidated results
-          uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+          uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
           with:
             name: consolidated-accounts
             path: |

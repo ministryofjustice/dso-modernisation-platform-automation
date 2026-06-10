@@ -8,7 +8,11 @@
 DRYRUN=0
 VERBOSE=0
 FORCE=0
+QUICK_MODE=0
+GAP_SECS=0
 LBS=
+CMS_START_STOP_SEQUENTIAL_WAIT_SECS=
+WEB_START_STOP_SEQUENTIAL_WAIT_SECS=
 EC2_RUN_SCRIPT=$(dirname "$0")/../run_script_on_ec2.sh
 STAGE3_WAIT_SECS=600
 STAGE1_TIMEOUT_SECS=900
@@ -25,10 +29,14 @@ usage() {
 
 Where <opts>:
   -3 wait_secs              Override default pipeline stage 3 wait time
+  -c wait_secs              Start/Stop CMS EC2s sequentially and leave wait_secs in between each
   -d                        Enable dryrun for maintenance mode commands
   -e <env>                  Set oasys-national-reporting environment
   -f                        Force start/stop
+  -g <seconds>              The gap to wait between each ccm.sh command
+  -q                        Do quick stop in pipeline mode, i.e. only disable AdaptiveJobServer
   -v                        Enable verbose debug
+  -w wait_secs              Start/Stop WEB EC2s sequentially and leave wait_secs in between each
 
 Where <cmd>:
   ec2        display                                  - display status of ec2s
@@ -50,6 +58,8 @@ For pipeline start, below steps are run in reverse order 8 through to 0:
   6          stop       or start    BIP processing servers
   7          stop       or start    all other servers
   8          stop       or start    SIA
+
+NOTE: in quick mode, only AdaptiveJobServers are disabled in stage 2, and stages 4-7 are skipped
 " >&2
   return 1
 }
@@ -527,12 +537,14 @@ pipeline_stage_ec2_start() {
   local i
   local n
   local logprefix
+  local sequential_wait_secs
 
   set -o pipefail
 
   logprefix="$1"
-  export TIMEOUT_SECS=$2
-  ec2s=$3
+  sequential_wait_secs="$2"
+  export TIMEOUT_SECS=$3
+  ec2s=$4
   ec2wait=
 
   if ((VERBOSE == 0)); then
@@ -540,69 +552,140 @@ pipeline_stage_ec2_start() {
   else
     export SHOW_PROGRESS=1
   fi
-  for ec2 in $ec2s; do
-    ec2name=$(cut -d: -f1 <<< "$ec2")
-    ec2id=$(cut -d: -f2 <<< "$ec2")
-    ec2status=$(cut -d: -f3 <<< "$ec2")
-    if [[ $ec2status != 'running' ]]; then
-      if ((DRYRUN == 0 )); then
-        echo "${logprefix}${ec2name}: running:  aws ec2 start-instances --instance-ids $ec2id"
-        aws ec2 start-instances --instance-ids "$ec2id" >/dev/null
-        ec2wait="$ec2wait $ec2"
-      else
-        echo "${logprefix}${ec2name}: DRYRUN:   aws ec2 start-instances --instance-ids $ec2id"
-      fi
-    else
-      debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
-      output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
-      if [[ $output == active ]]; then
-        echo "${logprefix}${ec2name}: skipping: sapbobj service already active"
-      elif ((DRYRUN == 0 )); then
-        echo "${logprefix}${ec2name}: running:  systemctl start sapbobj"
-        debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl start sapbobj' 'sudo systemctl start sapbobj'"
-        $EC2_RUN_SCRIPT shell "$ec2id" "systemctl start sapbobj" "sudo systemctl start sapbobj" "${logprefix}${ec2name}: " || true
-      else
-        echo "${logprefix}${ec2name}: DRYRUN:   systemctl start sapbobj"
-      fi
-    fi
-  done
-  n=15
-  for i in $(seq 1 $n); do
-    if [[ -z $ec2wait ]]; then
-      return 0
-    fi
-    echo "${logprefix}[$i/$n]: waiting for active sapbobj service on $ec2wait"
-    sleep 60
-    ec2s="$ec2wait"
-    ec2wait=
+  if [[ -z $sequential_wait_secs ]]; then
+    # start in parallel
     for ec2 in $ec2s; do
       ec2name=$(cut -d: -f1 <<< "$ec2")
       ec2id=$(cut -d: -f2 <<< "$ec2")
       ec2status=$(cut -d: -f3 <<< "$ec2")
-
-      if [[ $ec2status != "running" ]]; then
-        if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
-          ec2name=$(cut -d: -f1 <<< "$ec2update")
-          ec2id=$(cut -d: -f2 <<< "$ec2update")
-          ec2status=$(cut -d: -f3 <<< "$ec2update")
-        fi
-      fi
-      if [[ $ec2status == "running" ]]; then
-        # check sapbobj status
-        debug "${logprefix}run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
-        output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
-        if [[ $output != "active" ]]; then
+      if [[ $ec2status != 'running' ]]; then
+        if ((DRYRUN == 0 )); then
+          echo "${logprefix}${ec2name}: running:  aws ec2 start-instances --instance-ids $ec2id"
+          aws ec2 start-instances --instance-ids "$ec2id" >/dev/null
           ec2wait="$ec2wait $ec2"
         else
-          echo "${logprefix}${ec2name}: complete: sapbobj service is active"
+          echo "${logprefix}${ec2name}: DRYRUN:   aws ec2 start-instances --instance-ids $ec2id"
         fi
       else
-        ec2wait="$ec2wait $ec2"
+        debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+        output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
+        if [[ $output == active ]]; then
+          echo "${logprefix}${ec2name}: skipping: sapbobj service already active"
+        elif ((DRYRUN == 0 )); then
+          echo "${logprefix}${ec2name}: running:  systemctl start sapbobj"
+          debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl start sapbobj' 'sudo systemctl start sapbobj'"
+          $EC2_RUN_SCRIPT shell "$ec2id" "systemctl start sapbobj" "sudo systemctl start sapbobj" "${logprefix}${ec2name}: " || true
+        else
+          echo "${logprefix}${ec2name}: DRYRUN:   systemctl start sapbobj"
+        fi
       fi
     done
-  done
-  error "${logprefix}timed out waiting for EC2/sapbobj to start: $ec2wait"
-  return 1
+    n=15
+    for i in $(seq 1 $n); do
+      if [[ -z $ec2wait ]]; then
+        return 0
+      fi
+      echo "${logprefix}[$i/$n]: waiting for active sapbobj service on $ec2wait"
+      sleep 60
+      ec2s="$ec2wait"
+      ec2wait=
+      for ec2 in $ec2s; do
+        ec2update="$ec2"
+        ec2name=$(cut -d: -f1 <<< "$ec2update")
+        ec2id=$(cut -d: -f2 <<< "$ec2update")
+        ec2status=$(cut -d: -f3 <<< "$ec2update")
+
+        if [[ $ec2status != "running" ]]; then
+          if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
+            ec2status=$(cut -d: -f3 <<< "$ec2update")
+          else
+            ec2update="$ec2"
+          fi
+        fi
+        if [[ $ec2status == "running" ]]; then
+          # check sapbobj status
+          debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+          output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
+          if [[ $output != "active" ]]; then
+            ec2wait="$ec2wait $ec2update"
+          else
+            echo "${logprefix}${ec2name}: complete: sapbobj service is active"
+          fi
+        else
+          ec2wait="$ec2wait $ec2"
+        fi
+      done
+    done
+    error "${logprefix}timed out waiting for EC2/sapbobj to start: $ec2wait"
+    return 1
+  else
+    # start sequentially
+    ec2_exitcode=0
+    for ec2 in $ec2s; do
+      ec2update="$ec2"
+      ec2name=$(cut -d: -f1 <<< "$ec2update")
+      ec2id=$(cut -d: -f2 <<< "$ec2update")
+      ec2status=$(cut -d: -f3 <<< "$ec2update")
+      if [[ $ec2status != 'running' ]]; then
+        if ((DRYRUN == 0 )); then
+          echo "${logprefix}${ec2name}: running:  aws ec2 start-instances --instance-ids $ec2id"
+          aws ec2 start-instances --instance-ids "$ec2id" >/dev/null
+
+          n=30
+          for i in $(seq 1 $n); do
+            echo "${logprefix}${ec2name}: [$i/$n]: waiting for running status on $ec2id $ec2status"
+            sleep 30
+            if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
+              ec2status=$(cut -d: -f3 <<< "$ec2update")
+            else
+              ec2update="$ec2"
+            fi
+            if [[ $ec2status == "running" ]]; then
+              break
+            fi
+          done
+        else
+          echo "${logprefix}${ec2name}: DRYRUN:   aws ec2 start-instances --instance-ids $ec2id"
+        fi
+      fi
+      if [[ $ec2status == 'running' ]]; then
+        debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+        output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
+        if [[ $output == active ]]; then
+          echo "${logprefix}${ec2name}: skipping: sapbobj service already active"
+        elif ((DRYRUN == 0 )); then
+          echo "${logprefix}${ec2name}: running:  systemctl start sapbobj"
+          debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl start sapbobj' 'sudo systemctl start sapbobj'"
+          $EC2_RUN_SCRIPT shell "$ec2id" "systemctl start sapbobj" "sudo systemctl start sapbobj" "${logprefix}${ec2name}: " || true
+
+          n=30
+          for i in $(seq 1 $n); do
+            echo "${logprefix}${ec2name}: [$i/$n]: waiting for active sapbobj service"
+            sleep 30
+            # check sapbobj status
+            debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+            output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
+            if [[ $output == "active" ]]; then
+              echo "${logprefix}${ec2name}: complete: sapbobj service is active"
+              break
+            fi
+          done
+          if [[ $output != "active" ]]; then
+            error "${logprefix}${ec2name}: timed out waiting for sapbobj to start [$output]"
+            ec2_exitcode=1
+          fi
+        else
+          echo "${logprefix}${ec2name}: DRYRUN:   systemctl start sapbobj"
+        fi
+      elif ((DRYRUN == 0 )); then
+        error "${logprefix}${ec2name}: timed out waiting for EC2 to start: $ec2id $ec2status"
+        ec2_exitcode=1
+      fi
+      echo "${logprefix}${ec2name}: waiting ${sequential_wait_secs}s between EC2s"
+      sleep "$sequential_wait_secs"
+    done
+    return $ec2_exitcode
+  fi
 }
 
 pipeline_stage_ec2_stop_or_shutdown() {
@@ -617,13 +700,15 @@ pipeline_stage_ec2_stop_or_shutdown() {
   local i
   local n
   local stop_or_shutdown
+  local sequential_wait_secs
 
   set -o pipefail
 
   logprefix="$1"
   stop_or_shutdown=$2
-  export TIMEOUT_SECS=$3
-  ec2s=$4
+  sequential_wait_secs="$3"
+  export TIMEOUT_SECS=$4
+  ec2s=$5
   ec2wait=
 
   if ((VERBOSE == 0)); then
@@ -632,88 +717,164 @@ pipeline_stage_ec2_stop_or_shutdown() {
     export SHOW_PROGRESS=1
   fi
 
-  for ec2 in $ec2s; do
-    ec2name=$(cut -d: -f1 <<< "$ec2")
-    ec2id=$(cut -d: -f2 <<< "$ec2")
-    ec2status=$(cut -d: -f3 <<< "$ec2")
-    if [[ $ec2status == "running" ]]; then
-      debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
-      output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
-      if [[ $output == "active" ]]; then
-        if ((DRYRUN == 0 )); then
-          echo "${logprefix}${ec2name}: running:  systemctl stop sapbobj"
-          debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl stop sapbobj' 'sudo systemctl stop sapbobj'"
-          $EC2_RUN_SCRIPT shell "$ec2id" "systemctl stop sapbobj" "sudo systemctl stop sapbobj" "${logprefix}${ec2name}: " || true
-          waitec2="$waitec2 $ec2"
+  if [[ -z $sequential_wait_secs ]]; then
+    for ec2 in $ec2s; do
+      ec2name=$(cut -d: -f1 <<< "$ec2")
+      ec2id=$(cut -d: -f2 <<< "$ec2")
+      ec2status=$(cut -d: -f3 <<< "$ec2")
+      if [[ $ec2status == "running" ]]; then
+        debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+        output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
+        if [[ $output == "active" ]]; then
+          if ((DRYRUN == 0 )); then
+            echo "${logprefix}${ec2name}: running:  systemctl stop sapbobj"
+            debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl stop sapbobj' 'sudo systemctl stop sapbobj'"
+            $EC2_RUN_SCRIPT shell "$ec2id" "systemctl stop sapbobj" "sudo systemctl stop sapbobj" "${logprefix}${ec2name}: " || true
+            waitec2="$waitec2 $ec2"
+          else
+            echo "${logprefix}${ec2name}: DRYRUN:   systemctl stop sapbobj"
+          fi
+        elif [[ $output == "inactive" ]]; then
+          echo "${logprefix}${ec2name}: skipping: sapbobj service already stopped"
         else
-          echo "${logprefix}${ec2name}: DRYRUN:   systemctl stop sapbobj"
+          echo "${logprefix}${ec2name}: skipping: sapbobj service state unknown: $output"
         fi
-      elif [[ $output == "inactive" ]]; then
-        echo "${logprefix}${ec2name}: skipping: sapbobj service already stopped"
-      else
-        echo "${logprefix}${ec2name}: skipping: sapbobj service state unknown: $output"
+      elif [[ $stop_or_shutdown == "stop" ]]; then
+        echo "${logprefix}${ec2name}: skipping: cannot stop sapbobj service as EC2 in $ec2status state"
       fi
-    elif [[ $stop_or_shutdown == "stop" ]]; then
-      echo "${logprefix}${ec2name}: skipping: cannot stop sapbobj service as EC2 in $ec2status state"
+    done
+
+    if [[ -n $ec2wait ]]; then
+      echo "${logprefix}[$i/$n]: waiting for systemctl stop on $ec2wait"
+      sleep 60
     fi
-  done
 
-  if [[ -n $ec2wait ]]; then
-    echo "${logprefix}[$i/$n]: waiting for systemctl stop on $ec2wait"
-    sleep 60
-  fi
-
-  if [[ $stop_or_shutdown == "stop" ]]; then
-    return 0
-  fi
-
-  ec2wait=
-  for ec2 in $ec2s; do
-    ec2name=$(cut -d: -f1 <<< "$ec2")
-    ec2id=$(cut -d: -f2 <<< "$ec2")
-    ec2status=$(cut -d: -f3 <<< "$ec2")
-    if [[ $ec2status != "stopped" ]]; then
-      if ((DRYRUN == 0 )); then
-        echo "${logprefix}${ec2name}: running:  aws ec2 stop-instances --instance-ids $ec2id"
-        aws ec2 "stop-instances" --instance-ids "$ec2id" >/dev/null
-        ec2wait="$ec2wait $ec2"
-      else
-        echo "${logprefix}${ec2name}: DRYRUN:   aws ec2 stop-instances --instance-ids $ec2id"
-      fi
-    else
-      echo "${logprefix}${ec2name}: skipping: EC2 already stopped"
-    fi
-  done
-
-  n=90
-  for i in $(seq 1 $n); do
-    if [[ -z $ec2wait ]]; then
+    if [[ $stop_or_shutdown == "stop" ]]; then
       return 0
     fi
-    echo "${logprefix}[$i/$n]: Waiting for $ec2wait"
-    sleep 10
-    ec2s="$ec2wait"
+
     ec2wait=
     for ec2 in $ec2s; do
       ec2name=$(cut -d: -f1 <<< "$ec2")
       ec2id=$(cut -d: -f2 <<< "$ec2")
       ec2status=$(cut -d: -f3 <<< "$ec2")
       if [[ $ec2status != "stopped" ]]; then
-        if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
-          ec2name=$(cut -d: -f1 <<< "$ec2update")
-          ec2id=$(cut -d: -f2 <<< "$ec2update")
-          ec2status=$(cut -d: -f3 <<< "$ec2update")
+        if ((DRYRUN == 0 )); then
+          echo "${logprefix}${ec2name}: running:  aws ec2 stop-instances --instance-ids $ec2id"
+          aws ec2 "stop-instances" --instance-ids "$ec2id" >/dev/null
+          ec2wait="$ec2wait $ec2"
+        else
+          echo "${logprefix}${ec2name}: DRYRUN:   aws ec2 stop-instances --instance-ids $ec2id"
         fi
-      fi
-      if [[ $ec2status != "stopped" ]]; then
-        ec2wait="$ec2wait $ec2"
       else
-        echo "${logprefix}${ec2name}: complete: EC2 is stopped"
+        echo "${logprefix}${ec2name}: skipping: EC2 already stopped"
       fi
     done
-  done
-  error "${logprefix}timed out waiting for EC2 to stop: $ec2wait"
-  return 1
+
+    n=90
+    for i in $(seq 1 $n); do
+      if [[ -z $ec2wait ]]; then
+        return 0
+      fi
+      echo "${logprefix}[$i/$n]: Waiting for $ec2wait"
+      sleep 10
+      ec2s="$ec2wait"
+      ec2wait=
+      for ec2 in $ec2s; do
+        ec2update="$ec2"
+        ec2name=$(cut -d: -f1 <<< "$ec2update")
+        ec2id=$(cut -d: -f2 <<< "$ec2update")
+        ec2status=$(cut -d: -f3 <<< "$ec2update")
+        if [[ $ec2status != "stopped" ]]; then
+          if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
+            ec2status=$(cut -d: -f3 <<< "$ec2update")
+          else
+            ec2update="$ec2"
+          fi
+        fi
+        if [[ $ec2status != "stopped" ]]; then
+          ec2wait="$ec2wait $ec2update"
+        else
+          echo "${logprefix}${ec2name}: complete: EC2 is stopped"
+        fi
+      done
+    done
+    error "${logprefix}timed out waiting for EC2 to stop: $ec2wait"
+    return 1
+  else
+    ec2_exitcode=0
+    for ec2 in $ec2s; do
+      ec2name=$(cut -d: -f1 <<< "$ec2")
+      ec2id=$(cut -d: -f2 <<< "$ec2")
+      ec2status=$(cut -d: -f3 <<< "$ec2")
+      if [[ $ec2status == "running" ]]; then
+        debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+        output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
+        if [[ $output == "active" ]]; then
+          if ((DRYRUN == 0 )); then
+            echo "${logprefix}${ec2name}: running:  systemctl stop sapbobj"
+            debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl stop sapbobj' 'sudo systemctl stop sapbobj'"
+            $EC2_RUN_SCRIPT shell "$ec2id" "systemctl stop sapbobj" "sudo systemctl stop sapbobj" "${logprefix}${ec2name}: " || true
+
+            n=30
+            for i in $(seq 1 $n); do
+              echo "${logprefix}${ec2name}: [$i/$n]: waiting for inactive sapbobj service"
+              sleep 30
+              # check sapbobj status
+              debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl is-active sapbobj' 'sudo systemctl is-active sapbobj'"
+              output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active sapbobj" "sudo systemctl is-active sapbobj" 2>/dev/null || true)
+              if [[ $output == "inactive" ]]; then
+                echo "${logprefix}${ec2name}: complete: sapbobj service is $output"
+                break
+              fi
+            done
+            if [[ $output != "inactive" ]]; then
+              error "${logprefix}${ec2name}: timed out waiting for sapbobj to stop [$output]"
+              ec2_exitcode=1
+            fi
+            echo "${logprefix}${ec2name}: waiting ${sequential_wait_secs}s between EC2s"
+            sleep "$sequential_wait_secs"
+          else
+            echo "${logprefix}${ec2name}: DRYRUN:   systemctl stop sapbobj"
+          fi
+        elif [[ $output == "inactive" ]]; then
+          echo "${logprefix}${ec2name}: skipping: sapbobj service already stopped"
+        else
+          echo "${logprefix}${ec2name}: skipping: sapbobj service state unknown: $output"
+        fi
+
+        if [[ $stop_or_shutdown == "shutdown" ]]; then
+          if ((DRYRUN == 0 )); then
+            echo "${logprefix}${ec2name}: running:  aws ec2 stop-instances --instance-ids $ec2id"
+            aws ec2 "stop-instances" --instance-ids "$ec2id" >/dev/null
+
+            n=90
+            ec2update="$ec2"
+            for i in $(seq 1 $n); do
+              echo "${logprefix}${ec2name}: [$i/$n]: Waiting for EC2 to stop $ec2id $ec2status"
+              sleep 10
+              if ec2update=$(get_ec2_server_info "Name" "$ec2name"); then
+                ec2status=$(cut -d: -f3 <<< "$ec2update")
+              else
+                ec2update="$ec2"
+              fi
+              if [[ $ec2status == "stopped" ]]; then
+                echo "${logprefix}${ec2name}: complete: EC2 is stopped"
+                break
+              fi
+            done
+            if [[ $ec2status != "stopped" ]]; then
+              error "${logprefix}${ec2update}: timed out waiting for EC2 to stop"
+              ec2_exitcode=1
+            fi
+          fi
+        fi
+      else
+        echo "${logprefix}${ec2name}: skipping: EC2 not running [$ec2status]"
+      fi
+    done
+    return $ec2_exitcode
+  fi
 }
 
 pipeline_stage_bip() {
@@ -753,6 +914,12 @@ pipeline_stage_bip() {
     if ((DRYRUN != 0)); then
       opts="$opts -d"
     fi
+    if ((QUICK_MODE == 1)); then
+      opts="$opts -q"
+    fi
+    if ((GAP_SECS != 0)); then
+      opts="$opts -g $GAP_SECS"
+    fi
     if [[ -n $waitsecs ]]; then
       opts="$opts -3 $waitsecs"
       echo "${logprefix}running:  bip_control.sh $opts pipeline $bipcmd $stage (waits for up to ${waitsecs}s)"
@@ -784,7 +951,7 @@ do_pipeline() {
 
   if [[ $1 == "start" ]]; then
     if [[ $2 == "all" || $2 == *8* ]]; then
-      if ! pipeline_stage_ec2_start "STAGE 8: " "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"; then
+      if ! pipeline_stage_ec2_start "STAGE 8: " "$CMS_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"; then
         return 1
       fi
       if ! set_env_ec2_info; then
@@ -828,12 +995,12 @@ do_pipeline() {
       fi
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
-      pipeline_stage_ec2_start "STAGE 1: " "$STAGE1_TIMEOUT_SECS" "$WEB_EC2_INFO" || stage1_exitcode=$?
+      pipeline_stage_ec2_start "STAGE 1: " "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS" "$WEB_EC2_INFO" || stage1_exitcode=$?
       if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
         return $stage1_exitcode
       fi
       if [[ -n $WEBSSO_EC2_INFO ]]; then
-        pipeline_stage_ec2_start "STAGE 1: " "$STAGE1_TIMEOUT_SECS" "$WEBSSO_EC2_INFO" || stage1_exitcode=$?
+        pipeline_stage_ec2_start "STAGE 1: " "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS" "$WEBSSO_EC2_INFO" || stage1_exitcode=$?
         if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
           return $stage1_exitcode
         fi
@@ -864,12 +1031,12 @@ do_pipeline() {
       pipeline_stage_lb "STAGE 0: public-lb:    " enable  public  -1
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
-      pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO" || stage1_exitcode=$?
+      pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO" || stage1_exitcode=$?
       if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
         return $stage1_exitcode
       fi
       if [[ -n $WEBSSO_EC2_INFO ]]; then
-        pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$STAGE1_TIMEOUT_SECS"  "$WEBSSO_EC2_INFO" || stage1_exitcode=$?
+        pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS"  "$WEBSSO_EC2_INFO" || stage1_exitcode=$?
         if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
           return $stage1_exitcode
         fi
@@ -894,27 +1061,43 @@ do_pipeline() {
       fi
     fi
     if [[ $2 == "all" || $2 == *4* ]]; then
-      pipeline_stage_bip "STAGE 4: " stop 4 "$STAGE4_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage4_exitcode=$?
-      if [[ $stage4_exitcode != 0 && $FORCE != 1 ]]; then
-        return $stage4_exitcode
+      if ((QUICK_MODE == 1)); then
+        echo "STAGE 4: skipping in quick mode"
+      else
+        pipeline_stage_bip "STAGE 4: " stop 4 "$STAGE4_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage4_exitcode=$?
+        if [[ $stage4_exitcode != 0 && $FORCE != 1 ]]; then
+          return $stage4_exitcode
+        fi
       fi
     fi
     if [[ $2 == "all" || $2 == *5* ]]; then
-      pipeline_stage_bip "STAGE 5: " stop 5 "$STAGE5_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage5_exitcode=$?
-      if [[ $stage5_exitcode != 0 && $FORCE != 1 ]]; then
-        return $stage5_exitcode
+      if ((QUICK_MODE == 1)); then
+        echo "STAGE 5: skipping in quick mode"
+      else
+        pipeline_stage_bip "STAGE 5: " stop 5 "$STAGE5_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage5_exitcode=$?
+        if [[ $stage5_exitcode != 0 && $FORCE != 1 ]]; then
+          return $stage5_exitcode
+        fi
       fi
     fi
     if [[ $2 == "all" || $2 == *6* ]]; then
-      pipeline_stage_bip "STAGE 6: " stop 6 "$STAGE6_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage6_exitcode=$?
-      if [[ $stage6_exitcode != 0 && $FORCE != 1 ]]; then
-        return $stage6_exitcode
+      if ((QUICK_MODE == 1)); then
+        echo "STAGE 6: skipping in quick mode"
+      else
+        pipeline_stage_bip "STAGE 6: " stop 6 "$STAGE6_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage6_exitcode=$?
+        if [[ $stage6_exitcode != 0 && $FORCE != 1 ]]; then
+          return $stage6_exitcode
+        fi
       fi
     fi
     if [[ $2 == "all" || $2 == *7* ]]; then
-      pipeline_stage_bip "STAGE 7: " stop 7 "$STAGE7_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage7_exitcode=$?
-      if [[ $stage7_exitcode != 0 && $FORCE != 1 ]]; then
-        return $stage7_exitcode
+      if ((QUICK_MODE == 1)); then
+        echo "STAGE 7: skipping in quick mode"
+      else
+        pipeline_stage_bip "STAGE 7: " stop 7 "$STAGE7_TIMEOUT_SECS" "$CMS_EC2_INFO" || stage7_exitcode=$?
+        if [[ $stage7_exitcode != 0 && $FORCE != 1 ]]; then
+          return $stage7_exitcode
+        fi
       fi
     fi
 
@@ -928,7 +1111,7 @@ do_pipeline() {
     [[ $stage7_exitcode != 0 ]] && echo "STAGE 7: FAILED" && failed=1
 
     if [[ $2 == "all" || $2 == *8* ]]; then
-      if ! pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"; then
+      if ! pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$CMS_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"; then
         return 1
       fi
       if ! set_env_ec2_info; then
@@ -947,10 +1130,13 @@ do_pipeline() {
 
 main() {
   set -o pipefail
-  while getopts "3:de:fv" opt; do
+  while getopts "3:c:de:fg:qvw:" opt; do
       case $opt in
           3)
               STAGE3_WAIT_SECS=${OPTARG}
+              ;;
+          c)
+              CMS_START_STOP_SEQUENTIAL_WAIT_SECS=${OPTARG}
               ;;
           d)
               DRYRUN=1
@@ -961,8 +1147,17 @@ main() {
           f)
               FORCE=1
               ;;
+          g)
+              GAP_SECS=${OPTARG}
+              ;;
+          q)
+              QUICK_MODE=1
+              ;;
           v)
               VERBOSE=1
+              ;;
+          w)
+              WEB_START_STOP_SEQUENTIAL_WAIT_SECS=${OPTARG}
               ;;
           :)
               error "Error: option ${OPTARG} requires an argument"

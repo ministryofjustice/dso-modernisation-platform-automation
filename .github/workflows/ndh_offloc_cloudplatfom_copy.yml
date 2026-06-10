@@ -18,15 +18,17 @@ on:
         options:
           - "preprod"
           - "prod"
-        
-  schedule:                # Only runs on prod environment 
-    - cron: "20 02 * * *"  # Runs at 02:20 local daily
-      timezone: "Europe/London"
+
+  schedule:
+    - cron: "00 23 * * *"
+    - cron: "00 00 * * *"
+    - cron: "30 00 * * *"
+    - cron: "30 03 * * *"
 
 permissions:
   id-token: write
   contents: read
-  
+
 run-name: ${{ github.event_name == 'schedule' && 'NDH Offloc Copy to Cloud Platform prod' || format('NDH Offloc Copy to Cloud Platform {0}{1}', inputs.cp_environment, inputs.check_files == 'true' && ' (check files)' || '') }}
 
 
@@ -67,29 +69,29 @@ jobs:
             echo "cp_environment=${cp_environment}" >> $GITHUB_OUTPUT
 
             # Generate date and file variables
-            TODAY=$(date +"%d%m%Y")
-            SOURCE_OFFLOC_FILE_DATE=$(date -d "yesterday" +"%d%m%Y")
+            TODAY=$(TZ="Europe/London" date +"%d%m%Y")
+            SOURCE_OFFLOC_FILE_DATE=$(TZ="Europe/London" date -d "yesterday" +"%d%m%Y")
             FILE_NAME="C_NOMIS_OFFENDER_${SOURCE_OFFLOC_FILE_DATE}_01.dat"
-            CURRENT_TIME=$(date)
-            
+            CURRENT_TIME=$(TZ="Europe/London" date)
+
             echo "today=${TODAY}" >> $GITHUB_OUTPUT
             echo "source_offloc_file_date=${SOURCE_OFFLOC_FILE_DATE}" >> $GITHUB_OUTPUT
             echo "file_name=${FILE_NAME}" >> $GITHUB_OUTPUT
             echo "current_time=${CURRENT_TIME}" >> $GITHUB_OUTPUT
-            
+
             echo "Setup complete:"
             echo "- Check files mode: ${check_files}"
             echo "- Today: ${TODAY}"
             echo "- Source Offloc file date: ${SOURCE_OFFLOC_FILE_DATE}"
             echo "- Target Offloc file name: ${FILE_NAME}"
             echo "- Pipeline run time: ${CURRENT_TIME}"
-            
+
             if [[ "${check_files}" == "true" ]]; then
               echo "Running in check files mode."
             else
               echo "Running in transfer mode."
-            fi      
- 
+            fi
+
   copytocloudplatform:
     name: Copy to Cloud Platform
     needs: setup
@@ -111,7 +113,7 @@ jobs:
           echo "account_id=${account_id}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials for Source
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885
         with:
           role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-source"
@@ -126,7 +128,7 @@ jobs:
             CURRENT_TIME: ${{ needs.setup.outputs.current_time }}
         run: |
             echo "Checking source bucket for: ${FILE_NAME}"
-            
+
             # Check if the target file exists in source bucket
             if aws s3 ls "s3://${SOURCE_BUCKET}/${FILE_NAME}" >/dev/null 2>&1; then
               echo "File ${FILE_NAME} found in source bucket"
@@ -134,15 +136,15 @@ jobs:
             else
               echo "File for ${TODAY} is not yet available at ${CURRENT_TIME}"
               echo "source_file_exists=false" >> $GITHUB_OUTPUT
-              
+
               # Find the most recent file in source bucket
               echo "Looking for most recent file in source bucket..."
               RECENT_FILES=$(aws s3 ls "s3://${SOURCE_BUCKET}/" --recursive | grep "C_NOMIS_OFFENDER_.*_01\.dat" | sort -k1,2 -r | head -5)
-              
+
               if [[ -n "${RECENT_FILES}" ]]; then
                 echo "Most recent files found:"
                 echo "${RECENT_FILES}"
-                
+
                 # Extract the most recent filename
                 MOST_RECENT=$(echo "${RECENT_FILES}" | head -1 | awk '{print $4}')
                 echo "Most recent file: ${MOST_RECENT}"
@@ -159,10 +161,10 @@ jobs:
             FILE_NAME: ${{ needs.setup.outputs.file_name }}
         run: |
             LOCAL_FILE="/tmp/${FILE_NAME}"
-            
+
             echo "Downloading ${FILE_NAME}..."
             aws s3 cp "s3://${SOURCE_BUCKET}/${FILE_NAME}" "${LOCAL_FILE}"
-            
+
             if [[ $? -eq 0 ]]; then
               echo "File downloaded successfully to ${LOCAL_FILE}"
               echo "file_downloaded=true" >> $GITHUB_OUTPUT
@@ -177,17 +179,17 @@ jobs:
         if: needs.setup.outputs.check_files == 'false' && steps.download_file.outputs.file_downloaded == 'true'
         run: |
             LOCAL_FILE="${{ steps.download_file.outputs.local_file }}"
-            TODAY_YYYYMMDD=$(date +"%Y%m%d")
+            TODAY_YYYYMMDD=$(TZ="Europe/London" date +"%Y%m%d")
             ZIP_FILE="/tmp/${TODAY_YYYYMMDD}.zip"
-            
+
             echo "Creating zip file: ${ZIP_FILE}"
             zip -j "${ZIP_FILE}" "${LOCAL_FILE}"
-            
+
             if [[ $? -eq 0 ]]; then
               echo "File zipped successfully to ${ZIP_FILE}"
               echo "zip_file=${ZIP_FILE}" >> $GITHUB_OUTPUT
               echo "zip_filename=${TODAY_YYYYMMDD}.zip" >> $GITHUB_OUTPUT
-              
+
               # Clean up original file
               rm -f "${LOCAL_FILE}"
               echo "Original .dat file deleted"
@@ -197,7 +199,7 @@ jobs:
             fi
 
       - name: Configure AWS Credentials for Destination
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885
         with:
           role-to-assume: ${{ needs.setup.outputs.cp_environment == 'preprod' && secrets.OFFLOC_TRANSFER_GHA_ROLE_ARN_PREPROD || secrets.OFFLOC_TRANSFER_GHA_ROLE_ARN_PROD }}
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-dest"
@@ -215,12 +217,12 @@ jobs:
           if [[ "${{ steps.prepare_file.outputs.zip_filename }}" != "" ]]; then
             ZIP_FILENAME="${{ steps.prepare_file.outputs.zip_filename }}"
           else
-            TODAY_YYYYMMDD=$(date +"%Y%m%d")
+            TODAY_YYYYMMDD=$(TZ="Europe/London" date +"%Y%m%d")
             ZIP_FILENAME="${TODAY_YYYYMMDD}.zip"
           fi
-          
+
           echo "Checking destination bucket for: ${ZIP_FILENAME}"
-          
+
           # Check if zip file already exists in destination bucket
           if aws s3 ls "s3://${DEST_BUCKET}/${ZIP_FILENAME}" >/dev/null 2>&1; then
             echo "File ${ZIP_FILENAME} already exists in destination bucket"
@@ -228,15 +230,15 @@ jobs:
           else
             echo "File ${ZIP_FILENAME} not found in destination bucket"
             echo "dest_file_exists=false" >> $GITHUB_OUTPUT
-            
+
             # Find the most recent zip files in destination bucket
             echo "Looking for most recent zip files in destination bucket..."
             RECENT_FILES=$(aws s3 ls "s3://${DEST_BUCKET}/" --recursive | grep ".*\.zip$" | sort -k1,2 -r | head -5)
-            
+
             if [[ -n "${RECENT_FILES}" ]]; then
               echo "Most recent zip files found:"
               echo "${RECENT_FILES}"
-              
+
               # Extract the most recent filename
               MOST_RECENT=$(echo "${RECENT_FILES}" | head -1 | awk '{print $4}')
               echo "Most recent zip file: ${MOST_RECENT}"
@@ -254,7 +256,7 @@ jobs:
         run: |
           ZIP_FILE="${{ steps.prepare_file.outputs.zip_file }}"
           ZIP_FILENAME="${{ steps.prepare_file.outputs.zip_filename }}"
-          
+
           if [[ "${{ steps.check_dest.outputs.dest_file_exists }}" == "true" ]]; then
             echo "File for ${TODAY} already available at ${CURRENT_TIME}"
             echo "Deleting zip file..."
@@ -263,7 +265,7 @@ jobs:
           else
             echo "Uploading ${ZIP_FILENAME} to destination bucket..."
             aws s3 cp "${ZIP_FILE}" "s3://${DEST_BUCKET}/${ZIP_FILENAME}"  # Use full path for source, filename for destination
-            
+
             if [[ $? -eq 0 ]]; then
               echo "File ${ZIP_FILENAME} uploaded, local file deleted at ${CURRENT_TIME}"
               rm -f "${ZIP_FILE}"
