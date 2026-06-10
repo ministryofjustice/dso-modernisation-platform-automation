@@ -30,11 +30,11 @@ on:
           - false
 
   schedule:
-    # runs at 06:30 and 09:30 local time. 2 entries to deal with BST/GMT
-    - cron: "30 5 * * 1-5"
+    # runs at 06:30 and 09:30 local time
     - cron: "30 6 * * 1-5"
-    - cron: "30 8 * * 1-5"
+      timezone: "Europe/London"
     - cron: "30 9 * * 1-5"
+      timezone: "Europe/London"
 
 permissions:
   id-token: write

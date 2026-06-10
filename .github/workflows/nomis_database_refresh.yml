@@ -38,7 +38,9 @@ on:
   # Each scheduled job requires a unique time
   schedule:
     - cron: '00 07 * * 0' # preprod-nomis-db-1-a PPCNOM
+      timezone: "Europe/London"
     - cron: '00 10 * * 0' # preprod-nomis-db-2-a PPMIS
+      timezone: "Europe/London"
 
 env:
   ALLOWED_PARAMS: "preprod-nomis-db-1-a:CNOMP:PPCNOM preprod-nomis-db-2-a:MISP:PPMIS"

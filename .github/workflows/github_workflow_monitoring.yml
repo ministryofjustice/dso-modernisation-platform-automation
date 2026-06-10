@@ -43,6 +43,7 @@ on:
           - false
   schedule:
     - cron: "0,30 * * * *"
+      timezone: "Europe/London"    
 
 jobs:
   check-strategy:

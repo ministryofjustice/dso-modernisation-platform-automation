@@ -22,11 +22,13 @@ on:
           - false
 
   schedule:
-    # runs at 06:45 and 08:45 local time as a backup. 2 entries to deal with BST/GMT
-    - cron: "45 5 * * 1-5"
+    # runs at 06:45 to 08:45 local time as a backup
     - cron: "45 6 * * 1-5"
+      timezone: "Europe/London"    
     - cron: "45 7 * * 1-5"
+      timezone: "Europe/London"    
     - cron: "45 8 * * 1-5"
+      timezone: "Europe/London"    
 
 permissions:
   id-token: write

@@ -20,6 +20,7 @@ on:
 
   schedule:
     - cron: "30 7 * * 1-5"             
+      timezone: "Europe/London"
 
 permissions:
   id-token: write
