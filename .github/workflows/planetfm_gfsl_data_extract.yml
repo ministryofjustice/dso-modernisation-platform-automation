@@ -5,11 +5,11 @@ on:
   workflow_dispatch:
   schedule:
     # files are created on share just after 05:00 localtime
-    # schedule pipeline at 06:00 and 12:20 localtime - 2 entries to deal with BST/GMT
-    - cron: "00 5 * * *"
+    # schedule pipeline at 06:00 and 12:20 localtime
     - cron: "00 6 * * *"
-    - cron: "20 11 * * *"
+      timezone: "Europe/London"
     - cron: "20 12 * * *"
+      timezone: "Europe/London"
 
 permissions:
   id-token: write

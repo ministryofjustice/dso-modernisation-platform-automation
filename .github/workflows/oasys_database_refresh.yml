@@ -24,9 +24,11 @@ on:
   # Each scheduled job requires a unique time
   schedule:
     - cron: '00 07 * * 0' # pp-oasys-db-a PPOASYS
+      timezone: "Europe/London"
     - cron: '00 08 * * 0' # pp-onr-db-a PPOASREP
+      timezone: "Europe/London"
     - cron: '00 09 * * 0' # pp-onr-db-a PPMISTRN
-
+      timezone: "Europe/London"
 
 env:
   ALLOWED_PARAMS: "pp-oasys-db-a:OASPROD:PPOASYS pp-onr-db-a:MISTRANS:PPMISTRN pp-onr-db-a:OASYSREP:PPOASREP"

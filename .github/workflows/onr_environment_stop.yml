@@ -50,9 +50,9 @@ on:
           - false
 
   schedule:
-    # runs at 7pm local time. 2 entries to deal with BST/GMT
-    - cron: "05 18 * * 1-5"
+    # runs at 7pm local time
     - cron: "05 19 * * 1-5"
+      timezone: "Europe/London"
 
 permissions:
   id-token: write

@@ -22,9 +22,9 @@ on:
           - false
 
   schedule:
-    # runs at 22:05 local time. 2 entries to deal with BST/GMT
-    - cron: "05 21 * * 1-5"
+    # runs at 22:05 local time.
     - cron: "05 22 * * 1-5"
+      timezone: "Europe/London"    
 
 permissions:
   id-token: write

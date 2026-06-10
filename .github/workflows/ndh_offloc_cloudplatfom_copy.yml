@@ -20,8 +20,8 @@ on:
           - "prod"
         
   schedule:                # Only runs on prod environment 
-    - cron: "20 02 * * *"  # Runs at 02:20 UTC daily
-    - cron: "20 03 * * *"  # Runs at 03:20 UTC daily (to handle BST/GMT)
+    - cron: "20 02 * * *"  # Runs at 02:20 local daily
+      timezone: "Europe/London"
 
 permissions:
   id-token: write

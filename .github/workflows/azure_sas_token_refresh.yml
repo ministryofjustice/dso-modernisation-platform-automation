@@ -19,7 +19,8 @@ on:
           - false
   schedule:
     - cron: "15 6 * * 1-5"
-
+      timezone: "Europe/London"
+      
 permissions:
   id-token: write
   contents: read

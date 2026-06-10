@@ -39,12 +39,12 @@ on:
           - false
 
   schedule:
-    # runs at 06:45 local time, 2 entries to deal with BST/GMT
+    # runs at 06:45 local time
     # second cron at 07:50 is a failsafe, in case something went wrong with the first run
-    - cron: "45 5 * * 1-5"
     - cron: "45 6 * * 1-5"
-    - cron: "50 6 * * 1-5"
+      timezone: "Europe/London"
     - cron: "50 7 * * 1-5"
+      timezone: "Europe/London"
 
 permissions:
   id-token: write

@@ -17,10 +17,9 @@ on:
         type: string
         default: 'LE_PROD'
   schedule:
-    # separate crons to ensure certs aren't all updated on same day
-    - cron: "30 06 * * 2"
-    - cron: "30 06 * * 3"
-    - cron: "30 06 * * 4"
+    # separate days to ensure certs aren't all updated on same day
+    - cron: "30 06 * * 2-4"
+      timezone: "Europe/London"
 
 permissions:
   id-token: write
