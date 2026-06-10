@@ -109,6 +109,7 @@ jobs:
               script_flags="$script_flags -c ${{ github.event.inputs.ec2_gap_secs }}"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            script_flags="-c 30 -g 2"
             onr_environments="pp" # space separated list
           fi
           else
