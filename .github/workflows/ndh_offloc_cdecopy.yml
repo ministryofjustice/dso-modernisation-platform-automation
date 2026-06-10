@@ -86,23 +86,9 @@ jobs:
               script_flags="$script_flags -f ${{ github.event.inputs.filename }}"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            cron_time="${{ github.event.schedule }}"
             script_flags="-as"
-            is_bst=1
-            if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
-              is_bst=0
-            fi
-            if [[ "${cron_time}" == '45 22 * * *' ]]; then
-              if ((is_bst == 1)); then
-                ndh_environments="t1 t2 pp pd dr"
-              fi
-            elif [[ "${cron_time}" == '45 23 * * *' ]]; then
-              if ((is_bst == 0)); then
-                ndh_environments="t1 t2 pp pd dr"
-              fi
-            else
-              ndh_environments="t1 t2 pp pd dr"
-            fi
+            ndh_environments="t1 t2 pp pd dr"
+          fi
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1

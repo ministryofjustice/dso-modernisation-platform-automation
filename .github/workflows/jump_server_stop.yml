@@ -69,24 +69,9 @@ jobs:
               gha_environment="hmpps-domain-services-dryrun"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            cron_time="${{ github.event.schedule }}"
-            is_bst=1
             gha_environment="hmpps-domain-services-schedule"
-            if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
-              is_bst=0
-            fi
-            if [[ "${cron_time}" == '05 21 * * 1-5' ]]; then
-              if ((is_bst == 1)); then
-                jumpservers="development test"
-              fi
-            elif [[ "${cron_time}" == '05 22 * * 1-5' ]]; then
-              if ((is_bst == 0)); then
-                jumpservers="development test"
-              fi
-            else
-              echo "Unsupported schedule cron ${cron_time}"
-              exit 1
-            fi
+            jumpservers="development test"
+          fi
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
