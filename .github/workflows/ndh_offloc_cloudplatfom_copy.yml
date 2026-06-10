@@ -21,9 +21,13 @@ on:
 
   schedule:
     - cron: "00 23 * * *"
+      timezone: "Europe/London"
     - cron: "00 00 * * *"
+      timezone: "Europe/London"
     - cron: "30 00 * * *"
+      timezone: "Europe/London"
     - cron: "30 03 * * *"
+      timezone: "Europe/London"
 
 permissions:
   id-token: write

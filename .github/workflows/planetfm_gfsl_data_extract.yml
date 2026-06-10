@@ -7,11 +7,13 @@ on:
     # files are created on share just after 04:00 and 12:20 localtime
     # multiple crons to deal with BST/GMT and GitHub delays
     - cron: "10 4 * * *"
+      timezone: "Europe/London"
     - cron: "10 5 * * *"
-    - cron: "10 6 * * *"
-    - cron: "30 10 * * *"
-    - cron: "30 11 * * *"
+      timezone: "Europe/London"
     - cron: "30 12 * * *"
+      timezone: "Europe/London"
+    - cron: "30 13 * * *"
+      timezone: "Europe/London"
 
 permissions:
   id-token: write
