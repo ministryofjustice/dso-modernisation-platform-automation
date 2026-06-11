@@ -82,23 +82,7 @@ jobs:
               script_flags="$script_flags -${{ github.event.inputs.weblogic_deployment }}"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            cron_time="${{ github.event.schedule }}"
-            is_bst=1
-            if [[ $(TZ=Europe/London date +%H) == $(date -u +%H) ]]; then
-              is_bst=0
-            fi
-            if [[ "${cron_time}" == '30 5 * * 1-5' || "${cron_time}" == '30 8 * * 1-5' ]]; then
-              if ((is_bst == 1)); then
-                nomis_environments="t3 preprod"
-              fi
-            elif [[ "${cron_time}" == '30 6 * * 1-5' || "${cron_time}" == '30 9 * * 1-5' ]]; then
-              if ((is_bst == 0)); then
-                nomis_environments="t3 preprod"
-              fi
-            else
-              echo "Unsupported schedule cron ${cron_time}"
-              exit 1
-            fi
+            nomis_environments="t3 preprod"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
