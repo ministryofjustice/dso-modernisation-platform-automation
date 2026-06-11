@@ -74,6 +74,7 @@ jobs:
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             jumpservers="development test preproduction"
+          fi  
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
