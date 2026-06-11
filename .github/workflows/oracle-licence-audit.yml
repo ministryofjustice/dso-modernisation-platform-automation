@@ -62,7 +62,7 @@ jobs:
       matrix: ${{ steps.calc_matrix.outputs.matrix }}
     steps:
       - name: Checkout helper scripts
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           path: dso-modernisation-platform-automation
 
@@ -92,7 +92,7 @@ jobs:
       inventory: inventory/ansible
     steps:
       - name: Checkout ansible config
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           path: ansible
@@ -100,7 +100,7 @@ jobs:
           fetch-depth: 0
 
       - name: Checkout Inventory & Roles
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           sparse-checkout-cone-mode: false
@@ -112,7 +112,7 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch Required Roles & Site
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           sparse-checkout-cone-mode: false
@@ -342,7 +342,7 @@ jobs:
       environment_name: hmpps-oem-development
     steps:
       - name: Checkout ansible config
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           path: ansible
@@ -350,7 +350,7 @@ jobs:
           fetch-depth: 0
 
       - name: Checkout Inventory & Roles
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           sparse-checkout-cone-mode: false
@@ -362,7 +362,7 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch Required Roles & Site
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: ministryofjustice/modernisation-platform-configuration-management
           sparse-checkout-cone-mode: false
