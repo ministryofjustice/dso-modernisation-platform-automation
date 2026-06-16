@@ -18,7 +18,11 @@ on:
         default: 'LE_PROD'
   schedule:
     # separate days to ensure certs aren't all updated on same day
-    - cron: "30 06 * * 2-4"
+    - cron: "30 06 * * 2"
+      timezone: "Europe/London"    
+    - cron: "30 06 * * 3"
+      timezone: "Europe/London"    
+    - cron: "30 06 * * 4"
       timezone: "Europe/London"
 
 permissions:
