@@ -129,6 +129,11 @@ jobs:
           ref: ${{ github.event.inputs.SourceConfigVersion }}
           fetch-depth: 0
 
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ github.ref }}
+
       - name: Determine Database Targets
         id: databasetargets
         if: ${{ github.event.inputs.auditLevel == '' || github.event.inputs.auditLevel == 'databases' }}
@@ -169,12 +174,6 @@ jobs:
               ;;
           esac
           echo "targets=$TARGET" >> $GITHUB_OUTPUT
-
-      - name: Checkout Repository
-        if: steps.databasetargets.outputs.targets != ''
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          ref: ${{ github.ref }}
 
       - name: Get Account Details
         uses: ./.github/actions/get_account_details
