@@ -229,7 +229,7 @@ jobs:
           $command \
             -i $inventory \
             --limit '${{ steps.valid_databasetargets.outputs.targets }}' \
-            --tags '${{ github.event.inputs.operation }}' --tags 'databases'
+            --tags '${{ github.event.inputs.operation }}' --tags 'databases' --skip-tags ansible_version_check
 
       - name: Determine weblogic Targets
         id: weblogic_targets
@@ -324,7 +324,7 @@ jobs:
           $command \
             -i $inventory \
             --limit '${{ steps.valid_weblogic_targets.outputs.targets }}' \
-            --tags '${{ github.event.inputs.operation }}' --tags 'weblogic'
+            --tags '${{ github.event.inputs.operation }}' --tags 'weblogic' --skip-tags ansible_version_check
 
   # The summary task only needs to run once on one environment, so we're using hmpps-oem-development
   # as the target environment. This is because it needs access to the S3 bucket where the audit
@@ -401,4 +401,4 @@ jobs:
           $command \
             -i $inventory \
             --limit 'environment_name_${environment_name//-/_}' \
-            --tags '${{ github.event.inputs.operation }}'
+            --tags '${{ github.event.inputs.operation }}' --skip-tags ansible_version_check
