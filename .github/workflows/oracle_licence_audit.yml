@@ -133,6 +133,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           ref: ${{ github.ref }}
+          path: dso-automation
 
       - name: Determine Database Targets
         id: databasetargets
@@ -176,7 +177,7 @@ jobs:
           echo "targets=$TARGET" >> $GITHUB_OUTPUT
 
       - name: Get Account Details
-        uses: ./.github/actions/get_account_details
+        uses: ./dso-automation/.github/actions/get_account_details
         id: account
         if: steps.databasetargets.outputs.targets != ''
         with:
@@ -312,7 +313,7 @@ jobs:
           echo "targets=$TARGET" >> $GITHUB_OUTPUT
 
       - name: Get Account Details
-        uses: ./.github/actions/get_account_details
+        uses: ./dso-automation/.github/actions/get_account_details
         id: account_web
         if: steps.weblogic_targets.outputs.targets != ''
         with:
@@ -470,9 +471,10 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           ref: ${{ github.ref }}
+          path: dso-automation
 
       - name: Get Account Details
-        uses: ./.github/actions/get_account_details
+        uses: ./dso-automation/.github/actions/get_account_details
         id: account
         with:
           account_name: ${{ env.environment_name }}
