@@ -106,18 +106,19 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           ref: ${{ github.ref }}
+          path: dso-automation
 
       - name: Get Account Name
         env:
           nomis_environment: "${{ matrix.nomis_environment }}"
         id: account_name
         run: |
-          account_name=$(src/nomis/nomis_control.sh -z "$nomis_environment")
+          account_name=$(dso-automation/src/nomis/nomis_control.sh -z "$nomis_environment")
           echo "account_name=${account_name}"
           echo "account_name=${account_name}" >> $GITHUB_OUTPUT
 
       - name: Get Account Details
-        uses: ./.github/actions/get_account_details
+        uses: ./dso-automation/.github/actions/get_account_details
         id: account
         with:
           account_name: ${{ steps.account_name.outputs.account_name }}
@@ -129,6 +130,11 @@ jobs:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "${{ steps.account.outputs.role_session_name }}"
           aws-region: eu-west-2
+
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ github.ref }}
 
       - name: Get Active Weblogic ASG Stats
         id: active_asg_stats

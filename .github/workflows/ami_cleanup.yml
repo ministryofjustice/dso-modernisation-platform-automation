@@ -94,9 +94,10 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           ref: ${{ github.ref }}
+          path: dso-automation
 
       - name: Get Account Details
-        uses: ./.github/actions/get_account_details
+        uses: ./dso-automation/.github/actions/get_account_details
         id: account
         with:
           account_name: ${{ matrix.account_name }}
