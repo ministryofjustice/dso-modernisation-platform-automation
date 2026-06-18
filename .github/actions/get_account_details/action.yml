@@ -1,5 +1,5 @@
 name: "Get Account Details"
-description: "Retrieves AWS account ID from GitHub secrets with fallback to AWS Secrets Manager, and generates role ARN"
+description: "Retrieves AWS account ID from GitHub secrets with fallback to AWS Secrets Manager via a bridge account, and generates role ARN"
 
 inputs:
   account_name:
@@ -12,6 +12,10 @@ inputs:
     description: "IAM role name to assume (default: modernisation-platform-oidc-cicd)"
     required: false
     default: "modernisation-platform-oidc-cicd"
+  fallback_account_name:
+    description: "Account name to authenticate to for Secrets Manager fallback lookup (must be present in secrets_json)"
+    required: false
+    default: "nomis-test"
 
 outputs:
   account_id:
@@ -36,39 +40,40 @@ runs:
         account_id="${{ fromJSON(inputs.secrets_json).account_ids[inputs.account_name] }}"
 
         if [ -z "$account_id" ] || [ "$account_id" = "null" ]; then
-          echo "Account ID not found in GitHub secrets, will fetch from AWS Secrets Manager..."
+          echo "Account ID not found in GitHub secrets, will fetch from AWS Secrets Manager via bridge account '${{ inputs.fallback_account_name }}'..."
 
-          mp_account_id="${{ fromJSON(inputs.secrets_json).modernisation_platform_account_id }}"
-
-          if [ -z "$mp_account_id" ] || [ "$mp_account_id" = "null" ]; then
-            echo "ERROR: Cannot retrieve modernisation_platform_account_id from secrets"
+          fallback_account_id="${{ fromJSON(inputs.secrets_json).account_ids[inputs.fallback_account_name] }}"
+          if [ -z "$fallback_account_id" ] || [ "$fallback_account_id" = "null" ]; then
+            echo "ERROR: Bridge account '${{ inputs.fallback_account_name }}' not found in GitHub secrets"
             exit 1
           fi
 
-          mp_role_arn="arn:aws:iam::${mp_account_id}:role/${{ inputs.role_name }}"
-          echo "needs_secrets_manager=true" >> $GITHUB_OUTPUT
-          echo "mp_role_arn=${mp_role_arn}" >> $GITHUB_OUTPUT
+          fallback_role_arn="arn:aws:iam::${fallback_account_id}:role/${{ inputs.role_name }}"
+          echo "needs_fallback=true" >> $GITHUB_OUTPUT
+          echo "fallback_role_arn=${fallback_role_arn}" >> $GITHUB_OUTPUT
         else
           echo "✓ Account ID retrieved from GitHub secrets"
-          echo "needs_secrets_manager=false" >> $GITHUB_OUTPUT
+          echo "needs_fallback=false" >> $GITHUB_OUTPUT
           echo "account_id=${account_id}" >> $GITHUB_OUTPUT
         fi
 
-    - name: Configure AWS Credentials for Modernisation Platform
-      if: steps.resolve_account.outputs.needs_secrets_manager == 'true'
+    - name: Configure AWS Credentials for Bridge Account
+      if: steps.resolve_account.outputs.needs_fallback == 'true'
       uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
       with:
-        role-to-assume: ${{ steps.resolve_account.outputs.mp_role_arn }}
-        role-session-name: github-${{ github.repository_id }}-${{ github.run_id }}-mp-lookup
+        role-to-assume: ${{ steps.resolve_account.outputs.fallback_role_arn }}
+        role-session-name: github-${{ github.repository_id }}-${{ github.run_id }}-sm-lookup
         aws-region: eu-west-2
 
     - name: Fetch Account ID from Secrets Manager
       id: fetch_from_sm
-      if: steps.resolve_account.outputs.needs_secrets_manager == 'true'
+      if: steps.resolve_account.outputs.needs_fallback == 'true'
       shell: bash
       run: |
+        mp_account_id="${{ fromJSON(inputs.secrets_json).modernisation_platform_account_id }}"
+
         if ! secret_json=$(aws secretsmanager get-secret-value \
-          --secret-id "arn:aws:secretsmanager:eu-west-2:${{ fromJSON(inputs.secrets_json).modernisation_platform_account_id }}:secret:environment_management" \
+          --secret-id "arn:aws:secretsmanager:eu-west-2:${mp_account_id}:secret:environment_management" \
           --output text \
           --query SecretString 2>&1); then
           echo "ERROR: Failed to retrieve secret from AWS Secrets Manager"
