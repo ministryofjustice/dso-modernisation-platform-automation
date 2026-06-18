@@ -40,7 +40,7 @@ runs:
           echo "Account ID not found in GitHub secrets, fetching from AWS Secrets Manager..."
           
           # Get the Modernisation Platform account ID to access Secrets Manager
-          mp_account_id="${{ fromJSON(inputs.secrets_json).account_ids['modernisation_platform_account_id'] }}"
+          mp_account_id="${{ fromJSON(inputs.secrets_json).modernisation_platform_account_id }}"
           
           if [ -z "$mp_account_id" ] || [ "$mp_account_id" = "null" ]; then
             echo "ERROR: Cannot retrieve modernisation_platform_account_id from secrets"
