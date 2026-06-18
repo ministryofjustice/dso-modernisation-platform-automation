@@ -15,7 +15,7 @@ inputs:
   fallback_account_name:
     description: "Account name to authenticate to for Secrets Manager fallback lookup (must be present in secrets_json)"
     required: false
-    default: "nomis-test"
+    default: "nomis-development"
 
 outputs:
   account_id:
