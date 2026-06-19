@@ -83,18 +83,23 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.strategy.outputs.matrix) }}
     steps:
-      - name: Get Account Id
-        id: account_id
-        run: |
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
-          echo "account_id=${account_id}"
-          echo "account_id=${account_id}" >> $GITHUB_OUTPUT
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Get Account Details
+        uses: ./.github/actions/get_account_details
+        id: account
+        with:
+          account_name: ${{ matrix.account_name }}
+          secrets_json: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885  # v6.1.1
         with:
-          role-to-assume: "arn:aws:iam::${{ steps.account_id.outputs.account_id }}:role/modernisation-platform-oidc-cicd"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-1"
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "${{ steps.account.outputs.role_session_name }}"
           aws-region: eu-west-2
 
       - name: Azure Login
@@ -106,11 +111,6 @@ jobs:
         run: |
           az --version
           az account list
-
-      - name: Checkout Repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          ref: ${{ github.ref }}
 
       - name: Refresh Token
         run: |

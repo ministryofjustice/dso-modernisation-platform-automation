@@ -1,0 +1,118 @@
+name: "Get Account Details"
+description: "Retrieves AWS account ID from GitHub secrets with fallback to AWS Secrets Manager via a bridge account, and generates role ARN"
+
+inputs:
+  account_name:
+    description: "Name of the AWS account to lookup (e.g., nomis-development, oasys-production)"
+    required: true
+  secrets_json:
+    description: "JSON content of MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT secret"
+    required: true
+  role_name:
+    description: "IAM role name to assume (default: modernisation-platform-oidc-cicd)"
+    required: false
+    default: "modernisation-platform-oidc-cicd"
+  fallback_account_name:
+    description: "Account name to authenticate to for Secrets Manager fallback lookup (must be present in secrets_json)"
+    required: false
+    default: "nomis-development"
+
+outputs:
+  account_id:
+    description: "AWS Account ID"
+    value: ${{ steps.finalise.outputs.account_id }}
+  role_arn:
+    description: "Full ARN of the IAM role to assume"
+    value: ${{ steps.finalise.outputs.role_arn }}
+  role_session_name:
+    description: "Generated role session name for AWS credentials"
+    value: ${{ steps.finalise.outputs.role_session_name }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve Account ID from GitHub Secrets
+      id: resolve_account
+      shell: bash
+      run: |
+        echo "Resolving account ID for: ${{ inputs.account_name }}"
+
+        account_id="${{ fromJSON(inputs.secrets_json).account_ids[inputs.account_name] }}"
+
+        if [ -z "$account_id" ] || [ "$account_id" = "null" ]; then
+          echo "Account ID not found in GitHub secrets, will fetch from AWS Secrets Manager via bridge account '${{ inputs.fallback_account_name }}'..."
+
+          fallback_account_id="${{ fromJSON(inputs.secrets_json).account_ids[inputs.fallback_account_name] }}"
+          if [ -z "$fallback_account_id" ] || [ "$fallback_account_id" = "null" ]; then
+            echo "ERROR: Bridge account '${{ inputs.fallback_account_name }}' not found in GitHub secrets"
+            exit 1
+          fi
+
+          fallback_role_arn="arn:aws:iam::${fallback_account_id}:role/${{ inputs.role_name }}"
+          echo "needs_fallback=true" >> $GITHUB_OUTPUT
+          echo "fallback_role_arn=${fallback_role_arn}" >> $GITHUB_OUTPUT
+        else
+          echo "✓ Account ID retrieved from GitHub secrets"
+          echo "needs_fallback=false" >> $GITHUB_OUTPUT
+          echo "account_id=${account_id}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Configure AWS Credentials for Bridge Account
+      if: steps.resolve_account.outputs.needs_fallback == 'true'
+      uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+      with:
+        role-to-assume: ${{ steps.resolve_account.outputs.fallback_role_arn }}
+        role-session-name: github-${{ github.repository_id }}-${{ github.run_id }}-sm-lookup
+        aws-region: eu-west-2
+
+    - name: Fetch Account ID from Secrets Manager
+      id: fetch_from_sm
+      if: steps.resolve_account.outputs.needs_fallback == 'true'
+      shell: bash
+      run: |
+        mp_account_id="${{ fromJSON(inputs.secrets_json).modernisation_platform_account_id }}"
+
+        if ! secret_json=$(aws secretsmanager get-secret-value \
+          --secret-id "arn:aws:secretsmanager:eu-west-2:${mp_account_id}:secret:environment_management" \
+          --output text \
+          --query SecretString 2>&1); then
+          echo "ERROR: Failed to retrieve secret from AWS Secrets Manager"
+          echo "$secret_json"
+          exit 1
+        fi
+
+        account_id=$(echo "$secret_json" | jq -r ".account_ids[\"${{ inputs.account_name }}\"]")
+
+        if [ -z "$account_id" ] || [ "$account_id" = "null" ]; then
+          echo "ERROR: Account ID not found for '${{ inputs.account_name }}' in AWS Secrets Manager"
+          exit 1
+        fi
+
+        echo "✓ Account ID retrieved from AWS Secrets Manager"
+        echo "account_id=${account_id}" >> $GITHUB_OUTPUT
+
+    - name: Finalise Outputs
+      id: finalise
+      shell: bash
+      run: |
+        account_id="${{ steps.resolve_account.outputs.account_id }}"
+        if [ -z "$account_id" ] || [ "$account_id" = "null" ]; then
+          account_id="${{ steps.fetch_from_sm.outputs.account_id }}"
+        fi
+
+        if ! [[ "$account_id" =~ ^[0-9]{12}$ ]]; then
+          echo "ERROR: Invalid account ID format: $account_id (expected 12 digits)"
+          exit 1
+        fi
+
+        role_arn="arn:aws:iam::${account_id}:role/${{ inputs.role_name }}"
+        account_name_truncated=$(echo "${{ inputs.account_name }}" | cut -c1-20)
+        role_session_name="github-${{ github.repository_id }}-${{ github.run_id }}-${account_name_truncated}"
+
+        echo "account_id=${account_id}" >> $GITHUB_OUTPUT
+        echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+        echo "role_session_name=${role_session_name}" >> $GITHUB_OUTPUT
+
+        echo "Account ID: ${account_id}"
+        echo "Role ARN: ${role_arn}"
+        echo "Role Session Name: ${role_session_name}"

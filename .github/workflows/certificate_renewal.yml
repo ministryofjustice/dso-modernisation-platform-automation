@@ -114,19 +114,17 @@ jobs:
           echo "domain_names=${domain_names}" >> $GITHUB_OUTPUT
 
       - name: Get Account Id
+        uses: ./.github/actions/get_account_details
         id: account
-        run: |
-          echo "account name: ${{ steps.config.outputs.account_name }}"
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.config.outputs.account_name] }}"
-          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
-          echo "role arn:     ${role_arn}"
-          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+        with:
+          account_name: ${{ steps.config.outputs.account_name }}
+          secrets_json: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885  # v6.1.1
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ec2_hostname }}-1"
+          role-session-name: "${{ steps.account.outputs.role_session_name }}"
           aws-region: eu-west-2
 
       - name: Check Cert Expiry
@@ -229,19 +227,17 @@ jobs:
           echo "domain_names=${domain_names}" >> $GITHUB_OUTPUT
 
       - name: Get Account Id
+        uses: ./.github/actions/get_account_details
         id: account
-        run: |
-          echo "account name: ${{ steps.config.outputs.account_name }}"
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[steps.config.outputs.account_name] }}"
-          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
-          echo "role arn:     ${role_arn}"
-          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+        with:
+          account_name: ${{ steps.config.outputs.account_name }}
+          secrets_json: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885  # v6.1.1
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
-          role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-${{ matrix.ec2_hostname }}-1"
+          role-session-name: "${{ steps.account.outputs.role_session_name }}"
           aws-region: eu-west-2
 
       - name: Check Cert Expiry

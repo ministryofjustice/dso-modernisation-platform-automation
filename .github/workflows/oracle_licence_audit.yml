@@ -43,6 +43,9 @@ on:
           - ''
           - 'databases'
           - 'weblogic'
+      target_hostname:
+        description: 'Optional: Target hostname to limit the audit to a specific host'
+        type: string
       SourceConfigVersion:
         description: 'Branch/tag/commit for modernisation-platform-configuration-management'
         type: string
@@ -126,6 +129,12 @@ jobs:
           ref: ${{ github.event.inputs.SourceConfigVersion }}
           fetch-depth: 0
 
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ github.ref }}
+          path: dso-automation
+
       - name: Determine Database Targets
         id: databasetargets
         if: ${{ github.event.inputs.auditLevel == '' || github.event.inputs.auditLevel == 'databases' }}
@@ -168,22 +177,19 @@ jobs:
           echo "targets=$TARGET" >> $GITHUB_OUTPUT
 
       - name: Get Account Details
+        uses: ./dso-automation/.github/actions/get_account_details
         id: account
         if: steps.databasetargets.outputs.targets != ''
-        shell: bash
-        run: |
-          echo "account name: ${{ matrix.account_name }}"
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
-          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
-          echo "role arn:     ${role_arn}"
-          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+        with:
+          account_name: ${{ matrix.account_name }}
+          secrets_json: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
 
       - name: Configure AWS Credentials
         if: steps.databasetargets.outputs.targets != ''
         uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
-          role-session-name: "oracle-licence-audit-${{ matrix.account_name }}-${{ github.run_number }}"
+          role-session-name: "${{ steps.account.outputs.role_session_name }}"
           aws-region: eu-west-2
           output-credentials: true
 
@@ -221,14 +227,58 @@ jobs:
           # Export for GitHub Actions
           echo "targets=$JOINED" >> "$GITHUB_OUTPUT"
 
-      - name: Run Oracle Licence Audit
+      - name: Build Database Limit
         if: steps.valid_databasetargets.outputs.targets != ''
+        id: database_limit
+        shell: bash
+        run: |
+          export ANSIBLE_CONFIG=$ansible_config
+          targets="${{ steps.valid_databasetargets.outputs.targets }}"
+          target_hostname="${{ github.event.inputs.target_hostname }}"
+
+          if [ -n "$target_hostname" ]; then
+            aws_count=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=$target_hostname" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+              --query 'length(Reservations[].Instances[])' \
+              --output text)
+
+            if [ "$aws_count" = "0" ]; then
+              aws_count=$(aws ec2 describe-instances \
+                --filters "Name=private-dns-name,Values=$target_hostname" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+                --query 'length(Reservations[].Instances[])' \
+                --output text)
+            fi
+
+            if [ "$aws_count" = "0" ]; then
+              echo "Error: target_hostname '$target_hostname' not found in AWS account ${{ matrix.account_name }}"
+              exit 1
+            fi
+
+            if ! ansible-inventory -i "$inventory" --graph | grep -qw "$target_hostname"; then
+              echo "Error: target_hostname '$target_hostname' not found in ansible inventory"
+              exit 1
+            fi
+
+            scoped_limit="${targets//,/:}:&$target_hostname"
+            scoped_hosts=$(ansible all -i "$inventory" --list-hosts --limit "$scoped_limit" | tail -n +2 | wc -l | tr -d ' ')
+            if [ "$scoped_hosts" = "0" ]; then
+              echo "Error: target_hostname '$target_hostname' is not part of the database targets '$targets'"
+              exit 1
+            fi
+
+            echo "limit=$scoped_limit" >> "$GITHUB_OUTPUT"
+          else
+            echo "limit=$targets" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Oracle Licence Audit
+        if: steps.database_limit.outputs.limit != ''
         shell: bash
         run: |
           export ANSIBLE_CONFIG=$ansible_config
           $command \
             -i $inventory \
-            --limit '${{ steps.valid_databasetargets.outputs.targets }}' \
+            --limit '${{ steps.database_limit.outputs.limit }}' \
             --tags '${{ github.event.inputs.operation }}' --tags 'databases' --skip-tags ansible_version_check
 
       - name: Determine weblogic Targets
@@ -263,22 +313,19 @@ jobs:
           echo "targets=$TARGET" >> $GITHUB_OUTPUT
 
       - name: Get Account Details
+        uses: ./dso-automation/.github/actions/get_account_details
         id: account_web
         if: steps.weblogic_targets.outputs.targets != ''
-        shell: bash
-        run: |
-          echo "account name: ${{ matrix.account_name }}"
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[matrix.account_name] }}"
-          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
-          echo "role arn:     ${role_arn}"
-          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+        with:
+          account_name: ${{ matrix.account_name }}
+          secrets_json: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
 
       - name: Configure AWS Credentials
         if: steps.weblogic_targets.outputs.targets != ''
         uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: "${{ steps.account_web.outputs.role_arn }}"
-          role-session-name: "oracle-licence-audit-${{ matrix.account_name }}-${{ github.run_number }}"
+          role-session-name: "${{ steps.account_web.outputs.role_session_name }}"
           aws-region: eu-west-2
           output-credentials: true
           
@@ -316,14 +363,58 @@ jobs:
           # Export for GitHub Actions
           echo "targets=$JOINED" >> "$GITHUB_OUTPUT"
 
-      - name: Run Oracle Licence Audit
+      - name: Build Weblogic Limit
         if: steps.valid_weblogic_targets.outputs.targets != ''
+        id: weblogic_limit
+        shell: bash
+        run: |
+          export ANSIBLE_CONFIG=$ansible_config
+          targets="${{ steps.valid_weblogic_targets.outputs.targets }}"
+          target_hostname="${{ github.event.inputs.target_hostname }}"
+
+          if [ -n "$target_hostname" ]; then
+            aws_count=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=$target_hostname" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+              --query 'length(Reservations[].Instances[])' \
+              --output text)
+
+            if [ "$aws_count" = "0" ]; then
+              aws_count=$(aws ec2 describe-instances \
+                --filters "Name=private-dns-name,Values=$target_hostname" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+                --query 'length(Reservations[].Instances[])' \
+                --output text)
+            fi
+
+            if [ "$aws_count" = "0" ]; then
+              echo "Error: target_hostname '$target_hostname' not found in AWS account ${{ matrix.account_name }}"
+              exit 1
+            fi
+
+            if ! ansible-inventory -i "$inventory" --graph | grep -qw "$target_hostname"; then
+              echo "Error: target_hostname '$target_hostname' not found in ansible inventory"
+              exit 1
+            fi
+
+            scoped_limit="${targets//,/:}:&$target_hostname"
+            scoped_hosts=$(ansible all -i "$inventory" --list-hosts --limit "$scoped_limit" | tail -n +2 | wc -l | tr -d ' ')
+            if [ "$scoped_hosts" = "0" ]; then
+              echo "Error: target_hostname '$target_hostname' is not part of the weblogic targets '$targets'"
+              exit 1
+            fi
+
+            echo "limit=$scoped_limit" >> "$GITHUB_OUTPUT"
+          else
+            echo "limit=$targets" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Oracle Licence Audit
+        if: steps.weblogic_limit.outputs.limit != ''
         shell: bash
         run: |
           export ANSIBLE_CONFIG=$ansible_config
           $command \
             -i $inventory \
-            --limit '${{ steps.valid_weblogic_targets.outputs.targets }}' \
+            --limit '${{ steps.weblogic_limit.outputs.limit }}' \
             --tags '${{ github.event.inputs.operation }}' --tags 'weblogic' --skip-tags ansible_version_check
 
   # The summary task only needs to run once on one environment, so we're using hmpps-oem-development
@@ -376,23 +467,69 @@ jobs:
           ref: ${{ github.event.inputs.SourceConfigVersion }}
           fetch-depth: 0
 
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ github.ref }}
+          path: dso-automation
+
       - name: Get Account Details
+        uses: ./dso-automation/.github/actions/get_account_details
         id: account
-        shell: bash
-        run: |
-          echo "account name: ${{ env.environment_name }}"
-          account_id="${{ fromJSON(secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT).account_ids[env.environment_name] }}"
-          role_arn="arn:aws:iam::${account_id}:role/modernisation-platform-oidc-cicd"
-          echo "role arn:     ${role_arn}"
-          echo "role_arn=${role_arn}" >> $GITHUB_OUTPUT
+        with:
+          account_name: ${{ env.environment_name }}
+          secrets_json: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
-          role-session-name: "oracle-licence-audit-${{ env.environment_name }}-${{ github.run_number }}"
+          role-session-name: "${{ steps.account.outputs.role_session_name }}"
           aws-region: eu-west-2
           output-credentials: true
+
+      - name: Build Summary Limit
+        id: summary_limit
+        shell: bash
+        run: |
+          export ANSIBLE_CONFIG=$ansible_config
+          default_limit="environment_name_${environment_name//-/_}"
+          target_hostname="${{ github.event.inputs.target_hostname }}"
+
+          if [ -n "$target_hostname" ]; then
+            aws_count=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=$target_hostname" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+              --query 'length(Reservations[].Instances[])' \
+              --output text)
+
+            if [ "$aws_count" = "0" ]; then
+              aws_count=$(aws ec2 describe-instances \
+                --filters "Name=private-dns-name,Values=$target_hostname" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+                --query 'length(Reservations[].Instances[])' \
+                --output text)
+            fi
+
+            if [ "$aws_count" = "0" ]; then
+              echo "Error: target_hostname '$target_hostname' not found in AWS account $environment_name"
+              exit 1
+            fi
+
+            if ! ansible-inventory -i "$inventory" --graph | grep -qw "$target_hostname"; then
+              echo "Error: target_hostname '$target_hostname' not found in ansible inventory"
+              exit 1
+            fi
+
+            scoped_limit="${default_limit}:&$target_hostname"
+            scoped_hosts=$(ansible all -i "$inventory" --list-hosts --limit "$scoped_limit" | tail -n +2 | wc -l | tr -d ' ')
+            if [ "$scoped_hosts" = "0" ]; then
+              echo "Error: target_hostname '$target_hostname' is not part of summary target '$default_limit'"
+              exit 1
+            fi
+
+            echo "limit=$scoped_limit" >> "$GITHUB_OUTPUT"
+          else
+            echo "limit=$default_limit" >> "$GITHUB_OUTPUT"
+          fi
           
       - name: Run Audit Summary
         shell: bash
@@ -400,5 +537,5 @@ jobs:
           export ANSIBLE_CONFIG=$ansible_config
           $command \
             -i $inventory \
-            --limit 'environment_name_${environment_name//-/_}' \
+            --limit '${{ steps.summary_limit.outputs.limit }}' \
             --tags '${{ github.event.inputs.operation }}' --skip-tags ansible_version_check
