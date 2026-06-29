@@ -20,8 +20,8 @@ on:
         default: ''
       script_flags:
         type: string
-        description: "Flags to pass to ndh-cdecopy script: a=Azure s=s3"
-        default: "-as"
+        description: "Flags to pass to ndh-cdecopy script: s=s3"
+        default: "-s"
       dryrun:
         type: choice
         description: Dryrun mode (leave as false unless testing)
@@ -86,7 +86,7 @@ jobs:
               script_flags="$script_flags -f ${{ github.event.inputs.filename }}"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            script_flags="-as"
+            script_flags="-s"
             ndh_environments="t1 t2 pp pd dr"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
