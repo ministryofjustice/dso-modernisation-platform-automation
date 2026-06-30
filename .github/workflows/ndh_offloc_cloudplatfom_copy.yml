@@ -117,7 +117,7 @@ jobs:
           secrets_json: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
 
       - name: Configure AWS Credentials for Source
-        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "${{ steps.account.outputs.role_session_name }}"
@@ -203,7 +203,7 @@ jobs:
             fi
 
       - name: Configure AWS Credentials for Destination
-        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b
         with:
           role-to-assume: ${{ needs.setup.outputs.cp_environment == 'preprod' && secrets.OFFLOC_TRANSFER_GHA_ROLE_ARN_PREPROD || secrets.OFFLOC_TRANSFER_GHA_ROLE_ARN_PROD }}
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-dest"
