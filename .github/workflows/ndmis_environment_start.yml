@@ -1,0 +1,168 @@
+---
+name: NDMIS Environment Start
+
+on:
+  workflow_dispatch:
+    inputs:
+      ndmis_environment:
+        type: choice
+        description: Which delius-mis environment to start
+        default: dev
+        options:
+          - dev
+          - stage
+          - preprod
+      pipeline_stages:
+        type: string
+        description: limit which stages of the start process to run, 0-8 or all
+        default: all
+      force:
+        type: choice
+        description: Force run all stages (i.e. don't stop on error)
+        default: false
+        options:
+          - true
+          - false
+      dryrun:
+        type: choice
+        description: Dryrun mode (leave as false unless testing)
+        default: false
+        options:
+          - true
+          - false
+      verbose:
+        type: choice
+        description: Enable verbose output
+        default: false
+        options:
+          - true
+          - false
+      ccm_gap_secs:
+        type: number
+        description: Leave a gap between each ccm command
+        default: 2
+      ec2_gap_secs:
+        type: number
+        description: Leave a gap between starting each CMS/APP EC2
+        default: 30
+
+  schedule:
+    # runs at 06:45 local time
+    # second cron at 07:50 is a failsafe, in case something went wrong with the first run
+    - cron: "45 6 * * 1-5"
+      timezone: "Europe/London"
+    - cron: "50 7 * * 1-5"
+      timezone: "Europe/London"
+
+permissions:
+  id-token: write
+  contents: read
+
+run-name: "NDMIS Environment Start (${{ inputs.ndmis_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: "${{ steps.parseinput.outputs.matrix }}"
+      ndmis_environments: "${{ steps.parseinput.outputs.ndmis_environments }}"
+      script_flags: "${{ steps.parseinput.outputs.script_flags }}"
+      pipeline_stages: "${{ steps.parseinput.outputs.pipeline_stages }}"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Parse Workflow Inputs
+        id: parseinput
+        run: |
+          get_strategy_matrix() {
+            echo '{"include":['
+            (
+              for ndmis_environment in $@; do
+                echo '{"ndmis_environment": "'$ndmis_environment'"},'
+              done
+            ) | sed '$s/,$//'
+            echo ']}'
+          }
+          ndmis_environments=
+          script_flags=
+          pipeline_stages=all
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            ndmis_environments="${{ github.event.inputs.ndmis_environment }}"
+            pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
+            if [[ "${{ github.event.inputs.force }}" == "true" ]]; then
+              script_flags="$script_flags -f"
+            fi
+            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+              script_flags="$script_flags -d"
+            fi
+            if [[ "${{ github.event.inputs.verbose }}" == "true" ]]; then
+              script_flags="$script_flags -v"
+            fi
+            if [[ -n "${{ github.event.inputs.ccm_gap_secs }}" ]]; then
+              script_flags="$script_flags -g ${{ github.event.inputs.ccm_gap_secs }}"
+            fi
+            if [[ -n "${{ github.event.inputs.ec2_gap_secs }}" ]]; then
+              script_flags="$script_flags -c ${{ github.event.inputs.ec2_gap_secs }}"
+              script_flags="$script_flags -a ${{ github.event.inputs.ec2_gap_secs }}"
+            fi
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            ndmis_environments="pp" # space separated list
+            script_flags="-c 30 -a 30 -g 2"
+          else
+            echo "Unsupported event ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+          echo "ndmis_environments=${ndmis_environments} script_flags=${script_flags} pipeline_stages=${pipeline_stages}"
+          echo "matrix=$(get_strategy_matrix $ndmis_environments | jq -c)" >> $GITHUB_OUTPUT
+          echo "ndmis_environments=${ndmis_environments}" >> $GITHUB_OUTPUT
+          echo "script_flags=${script_flags}" >> $GITHUB_OUTPUT
+          echo "pipeline_stages=${pipeline_stages}" >> $GITHUB_OUTPUT
+
+  start:
+    name: Start
+    needs: setup
+    if: ${{ needs.setup.outputs.ndmis_environments != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Get Account Name
+        env:
+          ndmis_environment: "${{ matrix.ndmis_environment }}"
+        id: account_name
+        run: |
+          account_name=$(src/delius-mis/ndmis_control.sh -e "$ndmis_environment" env aws-account)
+          echo "account_name=${account_name}"
+          echo "account_name=${account_name}" >> $GITHUB_OUTPUT
+
+      - name: Get Account Id
+        uses: ./.github/actions/get_account_details
+        id: account
+        with:
+          account_name: ${{ steps.account_name.outputs.account_name }}
+          secrets_json: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885  # v6.1.1
+        with:
+          role-to-assume: "${{ steps.account.outputs.role_arn }}"
+          role-session-name: "${{ steps.account.outputs.role_session_name }}"
+          aws-region: eu-west-2
+
+      - name: Start
+        env:
+          ndmis_environment: "${{ matrix.ndmis_environment }}"
+          script_flags: "${{ needs.setup.outputs.script_flags }}"
+          pipeline_stages: "${{ needs.setup.outputs.pipeline_stages }}"
+        run: |
+          src/delius-mis/ndmis_control.sh -e "$ndmis_environment" $script_flags pipeline start "$pipeline_stages"
