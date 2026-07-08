@@ -12,6 +12,7 @@ QUICK_MODE=0
 GAP_SECS=0
 LBS=
 CMS_START_STOP_SEQUENTIAL_WAIT_SECS=
+APP_START_STOP_SEQUENTIAL_WAIT_SECS=
 WEB_START_STOP_SEQUENTIAL_WAIT_SECS=
 EC2_RUN_SCRIPT=$(dirname "$0")/../run_script_on_ec2.sh
 STAGE3_WAIT_SECS=600
@@ -29,11 +30,13 @@ usage() {
 
 Where <opts>:
   -3 wait_secs              Override default pipeline stage 3 wait time
+  -a wait_secs              Start/Stop APP EC2s sequentially and leave wait_secs in between each
   -c wait_secs              Start/Stop CMS EC2s sequentially and leave wait_secs in between each
   -d                        Enable dryrun for maintenance mode commands
-  -e <env>                  Set oasys-national-reporting environment
+  -e <env>                  Set delius-mis environment
   -f                        Force start/stop
   -g <seconds>              The gap to wait between each ccm.sh command
+  -l public,sso             Select LB endpoint(s)
   -q                        Do quick stop in pipeline mode, i.e. only disable AdaptiveJobServer
   -v                        Enable verbose debug
   -w wait_secs              Start/Stop WEB EC2s sequentially and leave wait_secs in between each
@@ -83,23 +86,34 @@ error() {
 }
 
 set_env_variables() {
-  PUBLIC_LB_NAME=public-lb
   PUBLIC_LB_RULE_MAINTENANCE_PRIORITY=999
   PUBLIC_LB_PORT=443
   PUBLIC_LB_BACKEND_PORT=7777
-  LBS=public
 
-  if [[ $ONR_ENVIRONMENT == t2 ]]; then
-    AWS_ACCOUNT=oasys-national-reporting-test
-    PUBLIC_LB_URL=t2.test.reporting.oasys.service.justice.gov.uk
-  elif [[ $ONR_ENVIRONMENT == pp ]]; then
-    AWS_ACCOUNT=oasys-national-reporting-preproduction
-    PUBLIC_LB_URL=preproduction.reporting.oasys.service.justice.gov.uk
-  elif [[ $ONR_ENVIRONMENT == pd ]]; then
-    AWS_ACCOUNT=oasys-national-reporting-production
-    PUBLIC_LB_URL=reporting.oasys.service.justice.gov.uk
+  if [[ $NDMIS_ENVIRONMENT == dev ]]; then
+    AWS_ACCOUNT=delius-mis-development
+    PUBLIC_LB_NAME=dev-mis-alb
+    PUBLIC_LB_URL=dev.delius-mis.hmpps-development.modernisation-platform.service.justice.gov.uk
+    if [[ -z $LBS ]]; then
+      LBS="public"
+    fi
+  elif [[ $NDMIS_ENVIRONMENT == stage ]]; then
+    AWS_ACCOUNT=delius-mis-preproduction
+    PUBLIC_LB_NAME=stage-mis-alb
+    PUBLIC_LB_URL=stage.delius-mis.hmpps-preproduction.modernisation-platform.service.justice.gov.uk
+    if [[ -z $LBS ]]; then
+      LBS="public sso"
+    fi
+
+  elif [[ $NDMIS_ENVIRONMENT == preprod ]]; then
+    AWS_ACCOUNT=delius-mis-preproduction
+    PUBLIC_LB_NAME=preprod-mis-alb
+    PUBLIC_LB_URL=preprod.delius-mis.hmpps-preproduction.modernisation-platform.service.justice.gov.uk
+    if [[ -z $LBS ]]; then
+      LBS="public sso"
+    fi
   else
-    error "Unsupported oasys-national-reporting-environment value '$ONR_ENVIRONMENT'"
+    error "Unsupported delius-mis-environment value '$NDMIS_ENVIRONMENT'"
     return 1
   fi
 }
@@ -112,8 +126,8 @@ get_ec2_server_info() {
   local name
   local status
 
-  debug "aws ec2 describe-instances --filters 'Name=tag:oasys-national-reporting-environment,Values=$ONR_ENVIRONMENT' 'Name=tag:$1,Values=$2'"
-  if ! json=$(aws ec2 describe-instances --no-cli-pager --filters "Name=tag:oasys-national-reporting-environment,Values=$ONR_ENVIRONMENT" "Name=tag:$1,Values=$2"); then
+  debug "aws ec2 describe-instances --filters 'Name=tag:delius-environment,Values=$NDMIS_ENVIRONMENT' 'Name=tag:$1,Values=$2'"
+  if ! json=$(aws ec2 describe-instances --no-cli-pager --filters "Name=tag:delius-environment,Values=$NDMIS_ENVIRONMENT" "Name=tag:$1,Values=$2"); then
     return 1
   fi
   ec2ids=$(jq -r ".Reservations[].Instances[].InstanceId" <<< "$json")
@@ -135,19 +149,25 @@ get_ec2_server_info() {
 }
 
 set_env_ec2_info() {
-  if ! CMS_EC2_INFO=$(get_ec2_server_info "server-type" "onr-bip-cms"); then
+  if ! CMS_EC2_INFO=$(get_ec2_server_info "server-type" "delius-bip-cms"); then
     return 1
   fi
-  if ! WEB_EC2_INFO=$(get_ec2_server_info "server-type" "onr-web"); then
+  if ! APP_EC2_INFO=$(get_ec2_server_info "server-type" "delius-bip-app"); then
     return 1
   fi
-  WEBSSO_EC2_INFO=$(get_ec2_server_info "server-type" "onr-websso")
+  if ! WEB_EC2_INFO=$(get_ec2_server_info "server-type" "delius-bip-web"); then
+    return 1
+  fi
+  if ! WEBSSO_EC2_INFO=$(get_ec2_server_info "server-type" "delius-bip-websso"); then
+    return 1
+  fi
 
-  if [[ -z $CMS_EC2_INFO ]]; then
-    error "Error retrieving EC2 info with onr-bip-cms tags"
+  if [[ -z $APP_EC2_INFO && -z $CMS_EC2_INFO ]]; then
+    error "Error retrieving EC2 info with delius-bip-cms and delius-bip-app tags"
     return 1
   fi
 
+  EXPECTED_WEBSSO_EC2_COUNT=$(echo "$WEBSSO_EC2_INFO" | wc -w | tr -d " ")
   EXPECTED_WEB_EC2_COUNT=$(echo "$WEB_EC2_INFO" | wc -w | tr -d " ")
 }
 
@@ -158,8 +178,14 @@ set_env_lb() {
     LB_PORT=$PUBLIC_LB_PORT
     LB_BACKEND_PORT=$PUBLIC_LB_BACKEND_PORT
     LB_URL=$PUBLIC_LB_URL
+  elif [[ $1 == "sso" ]]; then
+    LB_NAME=$PUBLIC_LB_NAME
+    LB_RULE_MAINTENANCE_PRIORITY=$PUBLIC_LB_RULE_MAINTENANCE_PRIORITY
+    LB_PORT=$PUBLIC_LB_PORT
+    LB_BACKEND_PORT=$PUBLIC_LB_BACKEND_PORT
+    LB_URL=sso.$PUBLIC_LB_URL
   else
-    error "Unexpected lb '$1', expected public"
+    error "Unexpected lb '$1', expected public or sso"
     return 1
   fi
 }
@@ -411,11 +437,10 @@ do_ec2() {
   set_env_ec2_info
   if [[ $1 == "display" ]]; then
     echo "cms:      $CMS_EC2_INFO"
+    echo "app:      $APP_EC2_INFO"
     echo "web:      $WEB_EC2_INFO"
-    if [[ -n $WEBSSO_EC2_INFO ]]; then
-      echo "websso:   $WEBSSO_EC2_INFO"
-    fi
-    echo "expected: web=$EXPECTED_WEB_EC2_COUNT"
+    echo "websso:   $WEBSSO_EC2_INFO"
+    echo "expected: websso=$EXPECTED_WEBSSO_EC2_COUNT web=$EXPECTED_WEB_EC2_COUNT"
   else
     usage
   fi
@@ -947,6 +972,11 @@ do_pipeline() {
       if ! pipeline_stage_ec2_start "STAGE 8: " "$CMS_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"; then
         return 1
       fi
+      if [[ -n $APP_EC2_INFO ]]; then
+        if ! pipeline_stage_ec2_start "STAGE 8: " "$APP_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE8_TIMEOUT_SECS" "$APP_EC2_INFO"; then
+          return 1
+        fi
+      fi
       if ! set_env_ec2_info; then
         return 1
       fi
@@ -988,15 +1018,9 @@ do_pipeline() {
       fi
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
-      pipeline_stage_ec2_start "STAGE 1: " "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS" "$WEB_EC2_INFO" || stage1_exitcode=$?
+      pipeline_stage_ec2_start "STAGE 1: " "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS" "$WEB_EC2_INFO $WEBSSO_EC2_INFO" || stage1_exitcode=$?
       if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
         return $stage1_exitcode
-      fi
-      if [[ -n $WEBSSO_EC2_INFO ]]; then
-        pipeline_stage_ec2_start "STAGE 1: " "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS" "$WEBSSO_EC2_INFO" || stage1_exitcode=$?
-        if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
-          return $stage1_exitcode
-        fi
       fi
       if ! set_env_ec2_info; then
         stage1_exitcode=1
@@ -1017,22 +1041,22 @@ do_pipeline() {
       return 1
     fi
     if [[ $2 == "all" || $2 == *0* ]]; then
-      pipeline_stage_lb "STAGE 0: public-lb:    " disable public  "$EXPECTED_WEB_EC2_COUNT"
+      if (( EXPECTED_WEBSSO_EC2_COUNT != 0 )); then
+        pipeline_stage_lb "STAGE 0: public-lb sso:     " disable sso   "$EXPECTED_WEBSSO_EC2_COUNT"
+      fi
+      pipeline_stage_lb "STAGE 0: public-lb web:   " disable public "$EXPECTED_WEB_EC2_COUNT"
     fi
   elif [[ $1 == "stop" || $1 == "shutdown" ]]; then
     if [[ $2 == "all" || $2 == *0* ]]; then
-      pipeline_stage_lb "STAGE 0: public-lb:    " enable  public  -1
+      pipeline_stage_lb "STAGE 0: public-lb web:    " enable  public  -1
+      if (( EXPECTED_WEBADMIN_EC2_COUNT != 0 )); then
+        pipeline_stage_lb "STAGE 0: public-lb sso:     " enable  sso   -1
+      fi
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
-      pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO" || stage1_exitcode=$?
+      pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO $WEBSSO_EC2_INFO" || stage1_exitcode=$?
       if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
         return $stage1_exitcode
-      fi
-      if [[ -n $WEBSSO_EC2_INFO ]]; then
-        pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS"  "$WEBSSO_EC2_INFO" || stage1_exitcode=$?
-        if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
-          return $stage1_exitcode
-        fi
       fi
       if ! set_env_ec2_info; then
         stage1_exitcode=1
@@ -1104,6 +1128,11 @@ do_pipeline() {
     [[ $stage7_exitcode != 0 ]] && echo "STAGE 7: FAILED" && failed=1
 
     if [[ $2 == "all" || $2 == *8* ]]; then
+      if [[ -n $APP_EC2_INFO ]]; then
+        if ! pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$APP_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE8_TIMEOUT_SECS" "$APP_EC2_INFO"; then
+          return 1
+        fi
+      fi
       if ! pipeline_stage_ec2_stop_or_shutdown "STAGE 8: " "$1" "$CMS_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE8_TIMEOUT_SECS" "$CMS_EC2_INFO"; then
         return 1
       fi
@@ -1123,10 +1152,13 @@ do_pipeline() {
 
 main() {
   set -o pipefail
-  while getopts "3:c:de:fg:qvw:" opt; do
+  while getopts "3:a:c:de:fg:l:qvw:" opt; do
       case $opt in
           3)
               STAGE3_WAIT_SECS=${OPTARG}
+              ;;
+          a)
+              APP_START_STOP_SEQUENTIAL_WAIT_SECS=${OPTARG}
               ;;
           c)
               CMS_START_STOP_SEQUENTIAL_WAIT_SECS=${OPTARG}
@@ -1135,13 +1167,16 @@ main() {
               DRYRUN=1
               ;;
           e)
-              ONR_ENVIRONMENT=${OPTARG}
+              NDMIS_ENVIRONMENT=${OPTARG}
               ;;
           f)
               FORCE=1
               ;;
           g)
               GAP_SECS=${OPTARG}
+              ;;
+          l)
+              LBS=${OPTARG}
               ;;
           q)
               QUICK_MODE=1
@@ -1170,7 +1205,7 @@ main() {
     exit 2
   fi
 
-  if [[ -z $ONR_ENVIRONMENT ]]; then
+  if [[ -z $NDMIS_ENVIRONMENT ]]; then
     error "Please specify environment"
     usage
     exit 2
