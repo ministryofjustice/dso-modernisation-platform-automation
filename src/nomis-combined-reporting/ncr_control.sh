@@ -137,13 +137,6 @@ set_env_variables() {
   fi
 }
 
-get_ec2_status_json() {
-  debug "aws ec2 describe-instance-status --filters 'Name=tag:nomis-combined-reporting-environment,Values=$NCR_ENVIRONMENT'"
-  if ! aws ec2 describe-instance-status --no-cli-pager; then
-    return 1
-  fi
-}
-
 get_ec2_server_info() {
   # return space separated list of ec2_name:instance_id:running_status
   local json
@@ -233,7 +226,7 @@ lb_get_listener_rules_json() {
   debug "aws elbv2 describe-load-balancers"
   lbarn=$(aws elbv2 describe-load-balancers --no-cli-pager | jq -r '.LoadBalancers[] | select(.LoadBalancerName=="'"$LB_NAME"'").LoadBalancerArn')
   if [[ -z $lbarn ]]; then
-    error "Error retriving load balancer details for $LB_NAME"
+    error "Error retrieving load balancer details for $LB_NAME"
     return 1
   fi
   debug "aws elbv2 describe-listeners --load-balancer-arn '$lbarn'"
