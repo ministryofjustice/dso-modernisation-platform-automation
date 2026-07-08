@@ -1,5 +1,5 @@
 ---
-name: ONR Environment Start
+name: ONR Environment Start POC
 
 # EventBridge Schedule -> Lambda -> GitHub Workflow Dispatch API -> ONR Environment Start Workflow
 
