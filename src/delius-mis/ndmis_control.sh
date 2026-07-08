@@ -197,7 +197,7 @@ lb_get_listener_rules_json() {
   debug "aws elbv2 describe-load-balancers"
   lbarn=$(aws elbv2 describe-load-balancers --no-cli-pager | jq -r '.LoadBalancers[] | select(.LoadBalancerName=="'"$LB_NAME"'").LoadBalancerArn')
   if [[ -z $lbarn ]]; then
-    error "Error retriving load balancer details for $LB_NAME"
+    error "Error retrieving load balancer details for $LB_NAME"
     return 1
   fi
   debug "aws elbv2 describe-listeners --load-balancer-arn '$lbarn'"
