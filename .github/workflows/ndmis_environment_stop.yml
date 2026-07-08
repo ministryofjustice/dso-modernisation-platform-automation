@@ -64,10 +64,10 @@ on:
         description: Leave a gap between stopping each CMS/APP EC2 sequentially
         default: 30
 
-  schedule:
-    # runs at 7pm local time
-    - cron: "05 19 * * 1-5"
-      timezone: "Europe/London"
+#  schedule:
+#    # runs at 7pm local time
+#    - cron: "05 19 * * 1-5"
+#      timezone: "Europe/London"
 
 permissions:
   id-token: write
