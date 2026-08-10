@@ -104,13 +104,19 @@ set_env_variables() {
     if [[ -z $LBS ]]; then
       LBS="public sso"
     fi
-
   elif [[ $NDMIS_ENVIRONMENT == preprod ]]; then
     AWS_ACCOUNT=delius-mis-preproduction
     PUBLIC_LB_NAME=preprod-mis-alb
     PUBLIC_LB_URL=preprod.delius-mis.hmpps-preproduction.modernisation-platform.service.justice.gov.uk
     if [[ -z $LBS ]]; then
-      LBS="public sso"
+      LBS="public"
+    fi
+  elif [[ $NDMIS_ENVIRONMENT == prod ]]; then
+    AWS_ACCOUNT=delius-mis-production
+    PUBLIC_LB_NAME=prod-mis-alb
+    PUBLIC_LB_URL=reporting.probation.service.justice.gov.uk
+    if [[ -z $LBS ]]; then
+      LBS="public"
     fi
   else
     error "Unsupported delius-mis-environment value '$NDMIS_ENVIRONMENT'"
