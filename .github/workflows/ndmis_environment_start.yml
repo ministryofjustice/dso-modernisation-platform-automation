@@ -12,6 +12,7 @@ on:
           - dev
           - stage
           - preprod
+          - prod
       pipeline_stages:
         type: string
         description: limit which stages of the start process to run, 0-8 or all
