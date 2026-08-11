@@ -88,11 +88,11 @@ error() {
 set_env_variables() {
   PUBLIC_LB_RULE_MAINTENANCE_PRIORITY=999
   PUBLIC_LB_PORT=443
-  PUBLIC_LB_BACKEND_PORT=7777
 
   if [[ $NDMIS_ENVIRONMENT == dev ]]; then
     AWS_ACCOUNT=delius-mis-development
     PUBLIC_LB_NAME=dev-mis-alb
+    PUBLIC_LB_BACKEND_TARGET_GROUP=dev-mis-alb-bws-tg
     PUBLIC_LB_URL=dev.delius-mis.hmpps-development.modernisation-platform.service.justice.gov.uk
     if [[ -z $LBS ]]; then
       LBS="public"
@@ -100,6 +100,7 @@ set_env_variables() {
   elif [[ $NDMIS_ENVIRONMENT == stage ]]; then
     AWS_ACCOUNT=delius-mis-preproduction
     PUBLIC_LB_NAME=stage-mis-alb
+    PUBLIC_LB_BACKEND_TARGET_GROUP=stage-mis-alb-bws-tg
     PUBLIC_LB_URL=stage.delius-mis.hmpps-preproduction.modernisation-platform.service.justice.gov.uk
     if [[ -z $LBS ]]; then
       LBS="public sso"
@@ -107,6 +108,7 @@ set_env_variables() {
   elif [[ $NDMIS_ENVIRONMENT == preprod ]]; then
     AWS_ACCOUNT=delius-mis-preproduction
     PUBLIC_LB_NAME=preprod-mis-alb
+    PUBLIC_LB_BACKEND_TARGET_GROUP=preprod-mis-alb-bws-tg
     PUBLIC_LB_URL=preprod.delius-mis.hmpps-preproduction.modernisation-platform.service.justice.gov.uk
     if [[ -z $LBS ]]; then
       LBS="public"
@@ -114,6 +116,7 @@ set_env_variables() {
   elif [[ $NDMIS_ENVIRONMENT == prod ]]; then
     AWS_ACCOUNT=delius-mis-production
     PUBLIC_LB_NAME=prod-mis-alb
+    PUBLIC_LB_BACKEND_TARGET_GROUP=prod-mis-alb-bws-tg
     PUBLIC_LB_URL=reporting.probation.service.justice.gov.uk
     if [[ -z $LBS ]]; then
       LBS="public"
@@ -182,13 +185,13 @@ set_env_lb() {
     LB_NAME=$PUBLIC_LB_NAME
     LB_RULE_MAINTENANCE_PRIORITY=$PUBLIC_LB_RULE_MAINTENANCE_PRIORITY
     LB_PORT=$PUBLIC_LB_PORT
-    LB_BACKEND_PORT=$PUBLIC_LB_BACKEND_PORT
+    LB_BACKEND_TARGET_GROUP=$PUBLIC_LB_BACKEND_TARGET_GROUP
     LB_URL=$PUBLIC_LB_URL
   elif [[ $1 == "sso" ]]; then
     LB_NAME=$PUBLIC_LB_NAME
     LB_RULE_MAINTENANCE_PRIORITY=$PUBLIC_LB_RULE_MAINTENANCE_PRIORITY
     LB_PORT=$PUBLIC_LB_PORT
-    LB_BACKEND_PORT=$PUBLIC_LB_BACKEND_PORT
+    LB_BACKEND_TARGET_GROUP=$PUBLIC_LB_BACKEND_TARGET_GROUP
     LB_URL=sso.$PUBLIC_LB_URL
   else
     error "Unexpected lb '$1', expected public or sso"
@@ -355,7 +358,7 @@ lb_get_target_group_arn() {
   if ! lbrulejson=$(lb_get_rule_json); then
     return 1
   fi
-  targetgrouparns=$(jq -r '.Actions[] | select(.Type == "forward").TargetGroupArn' <<< "$lbrulejson" | grep "$LB_BACKEND_PORT")
+  targetgrouparns=$(jq -r '.Actions[] | select(.Type == "forward").TargetGroupArn' <<< "$lbrulejson" | grep "$LB_BACKEND_TARGET_GROUP")
   num_targetgrouparns=$(wc -l <<< "$targetgrouparns" | tr -d " ")
   if [[ -z $targetgrouparns || $num_targetgrouparns != "1" ]]; then
     debug "$lbrulejson"
