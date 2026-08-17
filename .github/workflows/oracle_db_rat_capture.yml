@@ -172,6 +172,18 @@ jobs:
                   echo "Multiple primary databases are not expected for the same database system."
                   exit 1
               fi
+              TARGET_ENVIRONMENT="${{ github.event.inputs.TargetDatabase }}"
+              TARGET_ENVIRONMENT="${TARGET_ENVIRONMENT%%[[:space:]]*}"
+              case "${TARGET_ENVIRONMENT}" in
+                delius*)
+                  BUCKET_NAME=$(echo "${TARGET_ENVIRONMENT}" | awk -F_ '{print $1 "-" $2 "-" $(NF-1)}')
+                  echo "Using bucket: ${BUCKET_NAME}"
+                  ;;
+                *)
+                  echo "::error::A bucket has not been configured for TargetDatabase '${TARGET_ENVIRONMENT}'."
+                  exit 1
+                  ;;
+              esac
               # For Non-Delius environments create host-->database mapping based on the batch targets.
               # These are called the batched target pairs as they are an array of hostname/database pairs.
               if [ ! -z "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" ]
@@ -194,5 +206,6 @@ jobs:
                  --extra-vars "application=${{ steps.setup_db_system_access.outputs.application }}" \
                  --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
                  --extra-vars "rat_capture_action=${{ github.event.inputs.CaptureAction }}" \
+                 --extra-vars "rat_capture_bucket_name=${BUCKET_NAME}" \
                  ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
                  --extra-vars force_role=oracle-db-rat-capture roles/ansible/site.yml
