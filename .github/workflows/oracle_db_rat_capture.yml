@@ -176,7 +176,7 @@ jobs:
               TARGET_ENVIRONMENT="${TARGET_ENVIRONMENT%%[[:space:]]*}"
               case "${TARGET_ENVIRONMENT}" in
                 delius*)
-                  BUCKET_NAME=$(echo "${TARGET_ENVIRONMENT}" | awk -F_ '{print $1 "-" $2 "-" $(NF-1)}')
+                  BUCKET_NAME=$(echo "${TARGET_ENVIRONMENT}" | awk -F_ '{print $1 "-" $2 "-" $(NF-1)}')-oracle-db-rat-capture
                   echo "Using bucket: ${BUCKET_NAME}"
                   ;;
                 *)
