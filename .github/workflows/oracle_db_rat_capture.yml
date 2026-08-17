@@ -206,6 +206,6 @@ jobs:
                  --extra-vars "application=${{ steps.setup_db_system_access.outputs.application }}" \
                  --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
                  --extra-vars "rat_capture_action=${{ github.event.inputs.CaptureAction }}" \
-                 --extra-vars "rat_capture_bucket_name=${BUCKET_NAME}" \
+                 --extra-vars "rat_capture_s3_bucket_name=${BUCKET_NAME}" \
                  ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
                  --extra-vars force_role=oracle-db-rat-capture roles/ansible/site.yml
