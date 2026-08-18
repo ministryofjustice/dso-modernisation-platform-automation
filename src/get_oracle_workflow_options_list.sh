@@ -116,16 +116,18 @@ do
             for ALL in $(
                yq -o=json '.db_configs' ${GROUP_VARS_DIRECTORY}/${GROUP_VARS_FILE} \
                               | jq -r '
-                              to_entries
-                              | map(
-                                 select(.value.host_name != null)
-                                 | {key, services: (.value.service // [] | map(.name))}
-                              )
-                              | map(
-                                 .services[] as $svc
-                                 | .key
-                              )
-                              | .[]'
+                                 to_entries
+                                 | map(
+                                    select(.value.host_name != null)
+                                    | {key, services: (.value.service // [] | map(.name))}
+                                 )
+                                 | map(
+                                    .services[] as $svc
+                                    | {service:$svc, key:.key}
+                                 )
+                                 | sort_by(.service)
+                                 | map("\(.service)=>\(.key)")
+                                 | .[]'
                            );
             do
                TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE#*environment_name_} | sed 's/.yml$//') ${ALL}")
@@ -144,8 +146,10 @@ done
 
 if [[ "${MODE}" == "primary" ]]; then
    echo ">>>>>>>>CUT HERE FOR TARGET DATABASE LIST>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-else
+elif [[ "${MODE}" == "system" ]]; then
    echo ">>>>>>>>CUT HERE FOR TARGET DATABASE SYSTEMS LIST>>>>>>>>>>>>>>>>>>>>>>>"
+else
+   echo ">>>>>>>>CUT HERE FOR ALL DATABASES LIST>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
 fi
 
 # Print all target entries in alphabetical order formatted for align together
