@@ -87,8 +87,10 @@ runs:
                     then
                        TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_primarydb
                     elif [ "${{ inputs.TargetEntitiesType }}" == "system" ]
+                    then
                        TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_dbs
                     elif [ "${{ inputs.TargetEntitiesType }}" == "all" ]
+                    then
                        TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_${TARGET_DATABASES}
                     else
                         echo "Unknown target entity type"
