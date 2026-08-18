@@ -47,13 +47,13 @@ on:
         description: Leave a gap between starting each CMS/APP EC2
         default: 30
 
-#  schedule:
-#    # runs at 06:45 local time
-#    # second cron at 07:50 is a failsafe, in case something went wrong with the first run
-#    - cron: "45 6 * * 1-5"
-#      timezone: "Europe/London"
-#    - cron: "50 7 * * 1-5"
-#      timezone: "Europe/London"
+  schedule:
+    # runs at 06:45 local time
+    # second cron at 07:50 is a failsafe, in case something went wrong with the first run
+    - cron: "45 6 * * 1-5"
+      timezone: "Europe/London"
+    - cron: "50 7 * * 1-5"
+      timezone: "Europe/London"
 
 permissions:
   id-token: write
@@ -111,7 +111,7 @@ jobs:
               script_flags="$script_flags -a ${{ github.event.inputs.ec2_gap_secs }}"
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            ndmis_environments="pp" # space separated list
+            ndmis_environments="stage preprod" # space separated list
             script_flags="-c 30 -a 30 -g 2"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
