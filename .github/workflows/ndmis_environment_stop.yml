@@ -65,10 +65,10 @@ on:
         description: Leave a gap between stopping each CMS/APP EC2 sequentially
         default: 30
 
-#  schedule:
-#    # runs at 7pm local time
-#    - cron: "05 19 * * 1-5"
-#      timezone: "Europe/London"
+ schedule:
+   # runs at 7pm local time
+   - cron: "05 19 * * 1-5"
+     timezone: "Europe/London"
 
 permissions:
   id-token: write
@@ -137,7 +137,7 @@ jobs:
             fi
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             gha_environment="delius-mis-schedule"
-            ndmis_environments="dev" # space separated list
+            ndmis_environments="dev stage preprod" # space separated list
             script_flags="-c 30 -a 30 -g 2 -q"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
