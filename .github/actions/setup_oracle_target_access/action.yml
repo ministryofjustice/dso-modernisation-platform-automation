@@ -7,7 +7,7 @@ inputs:
       description: "Database entities to target"
       required: true
    TargetEntitiesType:
-      description: "primary|system"
+      description: "primary|system|all"
       required: true
    SourceConfigVersion:
       description: "Branch/tag/commit for modernisation-platform-configuration-management"
@@ -86,8 +86,13 @@ runs:
                     if [ "${{ inputs.TargetEntitiesType }}" == "primary" ]
                     then
                        TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_primarydb
-                    else
+                    elif [ "${{ inputs.TargetEntitiesType }}" == "system" ]
                        TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_dbs
+                    elif [ "${{ inputs.TargetEntitiesType }}" == "all" ]
+                       TARGET_GROUP=environment_name_${TARGET_ENVIRONMENT}_${TARGET_DATABASES}
+                    else
+                        echo "Unknown target entity type"
+                        exit 1
                     fi
                     # Delius contains multiple tiers within the same AWS account
                     # (For example, stage & pre-prod are in preproduction)
