@@ -187,7 +187,7 @@ jobs:
       - name: Checkout Local Repo to get Composite Action
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Setup Primary Database Access
+      - name: Setup Target Database Access
         id: setup_db_system_access
         uses: ./.github/actions/setup_oracle_target_access
         with:
