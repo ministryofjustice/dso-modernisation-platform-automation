@@ -203,6 +203,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ansible/roles/secretsmanager-passwords
+            ansible/roles/get-modernisation-platform-facts
             ansible/roles/oracle-db-rat-capture
             ansible/roles/oracle-db-rat-setup
             ansible/site.yml
