@@ -211,7 +211,7 @@ jobs:
           ref: ${{ github.event.inputs.SourceConfigVersion }}
           fetch-depth: 0
 
-      - name: Run Oracle DB Real Application Testing Workload Capture
+      - name: Run Oracle DB Real Application Testing Action
         id: oracle_db_rat_capture
         run: |
             ACTION="${{ github.event.inputs.Action }}"
