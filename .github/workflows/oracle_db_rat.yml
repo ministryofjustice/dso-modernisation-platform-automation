@@ -202,6 +202,7 @@ jobs:
           repository: ministryofjustice/modernisation-platform-configuration-management
           sparse-checkout-cone-mode: false
           sparse-checkout: |
+            ansible/roles/secretsmanager-passwords
             ansible/roles/oracle-db-rat-capture
             ansible/roles/oracle-db-rat-setup
             ansible/site.yml
