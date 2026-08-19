@@ -1,4 +1,4 @@
-name: Oracle DB Real Application Testing Workload Capture
+name: Oracle DB Real Application Testing
 
 # TargetDatabase options may be generated using the oracle_db_generate_target_list.yml workflow
 
