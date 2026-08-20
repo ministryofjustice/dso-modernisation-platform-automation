@@ -223,6 +223,7 @@ jobs:
 
       - name: Run Oracle DB Real Application Testing Action
         id: oracle_db_rat_replay
+        shell: bash
         run: |
             ACTION="${{ github.event.inputs.Action }}"
               if [ ${{ steps.setup_db_system_access.outputs.batch_count }} -ne 1 ];
@@ -242,11 +243,11 @@ jobs:
               # NOTE: *** CARE MUST BE TAKEN NOT TO RUN A REPLAY ON A PRIMARY PRODUCTION DATABASE ***
               # This may result in changes to live database.
               # Therefore we explicitly exclude cases where this not a permitted operation.
-              if [ ${TARGET_ENVIRONMENT} == 'delius_core_production_prod_delius                primarydb' ||
-                   ${TARGET_ENVIRONMENT} == 'delius_mis_production_prod_mis                    primarydb'    
-              ]
+                if [[ "${TARGET_ENVIRONMENT}" == "delius_core_production_prod_delius                primarydb" ||
+                    "${TARGET_ENVIRONMENT}" == "delius_mis_production_prod_mis                    primarydb" ]]
               then
                  echo "Running a replay against a primary production database is not permitted."
+                  exit 1
               fi
               TARGET_ENVIRONMENT="${TARGET_ENVIRONMENT%%[[:space:]]*}"
               case "${TARGET_ENVIRONMENT}" in
