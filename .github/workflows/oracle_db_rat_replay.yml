@@ -17,7 +17,7 @@ on:
           - 'start replay'
           - 'report replay'
       ReplayS3Location:
-        description: 'S3 Location for Capture Files - may be left blank for report mode - (for example, s3://delius-core-dev-oracle-db-rat-capture/delius_core/dmdndas1/20260819140352/ )'
+        description: 'For "prepare replay" this should be the Capture location, for "start replay" this should be the Prepared location (for example, s3://delius-core-dev-oracle-db-rat-capture/capture/delius_core/dmdndas1/20260819140352/ )'
         default: ''
         type: string
       ReplayName:
