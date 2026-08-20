@@ -1,4 +1,4 @@
-name: Oracle DB Real Application Testing
+name: Oracle DB Real Application Testing Replay
 
 # TargetDatabase options may be generated using the oracle_db_generate_target_list.yml workflow
 
@@ -9,15 +9,25 @@ on:
   workflow_dispatch:
     inputs:
       Action:
-        description: 'Action (start capture / stop capture)'
+        description: 'Action (start replay|report relay)'
         default: ''
         type: choice
         options:
-          - 'setup users'
-          - 'start capture'
-          - 'stop capture'
-      TargetDatabase:
-        description: 'Primary Databases for running of Real Application Testing Workload Capture'
+          - 'start replay'
+      ReplayS3Location:
+        description: 'S3 Location for Capture Files - may be left blank for report mode - (for example, s3://delius-core-dev-oracle-db-rat-capture/delius_core/dmdndas1/20260819140352/ )'
+        default: ''
+        type: string
+      ReplayName:
+        description: 'Name to identify the Replay'
+        default: ''
+        type: string
+      TargetTNSAlias:
+        description: 'TNS Alias for WRC to use for Database Connections (may be remote)'
+        default: ''
+        type: string        
+      WRCHost:
+        description: 'Database Hosts for running RAT Replay WRC (must have access to target database)'
         default: ''
         type: choice
         options:
@@ -204,23 +214,39 @@ jobs:
           sparse-checkout: |
             ansible/roles/secretsmanager-passwords
             ansible/roles/get-modernisation-platform-facts
-            ansible/roles/oracle-db-rat-capture
-            ansible/roles/oracle-db-rat-setup
+            ansible/roles/oracle-db-rat-replay
             ansible/site.yml
           path: roles
           ref: ${{ github.event.inputs.SourceConfigVersion }}
           fetch-depth: 0
 
       - name: Run Oracle DB Real Application Testing Action
-        id: oracle_db_rat_capture
+        id: oracle_db_rat_replay
         run: |
             ACTION="${{ github.event.inputs.Action }}"
               if [ ${{ steps.setup_db_system_access.outputs.batch_count }} -ne 1 ];
               then
-                  echo "Multiple databases are not expected for a capture."
+                  echo "Multiple WRC hosts are not expected for a replay."
                   exit 1
               fi
-              TARGET_ENVIRONMENT="${{ github.event.inputs.TargetDatabase }}"
+              # Note that the TARGET_ENVIRONMENT is where we are running the 
+              # Workload Replay Client (WRC) - and NOT where the target database is running.
+              # This is because we typically run WRC on a different host to avoid its 
+              # own overhead skewing performance.
+              # For example, we may select to run the WRC on a standby host and use
+              # the TNS Alias to connect to a database on a primary host.
+              # Obviously the selected host for running WRC must have connectivity to the
+              # desired TNS Alias for replay.
+              TARGET_ENVIRONMENT="${{ github.event.inputs.WRCHost }}"
+              # NOTE: *** CARE MUST BE TAKEN NOT TO RUN A REPLAY ON A PRIMARY PRODUCTION DATABASE ***
+              # This may result in changes to live database.
+              # Therefore we explicitly exclude cases where this not a permitted operation.
+              if [ ${TARGET_ENVIRONMENT} == 'delius_core_production_prod_delius                primarydb' ||
+                   ${TARGET_ENVIRONMENT} == 'delius_mis_production_prod_mis                    primarydb'    
+              ]
+              then
+                 echo "Running a replay against a primary production database is not permitted."
+              fi
               TARGET_ENVIRONMENT="${TARGET_ENVIRONMENT%%[[:space:]]*}"
               case "${TARGET_ENVIRONMENT}" in
                 delius*)
@@ -249,24 +275,28 @@ jobs:
                 echo "Limiting to hosts:    ${TARGET_HOST_LIMIT}"
                 echo "Host to database map: ${HOST_TO_DB_MAP}"
               fi
-              if [ "${ACTION}" = "start capture" ] || [ "${ACTION}" = "stop capture" ]
+              if [ "${ACTION}" = "start replay" ]
               then
-                RAT_CAPTURE_ACTION="${ACTION% capture}"
                 ansible-playbook \
                    -i $inventory \
-                   --extra-vars "application=${{ steps.setup_db_system_access.outputs.application }}" \
                    --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
-                   --extra-vars "rat_capture_action=${RAT_CAPTURE_ACTION}" \
+                   ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
+                   --extra-vars force_role=oracle-db-rat-replay \
+                   --extra-vars rat_replay_name=${{ github.event.inputs.ReplayName }} \
+                   --extra-vars rat_replay_s3_location=${{ github.event.inputs.ReplayS3Location }} \
+                   --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
+                   roles/ansible/site.yml
+              elsif [ "${ACTION}" = "report replay" ]
+              then
+                ansible-playbook \
+                   -i $inventory \
+                   --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
+                   ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
+                   --extra-vars force_role=oracle-db-rat-report \
+                   --extra-vars rat_replay_name=${{ github.event.inputs.ReplayName }} \
+                   --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
                    --extra-vars "rat_capture_s3_bucket_name=${BUCKET_NAME}" \
-                   ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
-                   --extra-vars force_role=oracle-db-rat-capture roles/ansible/site.yml
-              elif [ "${ACTION}" = "setup users" ]
-              then
-                ansible-playbook \
-                   -i $inventory \
-                   --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
-                   ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
-                   --extra-vars force_role=oracle-db-rat-setup roles/ansible/site.yml              
+                   roles/ansible/site.yml
               else
                 echo "Skipping Ansible playbook for Action: ${ACTION}"
               fi

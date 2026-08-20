@@ -1,0 +1,272 @@
+name: Oracle DB Real Application Testing Setup and Capture
+
+# TargetDatabase options may be generated using the oracle_db_generate_target_list.yml workflow
+
+on:
+  push:
+    branch:
+      - DBA-1275
+  workflow_dispatch:
+    inputs:
+      Action:
+        description: 'Action (start capture / stop capture)'
+        default: ''
+        type: choice
+        options:
+          - 'setup users'
+          - 'start capture'
+          - 'stop capture'
+      TargetDatabase:
+        description: 'Databases for running of Real Application Testing Workload Capture'
+        default: ''
+        type: choice
+        options:
+            - 'corporate_staff_rostering_preproduction    IWFM_TAF=>PPIWFM'
+            - 'corporate_staff_rostering_production       IWFM_TAF=>DRIWFM'
+            - 'corporate_staff_rostering_production        IWFM_TAF=>PIWFM'
+            - 'corporate_staff_rostering_test             IWFM_TAF=>T3IWFM'
+            - 'delius_core_development_dev_delius                primarydb'
+            - 'delius_core_development_dev_delius               standbydb1'
+            - 'delius_core_development_dev_delius               standbydb2'
+            - 'delius_core_preproduction_preprod_delius          primarydb'
+            - 'delius_core_preproduction_preprod_delius         standbydb1'
+            - 'delius_core_preproduction_preprod_delius         standbydb2'
+            - 'delius_core_preproduction_stage_delius            primarydb'
+            - 'delius_core_production_prod_delius                primarydb'
+            - 'delius_core_production_prod_delius               standbydb1'
+            - 'delius_core_production_prod_delius               standbydb2'
+            - 'delius_core_test_test_delius                      primarydb'
+            - 'delius_mis_development_dev_boe                    primarydb'
+            - 'delius_mis_development_dev_dsd                    primarydb'
+            - 'delius_mis_development_dev_mis                    primarydb'
+            - 'delius_mis_preproduction_preprod_boe              primarydb'
+            - 'delius_mis_preproduction_preprod_boe             standbydb1'
+            - 'delius_mis_preproduction_preprod_dsd              primarydb'
+            - 'delius_mis_preproduction_preprod_dsd             standbydb1'
+            - 'delius_mis_preproduction_preprod_mis              primarydb'
+            - 'delius_mis_preproduction_preprod_mis             standbydb1'
+            - 'delius_mis_preproduction_stage_boe                primarydb'
+            - 'delius_mis_preproduction_stage_dsd                primarydb'
+            - 'delius_mis_preproduction_stage_mis                primarydb'
+            - 'delius_mis_production_prod_boe                    primarydb'
+            - 'delius_mis_production_prod_boe                   standbydb1'
+            - 'delius_mis_production_prod_dsd                    primarydb'
+            - 'delius_mis_production_prod_dsd                   standbydb1'
+            - 'delius_mis_production_prod_mis                    primarydb'
+            - 'delius_mis_production_prod_mis                   standbydb1'
+            - 'hmpps_oem_development                                 EMREP'
+            - 'hmpps_oem_development                                RCVCAT'
+            - 'hmpps_oem_preproduction                               EMREP'
+            - 'hmpps_oem_preproduction                              RCVCAT'
+            - 'hmpps_oem_production                                  EMREP'
+            - 'hmpps_oem_production                                 RCVCAT'
+            - 'hmpps_oem_test                                        EMREP'
+            - 'hmpps_oem_test                                       RCVCAT'
+            - 'nomis_combined_reporting_preproduction   BIAUD_TAF=>PPBIAUD'
+            - 'nomis_combined_reporting_preproduction   BISYS_TAF=>PPBISYS'
+            - 'nomis_combined_reporting_production      BIAUD_TAF=>PDBIAUD'
+            - 'nomis_combined_reporting_production    BIPAUD_TAF=>PDBIPAUD'
+            - 'nomis_combined_reporting_production   BIPAUDP_CFG=>PDBIPAUD'
+            - 'nomis_combined_reporting_production    BIPSYS_TAF=>PDBIPSYS'
+            - 'nomis_combined_reporting_production   BIPSYSP_CFG=>PDBIPSYS'
+            - 'nomis_combined_reporting_production      BISYS_TAF=>PDBISYS'
+            - 'nomis_combined_reporting_production        DRBIAUD=>DRBIAUD'
+            - 'nomis_combined_reporting_production      DRBIPAUD=>DRBIPAUD'
+            - 'nomis_combined_reporting_production      DRBIPSYS=>DRBIPSYS'
+            - 'nomis_combined_reporting_production        DRBISYS=>DRBISYS'
+            - 'nomis_combined_reporting_test            BIAUD_TAF=>T1BIAUD'
+            - 'nomis_combined_reporting_test          BIPAUD_TAF=>T1BIPAUD'
+            - 'nomis_combined_reporting_test          BIPSYS_TAF=>T1BIPSYS'
+            - 'nomis_combined_reporting_test            BISYS_TAF=>T1BISYS'
+            - 'nomis_preproduction                    CNMAUD_TAF=>PPCNMAUD'
+            - 'nomis_preproduction                          MIS_TAF=>LSMIS'
+            - 'nomis_preproduction                          MIS_TAF=>PPMIS'
+            - 'nomis_preproduction                          NDH_TAF=>PPNDH'
+            - 'nomis_preproduction                     NOMIS_APIRO=>LSCNOM'
+            - 'nomis_preproduction                     NOMIS_APIRO=>PPCNOM'
+            - 'nomis_preproduction                       NOMIS_TAF=>LSCNOM'
+            - 'nomis_preproduction                       NOMIS_TAF=>PPCNOM'
+            - 'nomis_preproduction                    OLDNOMIS_TAF=>LSCNOM'
+            - 'nomis_preproduction                    OLDNOMIS_TAF=>PPCNOM'
+            - 'nomis_preproduction                          OR_TAF=>LSCNOM'
+            - 'nomis_preproduction                          OR_TAF=>PPCNOM'
+            - 'nomis_preproduction                      TRDAT_TAF=>PPTRDAT'
+            - 'nomis_production                       CNMAUD_TAF=>PDCNMAUD'
+            - 'nomis_production                             MIS_TAF=>DRMIS'
+            - 'nomis_production                             MIS_TAF=>PDMIS'
+            - 'nomis_production                             NDH_TAF=>DRNDH'
+            - 'nomis_production                             NDH_TAF=>PDNDH'
+            - 'nomis_production                    NOMIS_APIRO_TAF=>DRCNOM'
+            - 'nomis_production                        NOMIS_APIRO=>PDCNOM'
+            - 'nomis_production                          NOMIS_TAF=>DRCNOM'
+            - 'nomis_production                          NOMIS_TAF=>PDCNOM'
+            - 'nomis_production                       OLDNOMIS_TAF=>DRCNOM'
+            - 'nomis_production                       OLDNOMIS_TAF=>PDCNOM'
+            - 'nomis_production                             OR_TAF=>DRCNOM'
+            - 'nomis_production                             OR_TAF=>PDCNOM'
+            - 'nomis_production                         TRDAT_TAF=>DRTRDAT'
+            - 'nomis_production                         TRDAT_TAF=>PDTRDAT'
+            - 'nomis_test                             CNMAUD_TAF=>T1CNMAUD'
+            - 'nomis_test                                   MIS_TAF=>T1MIS'
+            - 'nomis_test                                   NDH_TAF=>T1NDH'
+            - 'nomis_test                                   NDH_TAF=>T2NDH'
+            - 'nomis_test                              NOMIS_APIRO=>T1CNOM'
+            - 'nomis_test                              NOMIS_APIRO=>T2CNOM'
+            - 'nomis_test                              NOMIS_APIRO=>T3CNOM'
+            - 'nomis_test                                NOMIS_TAF=>T1CNOM'
+            - 'nomis_test                                NOMIS_TAF=>T2CNOM'
+            - 'nomis_test                                NOMIS_TAF=>T3CNOM'
+            - 'nomis_test                             OLDNOMIS_TAF=>T1CNOM'
+            - 'nomis_test                             OLDNOMIS_TAF=>T2CNOM'
+            - 'nomis_test                             OLDNOMIS_TAF=>T3CNOM'
+            - 'nomis_test                                   OR_TAF=>T1CNOM'
+            - 'nomis_test                                   OR_TAF=>T2CNOM'
+            - 'nomis_test                                   OR_TAF=>T3CNOM'
+            - 'nomis_test                               ORSYS_TAF=>T1ORSYS'
+            - 'nomis_test                               TRDAT_TAF=>T1TRDAT'
+            - 'nomis_test                               TRDAT_TAF=>T2TRDAT'
+            - 'oasys_national_reporting_preproduction   BIAUD_TAF=>PPBOAUD'
+            - 'oasys_national_reporting_preproduction   BISYS_TAF=>PPBOSYS'
+            - 'oasys_preproduction                      BIAUD_TAF=>PPBOAUD'
+            - 'oasys_preproduction                      BISYS_TAF=>PPBOSYS'
+            - 'oasys_preproduction                      OASYS_TAF=>PPOASYS'
+            - 'oasys_preproduction                  ONRAUD42_TAF=>PPBIAD42'
+            - 'oasys_preproduction                  ONRSYS42_TAF=>PPBISY42'
+            - 'oasys_production                       BIPINF_TAF=>PDBIPINF'
+            - 'oasys_production                       BIPINF_TAF=>TRBIPINF'
+            - 'oasys_production                         BOAUD_TAF=>PDBOAUD'
+            - 'oasys_production                         BOSYS_TAF=>PDBOSYS'
+            - 'oasys_production                     MISTRANS_TAF=>PDMISTRN'
+            - 'oasys_production                         OASHA_TAF=>DROASYS'
+            - 'oasys_production                         OASYS_TAF=>PDOASYS'
+            - 'oasys_production                     OASYSREP_TAF=>PDOASREP'
+            - 'oasys_production                       ONRAUD_TAF=>PDONRAUD'
+            - 'oasys_production                      ONRBODS_TAF=>PDONRBDS'
+            - 'oasys_production                       ONRSYS_TAF=>PDONRSYS'
+            - 'oasys_production                PRACTICE_OASYS_TAF=>PROASYS'
+            - 'oasys_production                TRAINING_OASYS_TAF=>TROASYS'
+            - 'oasys_test                               BIAUD_TAF=>T2BOAUD'
+            - 'oasys_test                               BISYS_TAF=>T2BOSYS'
+            - 'oasys_test                           MISTRANS_TAF=>T1MISTRN'
+            - 'oasys_test                           MISTRANS_TAF=>T2MISTRN'
+            - 'oasys_test                             OASREP_TAF=>T1OASREP'
+            - 'oasys_test                             OASREP_TAF=>T2OASREP'
+            - 'oasys_test                              OASYS_TAF=>T1AZBIPI'
+            - 'oasys_test                               OASYS_TAF=>T1OASYS'
+            - 'oasys_test                               OASYS_TAF=>T2OASYS'
+            - 'oasys_test                             OASYS2_TAF=>T2OASYS2'
+            - 'oasys_test                             ONRAUD_TAF=>T1ONRAUD'
+            - 'oasys_test                             ONRAUD_TAF=>T2ONRAUD'
+            - 'oasys_test                            ONRBODS_TAF=>T1ONRBDS'
+            - 'oasys_test                            ONRBODS_TAF=>T2ONRBDS'
+            - 'oasys_test                             ONRSYS_TAF=>T1ONRSYS'
+            - 'oasys_test                             ONRSYS_TAF=>T2ONRSYS'
+      SourceConfigVersion:
+        description: 'Branch/tag/commit for modernisation-platform-configuration-management'
+        type: string
+        default: 'main'
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+env:
+  ansible_config: inventory/ansible/ansible.cfg
+  inventory: inventory/ansible
+
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ministryofjustice/hmpps-delius-operational-automation:0.80.0
+    timeout-minutes: 1440
+    continue-on-error: false
+    steps:
+
+      - name: Checkout Local Repo to get Composite Action
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Target Database Access
+        id: setup_db_system_access
+        uses: ./.github/actions/setup_oracle_target_access
+        with:
+          TargetEntities: "${{ github.event.inputs.TargetDatabase }}"
+          TargetEntitiesType: "all"
+          SourceConfigVersion: "${{ github.event.inputs.SourceConfigVersion }}"
+          ModernisationPlatformEnvironmentManagement: "${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}"
+
+      - name: Fetch Required Roles & Site
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ansible/roles/secretsmanager-passwords
+            ansible/roles/get-modernisation-platform-facts
+            ansible/roles/oracle-db-rat-capture
+            ansible/roles/oracle-db-rat-setup
+            ansible/site.yml
+          path: roles
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
+          fetch-depth: 0
+
+      - name: Run Oracle DB Real Application Testing Action
+        id: oracle_db_rat_capture
+        run: |
+            ACTION="${{ github.event.inputs.Action }}"
+              if [ ${{ steps.setup_db_system_access.outputs.batch_count }} -ne 1 ];
+              then
+                  echo "Multiple databases are not expected for a capture."
+                  exit 1
+              fi
+              TARGET_ENVIRONMENT="${{ github.event.inputs.TargetDatabase }}"
+              TARGET_ENVIRONMENT="${TARGET_ENVIRONMENT%%[[:space:]]*}"
+              case "${TARGET_ENVIRONMENT}" in
+                delius*)
+                  BUCKET_NAME=$(echo "${TARGET_ENVIRONMENT}" | awk -F_ '{print $1 "-" $2 "-" $(NF-1)}')-oracle-db-rat-capture
+                  echo "Using bucket: ${BUCKET_NAME}"
+                  ;;
+                *)
+                  echo "::error::A bucket has not been configured for TargetDatabase '${TARGET_ENVIRONMENT}'."
+                  exit 1
+                  ;;
+              esac
+              # For Non-Delius environments create host-->database mapping based on the batch targets.
+              # These are called the batched target pairs as they are an array of hostname/database pairs.
+              if [ ! -z "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" ]
+              then
+                # When targeting individual databases, we expect a single batch containing a single database
+                CURRENT_BATCH=$(echo "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" | base64 -d | jq --compact-output '.[0]')
+                DATABASE_COUNT=$(echo ${CURRENT_BATCH} | jq 'length')
+                if [ ${DATABASE_COUNT} -ne 1 ]
+                then
+                   echo "Only one database should be supplied - found ${CURRENT_BATCH}."
+                   exit 1
+                fi
+                TARGET_HOST_LIMIT="--limit "$(echo ${CURRENT_BATCH} | jq -r '.[0] | keys[0]')
+                HOST_TO_DB_MAP="--extra-vars target_db_names='${CURRENT_BATCH}'"
+                echo "Limiting to hosts:    ${TARGET_HOST_LIMIT}"
+                echo "Host to database map: ${HOST_TO_DB_MAP}"
+              fi
+              if [ "${ACTION}" = "start capture" ] || [ "${ACTION}" = "stop capture" ]
+              then
+                RAT_CAPTURE_ACTION="${ACTION% capture}"
+                ansible-playbook \
+                   -i $inventory \
+                   --extra-vars "application=${{ steps.setup_db_system_access.outputs.application }}" \
+                   --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
+                   --extra-vars "rat_capture_action=${RAT_CAPTURE_ACTION}" \
+                   --extra-vars "rat_capture_s3_bucket_name=${BUCKET_NAME}" \
+                   ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
+                   --extra-vars force_role=oracle-db-rat-capture roles/ansible/site.yml
+              elif [ "${ACTION}" = "setup users" ]
+              then
+                ansible-playbook \
+                   -i $inventory \
+                   --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
+                   ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
+                   --extra-vars force_role=oracle-db-rat-setup roles/ansible/site.yml              
+              else
+                echo "Skipping Ansible playbook for Action: ${ACTION}"
+              fi
