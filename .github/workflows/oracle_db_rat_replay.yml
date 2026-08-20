@@ -13,6 +13,7 @@ on:
         default: ''
         type: choice
         options:
+          - 'prepare replay'
           - 'start replay'
           - 'report replay'
       ReplayS3Location:
@@ -27,8 +28,8 @@ on:
         description: 'TNS Alias for WRC to use for Database Connections (may be remote)'
         default: ''
         type: string        
-      WRCHost:
-        description: 'Database Hosts for running RAT Replay WRC (must have access to target database)'
+      ReplayHost:
+        description: 'Host for Running Replay (for prepare replay it must be the target database host; other actions may be done remotely if a database connection is available)'
         default: ''
         type: choice
         options:
@@ -202,7 +203,7 @@ jobs:
         id: setup_db_system_access
         uses: ./.github/actions/setup_oracle_target_access
         with:
-          TargetEntities: "${{ github.event.inputs.WRCHost }}"
+          TargetEntities: "${{ github.event.inputs.ReplayHost }}"
           TargetEntitiesType: "all"
           SourceConfigVersion: "${{ github.event.inputs.SourceConfigVersion }}"
           ModernisationPlatformEnvironmentManagement: "${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}"
@@ -215,6 +216,7 @@ jobs:
           sparse-checkout: |
             ansible/roles/secretsmanager-passwords
             ansible/roles/get-modernisation-platform-facts
+            ansible/roles/oracle-db-rat-process
             ansible/roles/oracle-db-rat-replay
             ansible/roles/oracle-db-rat-report
             ansible/site.yml
@@ -240,7 +242,7 @@ jobs:
               # the TNS Alias to connect to a database on a primary host.
               # Obviously the selected host for running WRC must have connectivity to the
               # desired TNS Alias for replay.
-              TARGET_ENVIRONMENT="${{ github.event.inputs.WRCHost }}"
+              TARGET_ENVIRONMENT="${{ github.event.inputs.ReplayHost }}"
               # NOTE: *** CARE MUST BE TAKEN NOT TO RUN A REPLAY ON A PRIMARY PRODUCTION DATABASE ***
               # This may result in changes to live database.
               # Therefore we explicitly exclude cases where this not a permitted operation.
@@ -278,7 +280,18 @@ jobs:
                 echo "Limiting to hosts:    ${TARGET_HOST_LIMIT}"
                 echo "Host to database map: ${HOST_TO_DB_MAP}"
               fi
-              if [ "${ACTION}" = "start replay" ]
+              if [ "${ACTION}" = "process replay" ]
+              then
+                ansible-playbook \
+                   -i $inventory \
+                   --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
+                   ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
+                   --extra-vars force_role=oracle-db-rat-process \
+                   --extra-vars rat_replay_name=${{ github.event.inputs.ReplayName }} \
+                   --extra-vars rat_replay_s3_location=${{ github.event.inputs.ReplayS3Location }} \
+                   --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
+                   roles/ansible/site.yml
+              elif [ "${ACTION}" = "start replay" ]
               then
                 ansible-playbook \
                    -i $inventory \
