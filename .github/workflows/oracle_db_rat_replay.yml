@@ -280,7 +280,7 @@ jobs:
                 echo "Limiting to hosts:    ${TARGET_HOST_LIMIT}"
                 echo "Host to database map: ${HOST_TO_DB_MAP}"
               fi
-              if [ "${ACTION}" = "process replay" ]
+              if [ "${ACTION}" = "prepare replay" ]
               then
                 ansible-playbook \
                    -i $inventory \
