@@ -288,7 +288,7 @@ jobs:
                    ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
                    --extra-vars force_role=oracle-db-rat-process \
                    --extra-vars rat_replay_name=${{ github.event.inputs.ReplayName }} \
-                   --extra-vars rat_replay_s3_location=${{ github.event.inputs.ReplayS3Location }} \
+                   --extra-vars rat_prepare_s3_bucket_name=${{ github.event.inputs.ReplayS3Location }} \
                    --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
                    roles/ansible/site.yml
               elif [ "${ACTION}" = "start replay" ]
