@@ -287,7 +287,7 @@ jobs:
                    --extra-vars rat_replay_s3_location=${{ github.event.inputs.ReplayS3Location }} \
                    --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
                    roles/ansible/site.yml
-              elsif [ "${ACTION}" = "report replay" ]
+              elif [ "${ACTION}" = "report replay" ]
               then
                 ansible-playbook \
                    -i $inventory \
