@@ -296,7 +296,7 @@ jobs:
                    --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
                    ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
                    --extra-vars force_role=oracle-db-rat-report \
-                   --extra-vars rat_replay_name=${{ github.event.inputs.ReplayName }} \
+                   --extra-vars rat_report_replay_name=${{ github.event.inputs.ReplayName }} \
                    --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
                    --extra-vars "rat_capture_s3_bucket_name=${BUCKET_NAME}" \
                    roles/ansible/site.yml
