@@ -216,6 +216,7 @@ jobs:
             ansible/roles/secretsmanager-passwords
             ansible/roles/get-modernisation-platform-facts
             ansible/roles/oracle-db-rat-replay
+            ansible/roles/oracle-db-rat-report
             ansible/site.yml
           path: roles
           ref: ${{ github.event.inputs.SourceConfigVersion }}
