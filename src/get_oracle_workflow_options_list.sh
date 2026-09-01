@@ -2,12 +2,13 @@
 #
 # Generate lists of Oracle workflow options:
 #  - primary databases
-#  - database systems (i.e. primary and all standby databases)
+#  - database systems (i.e. primary and all standby databases grouped)
+#  - all databases (i.e. primary and standby databases ungrouped)
 
 set -euo pipefail
 
 usage() {
-   echo "Usage: $0 [primary|system] <dba_applications_list> <group_vars_directory>"
+   echo "Usage: $0 [primary|system|all] <dba_applications_list> <group_vars_directory>"
 }
 
 if [[ $# -ne 3 ]]; then
@@ -30,7 +31,7 @@ if [[ ! -f ${DBA_APPLICATIONS_LIST} ]]; then
 fi
 
 case "${MODE}" in
-   primary|system)
+   primary|system|all)
       ;;
    *)
       usage
@@ -46,12 +47,24 @@ do
    # For Delius (delius-core and delius-mis) we simply refer to the primarydb as there is only ever exactly one
    # of those per application group - the entry is the same regardless if it is a primary or system mode
    if [[ "${GROUP_VARS_FILE}" == *"delius"* ]]; then
-      if [[ "${GROUP_VARS_FILE}" == *"_primarydb.yml" ]]; then
-         TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE%%_primarydb.yml} | sed 's/^environment_name_//')")
+      if [[ "${MODE}" == "primary" || "${MODE}" == "system" ]]; then
+         if [[ "${GROUP_VARS_FILE}" == *"_primarydb.yml" ]]; then
+            TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE%%_primarydb.yml} | sed 's/^environment_name_//')")
+         fi
+      else
+      # mode == all we want to see all of the databases
+      # but refer to them by their type (primary/standbydb1/standbydb2) rather than by name
+         if [[ "${GROUP_VARS_FILE}" == *"_primarydb.yml" ]]; then
+            TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE%%_primarydb.yml} | sed 's/^environment_name_//') primarydb")
+         elif [[ "${GROUP_VARS_FILE}" == *"_standbydb1.yml" ]]; then
+           TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE%%_standbydb1.yml} | sed 's/^environment_name_//') standbydb1")
+         elif [[ "${GROUP_VARS_FILE}" == *"_standbydb2.yml" ]]; then
+           TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE%%_standbydb2.yml} | sed 's/^environment_name_//') standbydb2")
+         fi
       fi
    elif [[ "${GROUP_VARS_FILE}" == *"hmpps_oem"* ]]; then
        # For OEM we refer to the primary EMREP and RCVCAT databases as there are only ever these 2
-       # primary databases in the environment - the entry is the same regardless if it is a primary or system mode 
+       # primary databases in the environment - the entry is the same regardless if it is a primary, system or all mode 
        TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE#*environment_name_} | sed 's/.yml$//') EMREP")
        TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE#*environment_name_} | sed 's/.yml$//') RCVCAT")
    else
@@ -69,8 +82,8 @@ do
                fi
             fi
          done
-      else
-         # mode == system (get all databases; regardless of whether they are a primary or standby)
+      elif [[ "${MODE}" == "system" ]]; then
+         # mode == system (get all databases and group them; regardless of whether they are a primary or standby)
          if yq 'has("db_configs")' ${GROUP_VARS_DIRECTORY}/${GROUP_VARS_FILE} | grep -q true; then
             # We ignore entries which do not have a host_name as they will correspond to either obsolete databases
             # or the RMAN catalog database, which only exists in hmpps-oem* environment
@@ -95,6 +108,31 @@ do
                TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE#*environment_name_} | sed 's/.yml$//') ${SYSTEM}")
             done
          fi
+      else
+        # mode == all (get all databases ungrouped; regardless of whether they are a primary or standby)
+         if yq 'has("db_configs")' ${GROUP_VARS_DIRECTORY}/${GROUP_VARS_FILE} | grep -q true; then
+            # We ignore entries which do not have a host_name as they will correspond to either obsolete databases
+            # or the RMAN catalog database, which only exists in hmpps-oem* environment
+            for ALL in $(
+               yq -o=json '.db_configs' ${GROUP_VARS_DIRECTORY}/${GROUP_VARS_FILE} \
+                              | jq -r '
+                                 to_entries
+                                 | map(
+                                    select(.value.host_name != null)
+                                    | {key, services: (.value.service // [] | map(.name))}
+                                 )
+                                 | map(
+                                    .services[] as $svc
+                                    | {service:$svc, key:.key}
+                                 )
+                                 | sort_by(.service)
+                                 | map("\(.service)=>\(.key)")
+                                 | .[]'
+                           );
+            do
+               TARGET_ENTRIES+=("$(echo ${GROUP_VARS_FILE#*environment_name_} | sed 's/.yml$//') ${ALL}")
+            done
+         fi
       fi
    fi
 done
@@ -108,8 +146,10 @@ done
 
 if [[ "${MODE}" == "primary" ]]; then
    echo ">>>>>>>>CUT HERE FOR TARGET DATABASE LIST>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-else
+elif [[ "${MODE}" == "system" ]]; then
    echo ">>>>>>>>CUT HERE FOR TARGET DATABASE SYSTEMS LIST>>>>>>>>>>>>>>>>>>>>>>>"
+else
+   echo ">>>>>>>>CUT HERE FOR ALL DATABASES LIST>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
 fi
 
 # Print all target entries in alphabetical order formatted for align together

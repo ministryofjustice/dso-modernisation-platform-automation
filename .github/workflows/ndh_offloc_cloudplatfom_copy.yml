@@ -48,7 +48,7 @@ jobs:
         current_time: "${{ steps.parseinput.outputs.current_time }}"
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: ${{ github.ref }}
 
@@ -105,7 +105,7 @@ jobs:
       dest_file_exists: ${{ steps.check_dest.outputs.dest_file_exists }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.ref }}
 
@@ -117,7 +117,7 @@ jobs:
           secrets_json: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
 
       - name: Configure AWS Credentials for Source
-        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c
         with:
           role-to-assume: "${{ steps.account.outputs.role_arn }}"
           role-session-name: "${{ steps.account.outputs.role_session_name }}"
@@ -203,7 +203,7 @@ jobs:
             fi
 
       - name: Configure AWS Credentials for Destination
-        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c
         with:
           role-to-assume: ${{ needs.setup.outputs.cp_environment == 'preprod' && secrets.OFFLOC_TRANSFER_GHA_ROLE_ARN_PREPROD || secrets.OFFLOC_TRANSFER_GHA_ROLE_ARN_PROD }}
           role-session-name: "github-${{ github.repository_id }}-${{ github.run_id }}-dest"
@@ -292,3 +292,4 @@ jobs:
           echo "- Source file exists: ${{ steps.check_source.outputs.source_file_exists || 'unknown' }}"
           echo "- Destination file exists: ${{ steps.check_dest.outputs.dest_file_exists || 'unknown' }}"
           echo "- Pipeline run time: ${{ needs.setup.outputs.current_time }}"
+
