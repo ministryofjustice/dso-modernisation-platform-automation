@@ -78,7 +78,7 @@ jobs:
             echo "cp_environment=${cp_environment}" >> $GITHUB_OUTPUT
 
             # Generate date and file variables
-            DAY=$(TZ="Europe/London" date -d "$days_ago" +"%Y%m%d")
+            DAY=$(TZ="Europe/London" date -d "$days_ago days ago" +"%Y%m%d")
             SOURCE_OFFLOC_FILE_DATE=$(TZ="Europe/London" date -d "$((days_ago + 1)) days ago" +"%d%m%Y")
             FILE_NAME="C_NOMIS_OFFENDER_${SOURCE_OFFLOC_FILE_DATE}_01.dat"
             CURRENT_TIME=$(TZ="Europe/London" date)
