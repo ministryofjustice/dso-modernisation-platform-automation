@@ -6,7 +6,7 @@ on:
     inputs:
       dryrun:
         type: choice
-        description: For testing pipeline, leave as false unless testing
+        description: Dryrun mode. Leave as false unless testing pipeline
         default: "false"
         options:
           - "true"
