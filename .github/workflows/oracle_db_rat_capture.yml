@@ -3,9 +3,6 @@ name: Oracle DB RAT Setup and Capture
 # TargetDatabase options may be generated using the oracle_db_generate_target_list.yml workflow
 
 on:
-  push:
-    branch:
-      - DBA-1275
   workflow_dispatch:
     inputs:
       Action:
