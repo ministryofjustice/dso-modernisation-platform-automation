@@ -263,7 +263,7 @@ jobs:
           else
             echo "Uploading ${ZIP_FILENAME} to destination bucket..."
             if [[ $DRYRUN == "false" ]]; then
-              # aws s3 cp "${ZIP_FILE}" "s3://${DEST_BUCKET}/${ZIP_FILENAME}"  # Use full path for source, filename for destination
+              aws s3 cp "${ZIP_FILE}" "s3://${DEST_BUCKET}/${ZIP_FILENAME}"  # Use full path for source, filename for destination
 
               if [[ $? -eq 0 ]]; then
                 echo "File ${ZIP_FILENAME} uploaded, local file deleted at ${CURRENT_TIME}"
