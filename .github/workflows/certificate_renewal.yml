@@ -298,3 +298,4 @@ jobs:
           echo "EC2=$ec2_hostname DomainNames=$domain_names"
           sed -i "s|sed-domain-names|$domain_names|g" src/certificates/UpdateWebBinding.ps1
           src/run_script_on_ec2.sh first "$ec2_hostname" "certificate-renewal-web-binding" "src/certificates/UpdateWebBinding.ps1"
+

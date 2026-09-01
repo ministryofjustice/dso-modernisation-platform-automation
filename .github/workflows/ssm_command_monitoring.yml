@@ -174,3 +174,4 @@ jobs:
         run: |
           cat output.txt | grep -v "^Verbose" | grep -v "^DRYRUN"
           exit $exitcode
+

@@ -240,3 +240,4 @@ jobs:
             echo "${cmds[$i]}" > command.sh
             . ./command.sh
           done
+

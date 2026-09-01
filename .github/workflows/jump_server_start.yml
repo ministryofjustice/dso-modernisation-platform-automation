@@ -150,3 +150,4 @@ jobs:
         if: steps.current_state.outputs.not_running_count != '0'
         run: |
           src/jumpserver/jumpserver_control.sh $script_flags -p on "$jumpserver"
+

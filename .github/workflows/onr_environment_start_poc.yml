@@ -148,3 +148,4 @@ jobs:
           pipeline_stages: "${{ needs.setup.outputs.pipeline_stages }}"
         run: |
           src/oasys-national-reporting/onr_control.sh -e "$onr_environment" $script_flags pipeline start "$pipeline_stages"
+
