@@ -70,3 +70,4 @@ jobs:
           export SHOW_STDERR_ON_SUCCESS=1
           echo "src/run_script_on_ec2.sh first '$ec2_name_tag' 'planetfm-gfsl-dataextract' 'src/planetfm/Add-GFSLDataExtract.ps1'"
           src/run_script_on_ec2.sh first "$ec2_name_tag" "planetfm-gfsl-dataextract" "src/planetfm/Add-GFSLDataExtract.ps1"
+

@@ -191,3 +191,4 @@ jobs:
         if: steps.active_asg_stats.outputs.maintenance_mode == 'enabled'
         run: |
           src/nomis/nomis_control.sh -0 $script_flags "$nomis_environment"
+

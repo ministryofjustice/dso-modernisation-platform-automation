@@ -165,3 +165,4 @@ jobs:
           export SHOW_STDERR_ON_SUCCESS=1
           echo "src/run_script_on_ec2.sh first '$ec2_name_app' 'cdecopy' 'sudo su tibco -c /usr/local/bin/cdecopy.sh $script_flags'"
           src/run_script_on_ec2.sh first "$ec2_name_app" "cdecopy" "sudo su tibco -c '/usr/local/bin/cdecopy.sh $script_flags'"
+

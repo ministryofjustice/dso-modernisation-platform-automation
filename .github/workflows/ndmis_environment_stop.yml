@@ -197,3 +197,4 @@ jobs:
           pipeline_stages: "${{ needs.setup.outputs.pipeline_stages }}"
         run: |
           src/delius-mis/ndmis_control.sh -e "$ndmis_environment" $script_flags pipeline "$stop_or_shutdown" "$pipeline_stages"
+

@@ -292,3 +292,4 @@ jobs:
           echo "- Source file exists: ${{ steps.check_source.outputs.source_file_exists || 'unknown' }}"
           echo "- Destination file exists: ${{ steps.check_dest.outputs.dest_file_exists || 'unknown' }}"
           echo "- Pipeline run time: ${{ needs.setup.outputs.current_time }}"
+
