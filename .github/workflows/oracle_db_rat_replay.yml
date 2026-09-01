@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       Action:
-        description: 'Action (start replay|report relay)'
+        description: 'Action (prepare replay|start replay|report replay)'
         default: ''
         type: choice
         options:
