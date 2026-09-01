@@ -250,8 +250,8 @@ jobs:
           DEST_BUCKET: ${{ needs.setup.outputs.cp_environment == 'preprod' && secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PREPROD || secrets.OFFLOC_TRANSFER_S3_BUCKET_NAME_PROD }}
           DAY: ${{ needs.setup.outputs.day }}
           CURRENT_TIME: ${{ needs.setup.outputs.current_time }}
-          DRYRUN: ${{ needs.setup.outputs.dryrun }}
         run: |
+          DRYRUN=${{ needs.setup.outputs.dryrun }}
           ZIP_FILE="${{ steps.prepare_file.outputs.zip_file }}"
           ZIP_FILENAME="${{ steps.prepare_file.outputs.zip_filename }}"
 
