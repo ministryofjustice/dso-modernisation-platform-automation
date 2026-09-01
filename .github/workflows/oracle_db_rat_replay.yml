@@ -240,11 +240,13 @@ jobs:
               # Obviously the selected host for running WRC must have connectivity to the
               # desired TNS Alias for replay.
               TARGET_ENVIRONMENT="${{ github.event.inputs.ReplayHost }}"
+              TARGET_TNS_ALIAS="${{ github.event.inputs.TargetTNSAlias }}""
               # NOTE: *** CARE MUST BE TAKEN NOT TO RUN A REPLAY ON A PRIMARY PRODUCTION DATABASE ***
               # This may result in changes to live database.
               # Therefore we explicitly exclude cases where this not a permitted operation.
                 if [[ "${TARGET_ENVIRONMENT}" == "delius_core_production_prod_delius                primarydb" ||
-                    "${TARGET_ENVIRONMENT}" == "delius_mis_production_prod_mis                    primarydb" ]]
+                    "${TARGET_ENVIRONMENT}" == "delius_mis_production_prod_mis                    primarydb" ||
+                    "${TARGET_TNS_ALIAS}" == "PRDNDA" ]]
               then
                  echo "Running a replay against a primary production database is not permitted."
                   exit 1
