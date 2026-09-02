@@ -162,3 +162,4 @@ jobs:
           else
             echo "Dry Run: aws autoscaling set-desired-capacity --desired-capacity 0 --auto-scaling-group-name '$asg_name'" >&2
           fi
+

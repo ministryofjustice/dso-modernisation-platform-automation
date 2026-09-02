@@ -166,3 +166,4 @@ jobs:
           pipeline_stages: "${{ needs.setup.outputs.pipeline_stages }}"
         run: |
           src/nomis-combined-reporting/ncr_control.sh -e "$ncr_environment" $script_flags pipeline start "$pipeline_stages"
+
