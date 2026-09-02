@@ -1,0 +1,187 @@
+name: Oracle DB RAT Replay
+
+# TargetDatabase options may be generated using the oracle_db_generate_target_list.yml workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      Action:
+        description: 'Action (prepare replay|start replay|report replay)'
+        default: ''
+        type: choice
+        options:
+          - 'prepare replay'
+          - 'start replay'
+          - 'report replay'
+      ReplayS3Location:
+        description: 'For "prepare replay" this should be the Capture location, for "start replay" this should be the Prepared location (for example, s3://delius-core-dev-oracle-db-rat-capture/capture/delius_core/dmdndas1/20260819140352/ )'
+        default: ''
+        type: string
+      ReplayName:
+        description: 'Name to identify the Replay'
+        default: ''
+        type: string
+      TargetTNSAlias:
+        description: 'TNS Alias for WRC to use for Database Connections (may be remote)'
+        default: ''
+        type: string        
+      ReplayHost:
+        description: 'Host for Running Replay (for prepare replay it must be the target database host; other actions may be done remotely if a database connection is available)'
+        default: ''
+        type: choice
+        options:
+            - 'delius_core_development_dev_delius                primarydb'
+            - 'delius_core_development_dev_delius               standbydb1'
+            - 'delius_core_development_dev_delius               standbydb2'
+            - 'delius_core_preproduction_preprod_delius          primarydb'
+            - 'delius_core_preproduction_preprod_delius         standbydb1'
+            - 'delius_core_preproduction_preprod_delius         standbydb2'
+            - 'delius_core_production_prod_delius                primarydb'
+            - 'delius_core_production_prod_delius               standbydb1'
+            - 'delius_core_production_prod_delius               standbydb2'
+      SourceConfigVersion:
+        description: 'Branch/tag/commit for modernisation-platform-configuration-management'
+        type: string
+        default: 'main'
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+env:
+  ansible_config: inventory/ansible/ansible.cfg
+  inventory: inventory/ansible
+
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ministryofjustice/hmpps-delius-operational-automation:0.80.0
+    timeout-minutes: 1440
+    continue-on-error: false
+    steps:
+
+      - name: Checkout Local Repo to get Composite Action
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Target Database Access
+        id: setup_db_system_access
+        uses: ./.github/actions/setup_oracle_target_access
+        with:
+          TargetEntities: "${{ github.event.inputs.ReplayHost }}"
+          TargetEntitiesType: "all"
+          SourceConfigVersion: "${{ github.event.inputs.SourceConfigVersion }}"
+          ModernisationPlatformEnvironmentManagement: "${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}"
+
+      - name: Fetch Required Roles & Site
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ministryofjustice/modernisation-platform-configuration-management
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ansible/roles/secretsmanager-passwords
+            ansible/roles/get-modernisation-platform-facts
+            ansible/roles/oracle-db-rat-process
+            ansible/roles/oracle-db-rat-replay
+            ansible/roles/oracle-db-rat-report
+            ansible/site.yml
+          path: roles
+          ref: ${{ github.event.inputs.SourceConfigVersion }}
+          fetch-depth: 0
+
+      - name: Run Oracle DB Real Application Testing Action
+        id: oracle_db_rat_replay
+        shell: bash
+        run: |
+            ACTION="${{ github.event.inputs.Action }}"
+              if [ ${{ steps.setup_db_system_access.outputs.batch_count }} -ne 1 ];
+              then
+                  echo "Multiple WRC hosts are not expected for a replay."
+                  exit 1
+              fi
+              # Note that the TARGET_ENVIRONMENT is where we are running the 
+              # Workload Replay Client (WRC) - and NOT where the target database is running.
+              # This is because we typically run WRC on a different host to avoid its 
+              # own overhead skewing performance.
+              # For example, we may select to run the WRC on a standby host and use
+              # the TNS Alias to connect to a database on a primary host.
+              # Obviously the selected host for running WRC must have connectivity to the
+              # desired TNS Alias for replay.
+              TARGET_ENVIRONMENT="${{ github.event.inputs.ReplayHost }}"
+              TARGET_TNS_ALIAS="${{ github.event.inputs.TargetTNSAlias }}"
+              # NOTE: *** CARE MUST BE TAKEN NOT TO RUN A REPLAY ON A PRIMARY PRODUCTION DATABASE ***
+              # This may result in changes to live database.
+              # Therefore we explicitly exclude cases where this not a permitted operation.
+                if [[ "${TARGET_ENVIRONMENT}" == "delius_core_production_prod_delius                primarydb" ||
+                    "${TARGET_ENVIRONMENT}" == "delius_mis_production_prod_mis                    primarydb" ||
+                    "${TARGET_TNS_ALIAS}" == "PRDNDA" ]]
+              then
+                 echo "Running a replay against a primary production database is not permitted."
+                  exit 1
+              fi
+              TARGET_ENVIRONMENT="${TARGET_ENVIRONMENT%%[[:space:]]*}"
+              case "${TARGET_ENVIRONMENT}" in
+                delius*)
+                  BUCKET_NAME=$(echo "${TARGET_ENVIRONMENT}" | awk -F_ '{print $1 "-" $2 "-" $(NF-1)}')-oracle-db-rat-capture
+                  echo "Using bucket: ${BUCKET_NAME}"
+                  ;;
+                *)
+                  echo "::error::A bucket has not been configured for TargetDatabase '${TARGET_ENVIRONMENT}'."
+                  exit 1
+                  ;;
+              esac
+              # For Non-Delius environments create host-->database mapping based on the batch targets.
+              # These are called the batched target pairs as they are an array of hostname/database pairs.
+              if [ ! -z "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" ]
+              then
+                # When targeting individual databases, we expect a single batch containing a single database
+                CURRENT_BATCH=$(echo "${{ steps.setup_db_system_access.outputs.batched_target_pairs }}" | base64 -d | jq --compact-output '.[0]')
+                DATABASE_COUNT=$(echo ${CURRENT_BATCH} | jq 'length')
+                if [ ${DATABASE_COUNT} -ne 1 ]
+                then
+                   echo "Only one database should be supplied - found ${CURRENT_BATCH}."
+                   exit 1
+                fi
+                TARGET_HOST_LIMIT="--limit "$(echo ${CURRENT_BATCH} | jq -r '.[0] | keys[0]')
+                HOST_TO_DB_MAP="--extra-vars target_db_names='${CURRENT_BATCH}'"
+                echo "Limiting to hosts:    ${TARGET_HOST_LIMIT}"
+                echo "Host to database map: ${HOST_TO_DB_MAP}"
+              fi
+              if [ "${ACTION}" = "prepare replay" ]
+              then
+                ansible-playbook \
+                   -i $inventory \
+                   --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
+                   ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
+                   --extra-vars "force_role=oracle-db-rat-process" \
+                   --extra-vars "rat_replay_name=${{ github.event.inputs.ReplayName }}" \
+                   --extra-vars "rat_replay_s3_location=${{ github.event.inputs.ReplayS3Location }}" \
+                   --extra-vars "tns_alias=${{ github.event.inputs.TargetTNSAlias }}" \
+                   roles/ansible/site.yml
+              elif [ "${ACTION}" = "start replay" ]
+              then
+                ansible-playbook \
+                   -i $inventory \
+                   --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
+                   ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
+                   --extra-vars force_role=oracle-db-rat-replay \
+                   --extra-vars rat_replay_name=${{ github.event.inputs.ReplayName }} \
+                   --extra-vars rat_replay_s3_location=${{ github.event.inputs.ReplayS3Location }} \
+                   --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
+                   roles/ansible/site.yml
+              elif [ "${ACTION}" = "report replay" ]
+              then
+                ansible-playbook \
+                   -i $inventory \
+                   --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
+                   ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
+                   --extra-vars "application=${{ steps.setup_db_system_access.outputs.application }}" \
+                   --extra-vars force_role=oracle-db-rat-report \
+                   --extra-vars rat_report_replay_name=${{ github.event.inputs.ReplayName }} \
+                   --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
+                   --extra-vars "rat_report_s3_bucket_name=${BUCKET_NAME}" \
+                   roles/ansible/site.yml
+              else
+                echo "Skipping Ansible playbook for Action: ${ACTION}"
+              fi
