@@ -24,7 +24,14 @@ on:
       TargetTNSAlias:
         description: 'TNS Alias for WRC to use for Database Connections (may be remote)'
         default: ''
-        type: string        
+        type: string
+      ReplayPrepareParallel:
+        description: 'Use parallelism when preparing a replay'
+        default: 'no'
+        type: choice
+        options:
+          - 'no'
+          - 'yes'
       ReplayHost:
         description: 'Host for Running Replay (for prepare replay it must be the target database host; other actions may be done remotely if a database connection is available)'
         default: ''
@@ -161,6 +168,7 @@ jobs:
                    --extra-vars "rat_replay_name=${{ github.event.inputs.ReplayName }}" \
                    --extra-vars "rat_replay_s3_location=${{ github.event.inputs.ReplayS3Location }}" \
                    --extra-vars "tns_alias=${{ github.event.inputs.TargetTNSAlias }}" \
+                   --extra-vars "rat_replay_parallelism=${{ github.event.inputs.ReplayPrepareParallel }}" \
                    roles/ansible/site.yml
               elif [ "${ACTION}" = "start replay" ]
               then
