@@ -6,15 +6,15 @@ on:
   workflow_dispatch:
     inputs:
       Action:
-        description: 'Action (prepare replay|start replay|report replay)'
+        description: 'Action (process replay|start replay|report replay)'
         default: ''
         type: choice
         options:
-          - 'prepare replay'
+          - 'process replay'
           - 'start replay'
           - 'report replay'
       ReplayS3Location:
-        description: 'For "prepare replay" this should be the Capture location, for "start replay" this should be the Prepared location (for example, s3://delius-core-dev-oracle-db-rat-capture/capture/delius_core/dmdndas1/20260819140352/ )'
+        description: 'For "process replay" this should be the Capture location, for "start replay" this should be the Processed location (for example, s3://delius-core-dev-oracle-db-rat-capture/processed/delius_core/dmdndas1/20260819140352/ )'
         default: ''
         type: string
       ReplayName:
@@ -33,7 +33,7 @@ on:
           - 'no'
           - 'yes'
       ReplayHost:
-        description: 'Host for Running Replay (for prepare replay it must be the target database host; other actions may be done remotely if a database connection is available)'
+        description: 'Host for Running Replay (for process replay it must be the target database host; other actions may be done remotely if a database connection is available)'
         default: ''
         type: choice
         options:
@@ -158,7 +158,7 @@ jobs:
               export ANSIBLE_CONFIG=$ansible_config
               # Enable Ansible Task Profiling
               export ANSIBLE_CALLBACKS_ENABLED="ansible.posix.profile_tasks"
-              if [ "${ACTION}" = "prepare replay" ]
+              if [ "${ACTION}" = "process replay" ]
               then
                 ansible-playbook \
                    -i $inventory \
