@@ -83,7 +83,7 @@ do
             fi
          done
       elif [[ "${MODE}" == "system" ]]; then
-         # mode == system (get all databases and group them; regardless of whether they are a primary or standby)
+         # mode == system (get all databases and group them by db_name; regardless of whether they are a primary or standby)
          if yq 'has("db_configs")' ${GROUP_VARS_DIRECTORY}/${GROUP_VARS_FILE} | grep -q true; then
             # We ignore entries which do not have a host_name as they will correspond to either obsolete databases
             # or the RMAN catalog database, which only exists in hmpps-oem* environment
@@ -93,15 +93,11 @@ do
                               to_entries
                               | map(
                                  select(.value.host_name != null)
-                                 | {key, services: (.value.service // [] | map(.name))}
+                                 | {key, db_name: (.value.db_name // .key)}
                               )
-                              | map(
-                                 .services[] as $svc
-                                 | {service:$svc, key:.key}
-                              )
-                              | sort_by(.service)
-                              | group_by(.service)
-                              | map("(\(.[0].service))=>\(map(.key) | join(","))")
+                              | sort_by(.db_name)
+                              | group_by(.db_name)
+                              | map("(\(.[0].db_name))=>\(map(.key) | join(","))")
                               | .[]'
                            );
             do
@@ -119,14 +115,9 @@ do
                                  to_entries
                                  | map(
                                     select(.value.host_name != null)
-                                    | {key, services: (.value.service // [] | map(.name))}
+                                    | .key
                                  )
-                                 | map(
-                                    .services[] as $svc
-                                    | {service:$svc, key:.key}
-                                 )
-                                 | sort_by(.service)
-                                 | map("\(.service)=>\(.key)")
+                                 | sort
                                  | .[]'
                            );
             do
