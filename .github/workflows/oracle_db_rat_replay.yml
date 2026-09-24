@@ -6,27 +6,38 @@ on:
   workflow_dispatch:
     inputs:
       Action:
-        description: 'Action (prepare replay|start replay|report replay)'
+        description: 'Action (process replay|start replay|report replay)'
         default: ''
         type: choice
         options:
-          - 'prepare replay'
+          - 'process replay'
           - 'start replay'
           - 'report replay'
       ReplayS3Location:
-        description: 'For "prepare replay" this should be the Capture location, for "start replay" this should be the Prepared location (for example, s3://delius-core-dev-oracle-db-rat-capture/capture/delius_core/dmdndas1/20260819140352/ )'
+        description: 'For "process replay" this should be the Capture location, for "start replay" this should be the Processed location (for example, s3://delius-core-dev-oracle-db-rat-capture/processed/delius_core/dmdndas1/20260819140352/ )'
         default: ''
         type: string
+      ReplayDirectoryName:
+        description: 'Name of Oracle Directory where Replay Files are to be Processed and Held'
+        default: 'RAT_REPLAY_DIRECTORY'
+        type: string
       ReplayName:
-        description: 'Name to identify the Replay'
+        description: 'Name to identify the Replay (not required for processing)'
         default: ''
         type: string
       TargetTNSAlias:
         description: 'TNS Alias for WRC to use for Database Connections (may be remote)'
         default: ''
-        type: string        
+        type: string
+      ReplayProcessParallel:
+        description: 'Use parallelism when processing a replay'
+        default: 'no'
+        type: choice
+        options:
+          - 'no'
+          - 'yes'
       ReplayHost:
-        description: 'Host for Running Replay (for prepare replay it must be the target database host; other actions may be done remotely if a database connection is available)'
+        description: 'Host for Running Replay (for process replay it must be the target database host; other actions may be done remotely if a database connection is available)'
         default: ''
         type: choice
         options:
@@ -148,16 +159,20 @@ jobs:
                 echo "Limiting to hosts:    ${TARGET_HOST_LIMIT}"
                 echo "Host to database map: ${HOST_TO_DB_MAP}"
               fi
-              if [ "${ACTION}" = "prepare replay" ]
+              export ANSIBLE_CONFIG=$ansible_config
+              # Enable Ansible Task Profiling
+              export ANSIBLE_CALLBACKS_ENABLED="ansible.posix.profile_tasks"
+              if [ "${ACTION}" = "process replay" ]
               then
                 ansible-playbook \
                    -i $inventory \
                    --extra-vars "target=${{ steps.setup_db_system_access.outputs.target_group }}" \
                    ${TARGET_HOST_LIMIT} ${HOST_TO_DB_MAP} \
                    --extra-vars "force_role=oracle-db-rat-process" \
-                   --extra-vars "rat_replay_name=${{ github.event.inputs.ReplayName }}" \
                    --extra-vars "rat_replay_s3_location=${{ github.event.inputs.ReplayS3Location }}" \
                    --extra-vars "tns_alias=${{ github.event.inputs.TargetTNSAlias }}" \
+                   --extra-vars "rat_replay_parallelism=${{ github.event.inputs.ReplayProcessParallel }}" \
+                   --extra-vars "rat_replay_directory=${{ github.event.inputs.ReplayDirectoryName }}" \
                    roles/ansible/site.yml
               elif [ "${ACTION}" = "start replay" ]
               then
