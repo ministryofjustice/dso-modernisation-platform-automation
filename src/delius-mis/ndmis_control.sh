@@ -36,7 +36,7 @@ Where <opts>:
   -e <env>                  Set delius-mis environment
   -f                        Force start/stop
   -g <seconds>              The gap to wait between each ccm.sh command
-  -l public,sso             Select LB endpoint(s)
+  -l public                 Select LB endpoint(s)
   -q                        Do quick stop in pipeline mode, i.e. only disable AdaptiveJobServer
   -v                        Enable verbose debug
   -w wait_secs              Start/Stop WEB EC2s sequentially and leave wait_secs in between each
@@ -103,7 +103,7 @@ set_env_variables() {
     PUBLIC_LB_BACKEND_TARGET_GROUP=stage-mis-alb-bws-tg
     PUBLIC_LB_URL=stage.delius-mis.hmpps-preproduction.modernisation-platform.service.justice.gov.uk
     if [[ -z $LBS ]]; then
-      LBS="public sso"
+      LBS="public"
     fi
   elif [[ $NDMIS_ENVIRONMENT == preprod ]]; then
     AWS_ACCOUNT=delius-mis-preproduction
@@ -167,16 +167,12 @@ set_env_ec2_info() {
   if ! WEB_EC2_INFO=$(get_ec2_server_info "server-type" "delius-bip-web"); then
     return 1
   fi
-  if ! WEBSSO_EC2_INFO=$(get_ec2_server_info "server-type" "delius-bip-websso"); then
-    return 1
-  fi
 
   if [[ -z $APP_EC2_INFO && -z $CMS_EC2_INFO ]]; then
     error "Error retrieving EC2 info with delius-bip-cms and delius-bip-app tags"
     return 1
   fi
 
-  EXPECTED_WEBSSO_EC2_COUNT=$(echo "$WEBSSO_EC2_INFO" | wc -w | tr -d " ")
   EXPECTED_WEB_EC2_COUNT=$(echo "$WEB_EC2_INFO" | wc -w | tr -d " ")
 }
 
@@ -187,14 +183,8 @@ set_env_lb() {
     LB_PORT=$PUBLIC_LB_PORT
     LB_BACKEND_TARGET_GROUP=$PUBLIC_LB_BACKEND_TARGET_GROUP
     LB_URL=$PUBLIC_LB_URL
-  elif [[ $1 == "sso" ]]; then
-    LB_NAME=$PUBLIC_LB_NAME
-    LB_RULE_MAINTENANCE_PRIORITY=$PUBLIC_LB_RULE_MAINTENANCE_PRIORITY
-    LB_PORT=$PUBLIC_LB_PORT
-    LB_BACKEND_TARGET_GROUP=$PUBLIC_LB_BACKEND_TARGET_GROUP
-    LB_URL=sso.$PUBLIC_LB_URL
   else
-    error "Unexpected lb '$1', expected public or sso"
+    error "Unexpected lb '$1', expected public"
     return 1
   fi
 }
@@ -448,8 +438,7 @@ do_ec2() {
     echo "cms:      $CMS_EC2_INFO"
     echo "app:      $APP_EC2_INFO"
     echo "web:      $WEB_EC2_INFO"
-    echo "websso:   $WEBSSO_EC2_INFO"
-    echo "expected: websso=$EXPECTED_WEBSSO_EC2_COUNT web=$EXPECTED_WEB_EC2_COUNT"
+    echo "expected: web=$EXPECTED_WEB_EC2_COUNT"
   else
     usage
   fi
@@ -1027,7 +1016,7 @@ do_pipeline() {
       fi
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
-      pipeline_stage_ec2_start "STAGE 1: " "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS" "$WEB_EC2_INFO $WEBSSO_EC2_INFO" || stage1_exitcode=$?
+      pipeline_stage_ec2_start "STAGE 1: " "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS" "$WEB_EC2_INFO" || stage1_exitcode=$?
       if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
         return $stage1_exitcode
       fi
@@ -1050,20 +1039,14 @@ do_pipeline() {
       return 1
     fi
     if [[ $2 == "all" || $2 == *0* ]]; then
-      if (( EXPECTED_WEBSSO_EC2_COUNT != 0 )); then
-        pipeline_stage_lb "STAGE 0: public-lb sso:     " disable sso   "$EXPECTED_WEBSSO_EC2_COUNT"
-      fi
       pipeline_stage_lb "STAGE 0: public-lb web:   " disable public "$EXPECTED_WEB_EC2_COUNT"
     fi
   elif [[ $1 == "stop" || $1 == "shutdown" ]]; then
     if [[ $2 == "all" || $2 == *0* ]]; then
       pipeline_stage_lb "STAGE 0: public-lb web:    " enable  public  -1
-      if (( EXPECTED_WEBADMIN_EC2_COUNT != 0 )); then
-        pipeline_stage_lb "STAGE 0: public-lb sso:     " enable  sso   -1
-      fi
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
-      pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO $WEBSSO_EC2_INFO" || stage1_exitcode=$?
+      pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO" || stage1_exitcode=$?
       if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
         return $stage1_exitcode
       fi
