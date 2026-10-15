@@ -7,10 +7,14 @@ import datetime
 import os
 import textwrap
 import sys
+import urllib.parse
 
 CURL_TIMEOUT_SECS = 10
 API_PAGE_SIZE = 100
 PIPELINE_TIMEOUT_SECS = 216000
+LAMBDA_WORKFLOWS_FILE = os.path.join(
+    os.path.dirname(__file__),
+    'github_lambda_repositories_and_workflows.json')
 
 GITHUB_REPOS = [
     "dso-certificates",
@@ -39,6 +43,30 @@ def run_github_api(uri, github_token):
     if result.returncode != 0:
         raise ValueError(f'exit code {result.returncode} for {uri}' + os.linesep + result.stderr)
     return json.loads(result.stdout)
+
+
+def load_lambda_workflows():
+    if not os.path.isfile(LAMBDA_WORKFLOWS_FILE):
+        return {}
+
+    with open(LAMBDA_WORKFLOWS_FILE, encoding='utf-8') as lambda_workflows_file:
+        lambda_workflows = json.load(lambda_workflows_file)
+
+    if not isinstance(lambda_workflows, dict):
+        raise ValueError(f'invalid workflow config in {LAMBDA_WORKFLOWS_FILE}')
+
+    for repo, workflow_paths in lambda_workflows.items():
+        if not isinstance(repo, str):
+            raise ValueError(f'invalid repo name in {LAMBDA_WORKFLOWS_FILE}: {repo}')
+        if not isinstance(workflow_paths, list):
+            raise ValueError(
+                f'invalid workflow list for {repo} in {LAMBDA_WORKFLOWS_FILE}')
+        for workflow_path in workflow_paths:
+            if not isinstance(workflow_path, str):
+                raise ValueError(
+                    f'invalid workflow name for {repo} in {LAMBDA_WORKFLOWS_FILE}: {workflow_path}')
+
+    return lambda_workflows
 
 
 def add_workflow_stat(workflow_summary, repo, name, status):
@@ -174,6 +202,7 @@ def main():
     if os.environ.get('GITHUB_TOKEN') is None:
         raise ValueError('please set GITHUB_TOKEN environment variable')
     github_token = os.environ.get('GITHUB_TOKEN')
+    lambda_workflows = load_lambda_workflows()
 
     workflow_summary = {}
     repos = args.repo
@@ -206,6 +235,37 @@ def main():
             if num_workflows == 0:
                 sys.stderr.write(f'page {page}: {num_workflows_processed}/{total_count}{os.linesep}')
                 raise ValueError(f'API did not return all workflow page={page} processed={num_workflows_processed}/{total_count}')
+        if repo in lambda_workflows:
+            for workflow_path in lambda_workflows[repo]:
+                workflow_name = workflow_path.split('/')[-1].split('.')[0]
+                encoded_workflow_path = urllib.parse.quote(workflow_path, safe='')
+                add_workflow_stat(workflow_summary, repo, workflow_name, None)
+                num_workflows_processed = 0
+                for page in range(1,10000):
+                    uri = f'https://api.github.com/repos/ministryofjustice/{repo}/actions/workflows/{encoded_workflow_path}/runs?created=>={date}&per_page={API_PAGE_SIZE}&page={page}'
+                    if args.verbose >= 4:
+                        sys.stderr.write(f'Verbose4: {uri}{os.linesep}')
+                    workflow_runs = run_github_api(uri, github_token)
+
+                    if 'workflow_runs' not in workflow_runs or 'total_count' not in workflow_runs:
+                        sys.stderr.write(json.dumps(workflow_runs, indent=1))
+                        raise ValueError('API response error')
+
+                    total_count = workflow_runs["total_count"]
+                    num_workflows = len(workflow_runs['workflow_runs'])
+                    num_workflows_processed += num_workflows
+                    if args.verbose >= 4:
+                        sys.stderr.write(f'Verbose4: page {page}: got {num_workflows} workflows; {num_workflows_processed}/{total_count}{os.linesep}')
+
+                    for workflow_run in workflow_runs['workflow_runs']:
+                        if workflow_run.get('event') == 'schedule':
+                            continue
+                        check_workflow_run(workflow_summary, repo, workflow_run, args.verbose, start_timestamp, end_timestamp)
+                    if num_workflows_processed == total_count:
+                        break
+                    if num_workflows == 0:
+                        sys.stderr.write(f'page {page}: {num_workflows_processed}/{total_count}{os.linesep}')
+                        raise ValueError(f'API did not return all workflow page={page} processed={num_workflows_processed}/{total_count}')
 
     csv_timestamp = end_timestamp
     print_workflow_summary_csv(workflow_summary, csv_timestamp.strftime("%Y-%m-%dT%TZ"))

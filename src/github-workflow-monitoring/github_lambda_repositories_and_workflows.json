@@ -1,0 +1,11 @@
+{
+  "dso-certificates": ["cert-renewal-prod.yml"],
+  "dso-infra-azure-fixngo": [
+    "terragrunt-DigitalStudioDevTestEnvironments.yaml",
+    "terragrunt-NOMSDigitalStudioProduction1.yaml",
+    "terragrunt-NOMSProduction1.yaml",
+    "terragrunt-PlatformOperations.yaml"
+  ],
+  "dso-repositories": ["repos.yaml"],
+  "dso-useful-stuff": []
+}
