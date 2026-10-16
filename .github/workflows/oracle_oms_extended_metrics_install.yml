@@ -58,6 +58,7 @@ jobs:
           sparse-checkout: |
             ansible/roles/oracle-oms-setup
             ansible/roles/get-ec2-facts
+            ansible/roles/secretsmanager-passwords
             ansible/site.yml
           path: roles
           ref: ${{ github.event.inputs.SourceConfigVersion }}
