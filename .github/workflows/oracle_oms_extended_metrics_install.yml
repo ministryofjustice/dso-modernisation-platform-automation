@@ -1,9 +1,6 @@
 name: Oracle OMS Extended Metrics Install
 
 on:
-  push:
-    branches:
-      - DBA-1253
   workflow_dispatch:
     inputs:
       TargetOMS:
