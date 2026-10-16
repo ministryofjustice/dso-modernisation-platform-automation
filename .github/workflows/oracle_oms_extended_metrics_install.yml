@@ -61,6 +61,7 @@ jobs:
             ansible/roles/secretsmanager-passwords
             ansible/roles/get-modernisation-platform-facts
             ansible/roles/oracle-oem-blackout
+            ansible/roles/oracle-oem-agent-setup
             ansible/site.yml
           path: roles
           ref: ${{ github.event.inputs.SourceConfigVersion }}
