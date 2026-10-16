@@ -143,7 +143,7 @@ jobs:
 
       - name: Download Expiry Artifact if Update Required
         if: ${{ steps.certexpiry.outputs.requires_update == 1 }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: "expiry"
 
@@ -169,7 +169,7 @@ jobs:
       matrix: "${{ steps.strategy.outputs.matrix }}"
     steps:
       - name: Download Expiry Artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: "expiry"
 
