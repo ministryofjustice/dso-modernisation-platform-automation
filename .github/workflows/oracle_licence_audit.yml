@@ -163,11 +163,12 @@ jobs:
               TARGET="server_type_csr_db"
               ;;
             oasys-national*)
-              # No database in onr, so skip
-              TARGET=""
+              # No database instances in onr, but would in theory be server_type_onr_db
+              TARGET="server_type_onr_db"
               ;;
             oasys-*)
-              TARGET="server_type_oasys_db"
+              # oasys database group includes both oasys and onr databases
+              TARGET="server_type_oasys_db,server_type_onr_db"
               ;;
             *)
               # no TARGET → will be empty
