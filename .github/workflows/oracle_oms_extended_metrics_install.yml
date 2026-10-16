@@ -70,6 +70,8 @@ jobs:
       - name: Install OEM Extended Metrics
         id: install_oem_extended_metrics
         run: |
+              # Enable Ansible Task Profiling
+              export ANSIBLE_CALLBACKS_ENABLED="ansible.posix.profile_tasks"
               ansible-playbook \
                  -i $inventory \
                  --extra-vars "target=environment_name_${{ github.event.inputs.TargetOMS }}" \
