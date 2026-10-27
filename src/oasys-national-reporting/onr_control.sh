@@ -141,7 +141,6 @@ set_env_ec2_info() {
   if ! WEB_EC2_INFO=$(get_ec2_server_info "server-type" "onr-web"); then
     return 1
   fi
-  WEBSSO_EC2_INFO=$(get_ec2_server_info "server-type" "onr-websso")
 
   if [[ -z $CMS_EC2_INFO ]]; then
     error "Error retrieving EC2 info with onr-bip-cms tags"
@@ -412,9 +411,6 @@ do_ec2() {
   if [[ $1 == "display" ]]; then
     echo "cms:      $CMS_EC2_INFO"
     echo "web:      $WEB_EC2_INFO"
-    if [[ -n $WEBSSO_EC2_INFO ]]; then
-      echo "websso:   $WEBSSO_EC2_INFO"
-    fi
     echo "expected: web=$EXPECTED_WEB_EC2_COUNT"
   else
     usage
@@ -992,12 +988,6 @@ do_pipeline() {
       if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
         return $stage1_exitcode
       fi
-      if [[ -n $WEBSSO_EC2_INFO ]]; then
-        pipeline_stage_ec2_start "STAGE 1: " "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS" "$WEBSSO_EC2_INFO" || stage1_exitcode=$?
-        if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
-          return $stage1_exitcode
-        fi
-      fi
       if ! set_env_ec2_info; then
         stage1_exitcode=1
         if [[ $FORCE != 1 ]]; then
@@ -1027,12 +1017,6 @@ do_pipeline() {
       pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO" || stage1_exitcode=$?
       if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
         return $stage1_exitcode
-      fi
-      if [[ -n $WEBSSO_EC2_INFO ]]; then
-        pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS"  "$WEBSSO_EC2_INFO" || stage1_exitcode=$?
-        if [[ $stage1_exitcode != 0 && $FORCE != 1 ]]; then
-          return $stage1_exitcode
-        fi
       fi
       if ! set_env_ec2_info; then
         stage1_exitcode=1

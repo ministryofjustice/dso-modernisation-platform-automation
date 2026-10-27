@@ -163,11 +163,12 @@ jobs:
               TARGET="server_type_csr_db"
               ;;
             oasys-national*)
-              # No database in onr, so skip
-              TARGET=""
+              # No database instances in onr, but would in theory be server_type_onr_db
+              TARGET="server_type_onr_db"
               ;;
             oasys-*)
-              TARGET="server_type_oasys_db"
+              # oasys database group includes both oasys and onr databases
+              TARGET="server_type_oasys_db,server_type_onr_db"
               ;;
             *)
               # no TARGET → will be empty
@@ -279,7 +280,7 @@ jobs:
           $command \
             -i $inventory \
             --limit '${{ steps.database_limit.outputs.limit }}' \
-            --tags '${{ github.event.inputs.operation }}' --tags 'databases' --skip-tags ansible_version_check
+            --tags '${{ github.event.inputs.operation }}' --tags 'databases' --skip-tags ansible_version_check -e account_name='${{ matrix.account_name }}'
 
       - name: Determine weblogic Targets
         id: weblogic_targets
@@ -415,7 +416,7 @@ jobs:
           $command \
             -i $inventory \
             --limit '${{ steps.weblogic_limit.outputs.limit }}' \
-            --tags '${{ github.event.inputs.operation }}' --tags 'weblogic' --skip-tags ansible_version_check -e account_name='${{ matrix.account_name }}' -e mp_environment_management='${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}'
+            --tags '${{ github.event.inputs.operation }}' --tags 'weblogic' --skip-tags ansible_version_check -e account_name='${{ matrix.account_name }}'
 
 
   # The summary task only needs to run once on one environment, so we're using hmpps-oem-development
@@ -539,4 +540,4 @@ jobs:
           $command \
             -i $inventory \
             --limit '${{ steps.summary_limit.outputs.limit }}' \
-            --tags '${{ github.event.inputs.operation }}' --skip-tags ansible_version_check -e account_name=${{ matrix.account_name }} -e mp_environment_management='${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}'
+            --tags '${{ github.event.inputs.operation }}' --skip-tags ansible_version_check -e account_name=${{ matrix.account_name }}

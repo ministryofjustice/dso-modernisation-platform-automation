@@ -1,0 +1,16 @@
+{
+  "dso-infra-azure-ad": [
+    "application-cleanup.yml",
+    "application-management.yml",
+    "automated-user-management.yml",
+    "send-reminders.yml"
+  ],
+  "dso-infra-azure-fixngo": [
+    "terragrunt-DigitalStudioDevTestEnvironments.yaml",
+    "terragrunt-NOMSDigitalStudioProduction1.yaml",
+    "terragrunt-NOMSProduction1.yaml",
+    "terragrunt-PlatformOperations.yaml"
+  ],
+  "dso-repositories": ["repos.yaml"],
+  "dso-useful-stuff": []
+}
