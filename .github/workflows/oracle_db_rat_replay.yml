@@ -184,6 +184,7 @@ jobs:
                    --extra-vars rat_replay_name=${{ github.event.inputs.ReplayName }} \
                    --extra-vars rat_replay_s3_location=${{ github.event.inputs.ReplayS3Location }} \
                    --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
+                   --extra-vars "rat_replay_directory=${{ github.event.inputs.ReplayDirectoryName }}" \
                    roles/ansible/site.yml
               elif [ "${ACTION}" = "report replay" ]
               then
