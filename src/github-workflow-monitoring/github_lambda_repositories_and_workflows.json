@@ -11,6 +11,9 @@
     "terragrunt-NOMSProduction1.yaml",
     "terragrunt-PlatformOperations.yaml"
   ],
+  "dso-modernisation-platform-automation": [
+    "certificate_renewal.yml"
+  ],
   "dso-repositories": ["repos.yaml"],
   "dso-useful-stuff": []
 }
