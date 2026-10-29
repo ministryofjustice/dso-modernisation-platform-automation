@@ -12,7 +12,8 @@
     "terragrunt-PlatformOperations.yaml"
   ],
   "dso-modernisation-platform-automation": [
-    "certificate_renewal.yml"
+    "certificate_renewal.yml",
+    "github_workflow_monitoring.yml"
   ],
   "dso-repositories": ["repos.yaml"],
   "dso-useful-stuff": []
