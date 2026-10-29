@@ -14,6 +14,7 @@
   "dso-modernisation-platform-automation": [
     "certificate_renewal.yml",
     "github_workflow_monitoring.yml",
+    "security_hub_alerting.yml",
     "ssm_command_monitoring.yml"
   ],
   "dso-repositories": ["repos.yaml"],
