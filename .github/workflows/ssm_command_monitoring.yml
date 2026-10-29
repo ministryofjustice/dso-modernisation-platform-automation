@@ -4,6 +4,10 @@ name: SSM Command Monitoring
 on:
   workflow_dispatch:
     inputs:
+      scheduled_run:
+        description: 'Optional scheduled run selector: ssm_command_monitoring'
+        required: false
+        default: ''
       applications:
         description: 'e.g. nomis or leave blank for all'
         type: string
@@ -28,9 +32,6 @@ on:
         options:
           - true
           - false
-  schedule:
-    - cron: "0 * * * *"
-      timezone: "Europe/London"
 
 permissions:
   id-token: write
@@ -57,10 +58,17 @@ jobs:
         run: |
           echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            matrix=$(src/get_dso_aws_accounts.sh gha "" "")
-            round=true
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "ssm_command_monitoring" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be ssm_command_monitoring" >&2
+                exit 1
+              fi
+              matrix=$(src/get_dso_aws_accounts.sh gha "" "")
+              round=true
+            else
+              matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+            fi
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -79,12 +87,19 @@ jobs:
           interval=21600
           echo "Setting options event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            dryrun="${{ github.event.inputs.dryrun }}"
-            round="${{ github.event.inputs.round }}"
-            interval="${{ github.event.inputs.interval }}"
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            interval=3600
-            round=true
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "ssm_command_monitoring" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be ssm_command_monitoring" >&2
+                exit 1
+              fi
+              interval=3600
+              round=true
+            else
+              dryrun="${{ github.event.inputs.dryrun }}"
+              round="${{ github.event.inputs.round }}"
+              interval="${{ github.event.inputs.interval }}"
+            fi
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -174,4 +189,3 @@ jobs:
         run: |
           cat output.txt | grep -v "^Verbose" | grep -v "^DRYRUN"
           exit $exitcode
-
