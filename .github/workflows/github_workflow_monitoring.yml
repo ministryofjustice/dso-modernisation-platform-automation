@@ -7,6 +7,10 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      scheduled_run:
+        description: 'Optional scheduled run selector: monitoring'
+        required: false
+        default: ''
       repos:
         description: 'e.g. all'
         type: string
@@ -41,9 +45,6 @@ on:
         options:
           - true
           - false
-  schedule:
-    - cron: "0,30 * * * *"
-      timezone: "Europe/London"    
 
 jobs:
   check-strategy:
@@ -68,10 +69,16 @@ jobs:
         run: |
           echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            matrix=$(src/get_dso_aws_accounts.sh gha "hmpps-oem" "test")
-            round=true
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "monitoring" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be monitoring" >&2
+                exit 1
+              fi
+              matrix=$(src/get_dso_aws_accounts.sh gha "hmpps-oem" "test")
+            else
+              matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+            fi
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -87,17 +94,24 @@ jobs:
         run: |
           echo "Setting options event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            dryrun="${{ github.event.inputs.dryrun }}"
-            round="${{ github.event.inputs.round }}"
-            interval="${{ github.event.inputs.interval }}"
-            number="${{ github.event.inputs.number }}"
-            repos="${{ github.event.inputs.repos }}"
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            dryrun=false
-            round=true
-            interval=1800
-            number=336 # 7 days as some pipelines only run weekly
-            repos=all
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "monitoring" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be monitoring" >&2
+                exit 1
+              fi
+              dryrun=false
+              round=true
+              interval=1800
+              number=336 # 7 days as some pipelines only run weekly
+              repos=all
+            else
+              dryrun="${{ github.event.inputs.dryrun }}"
+              round="${{ github.event.inputs.round }}"
+              interval="${{ github.event.inputs.interval }}"
+              number="${{ github.event.inputs.number }}"
+              repos="${{ github.event.inputs.repos }}"
+            fi
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -178,4 +192,3 @@ jobs:
         run: |
           cat output.txt | grep -v "^Verbose" | grep -v "^DRYRUN"
           exit $exitcode
-

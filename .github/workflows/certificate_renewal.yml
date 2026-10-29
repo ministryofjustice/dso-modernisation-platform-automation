@@ -4,6 +4,10 @@ name: Certificate Renewal
 on:
   workflow_dispatch:
     inputs:
+      scheduled_run:
+        description: 'Optional scheduled run selector: TUESDAY, WEDNESDAY or THURSDAY'
+        required: false
+        default: ''
       ec2_hostname:
         description: 'e.g. pd-cafm-w-37-a'
         type: string
@@ -41,22 +45,28 @@ jobs:
         run: |
           echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            matrix=$(src/certificates/get_strategy_matrix.sh ec2_hostname "${{ github.event.inputs.ec2_hostname }}")
-            le_server=${{ github.event.inputs.le_server }}
-            renew_expiry_days=${{ github.event.inputs.renew_expiry_days }}
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            cron_time="${{ github.event.schedule }}"
-            le_server="LE_PROD"
-            renew_expiry_days=28
-            if [[ "${cron_time}" == '30 06 * * 2' ]]; then
-              matrix=$(src/certificates/get_strategy_matrix.sh schedule 0)
-            elif [[ "${cron_time}" == '30 06 * * 3' ]]; then
-              matrix=$(src/certificates/get_strategy_matrix.sh schedule 1)
-            elif [[ "${cron_time}" == '30 06 * * 4' ]]; then
-              matrix=$(src/certificates/get_strategy_matrix.sh schedule 2)
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "TUESDAY" && "${scheduled_run}" != "WEDNESDAY" && "${scheduled_run}" != "THURSDAY" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be TUESDAY, WEDNESDAY or THURSDAY" >&2
+                exit 1
+              fi
+              le_server="LE_PROD"
+              renew_expiry_days=28
+              if [[ "${scheduled_run}" == "TUESDAY" ]]; then
+                matrix=$(src/certificates/get_strategy_matrix.sh schedule 0)
+              elif [[ "${scheduled_run}" == "WEDNESDAY" ]]; then
+                matrix=$(src/certificates/get_strategy_matrix.sh schedule 1)
+              elif [[ "${scheduled_run}" == "THURSDAY" ]]; then
+                matrix=$(src/certificates/get_strategy_matrix.sh schedule 2)
+              else
+                echo "Unsupported scheduled_run ${scheduled_run}"
+                exit 1
+              fi
             else
-              echo "Unsupported schedule cron ${cron_time}"
-              exit 1
+              matrix=$(src/certificates/get_strategy_matrix.sh ec2_hostname "${{ github.event.inputs.ec2_hostname }}")
+              le_server=${{ github.event.inputs.le_server }}
+              renew_expiry_days=${{ github.event.inputs.renew_expiry_days }}
             fi
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"

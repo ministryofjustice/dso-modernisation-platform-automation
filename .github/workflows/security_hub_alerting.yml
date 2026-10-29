@@ -4,6 +4,10 @@ name: AWS Security Hub Alerting
 on:
   workflow_dispatch:
     inputs:
+      scheduled_run:
+        description: 'Optional scheduled run selector: security_hub_alerting'
+        required: false
+        default: ''
       applications:
         description: 'e.g. nomis or leave blank for all'
         type: string
@@ -16,11 +20,7 @@ on:
         default: 'false'
         options:
           - 'true'
-          - 'false'        
-
-  schedule:
-    - cron: "30 7 * * 1-5"             
-      timezone: "Europe/London"
+          - 'false'
 
 permissions:
   id-token: write
@@ -45,9 +45,16 @@ jobs:
         run: |
           echo "Setting strategy matrix event=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            matrix=$(src/get_dso_aws_accounts.sh gha "" "")
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "security_hub_alerting" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be security_hub_alerting" >&2
+                exit 1
+              fi
+              matrix=$(src/get_dso_aws_accounts.sh gha "" "")
+            else
+              matrix=$(src/get_dso_aws_accounts.sh gha "${{ github.event.inputs.applications }}" "${{ github.event.inputs.environments }}")
+            fi
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -64,9 +71,16 @@ jobs:
           dryrun='false'
           echo "Setting options, GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            dryrun="${{ github.event.inputs.dryrun }}"
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            echo "This is a scheduled full run with conditional slack alerting"
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "security_hub_alerting" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be security_hub_alerting" >&2
+                exit 1
+              fi
+              echo "This is a scheduled full run with conditional slack alerting"
+            else
+              dryrun="${{ github.event.inputs.dryrun }}"
+            fi
           else
             echo "Unsupported GITHUB_EVENT_NAME (${GITHUB_EVENT_NAME})"
             exit 1
@@ -240,7 +254,3 @@ jobs:
               echo "No new alerts exist, skipping slack notification"
               echo "new-alerts-exist=false" >> $GITHUB_OUTPUT              
             fi
-
-
-
-
