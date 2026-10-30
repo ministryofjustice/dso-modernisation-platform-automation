@@ -47,6 +47,7 @@ Where <cmd>:
   lb         maintenance-mode    enable|disable|check - enable, disable or check maintenance mode on given LB
   lb         get-target-group    arn|health|name      - get target group ARN, health or name on given LB
   lb         get-json            rules|rule           - debug lb json
+  rclone     start|stop                               - start and stop rclone-sync
   pipeline   start|stop|shutdown all|012345678        - start and stop services with given stages/steps, use dryrun flag to check, shutdown stops EC2 as well
 
 For pipeline stop and shutdown, below steps are run 0 through to 8
@@ -90,34 +91,34 @@ set_env_variables() {
   PUBLIC_LB_PORT=443
 
   if [[ $NDMIS_ENVIRONMENT == dev ]]; then
-    AWS_ACCOUNT=delius-mis-development
-    PUBLIC_LB_NAME=dev-mis-alb
-    PUBLIC_LB_BACKEND_TARGET_GROUP=dev-mis-alb-bws-tg
-    PUBLIC_LB_URL=dev.delius-mis.hmpps-development.modernisation-platform.service.justice.gov.uk
+    AWS_ACCOUNT="delius-mis-development"
+    PUBLIC_LB_NAME="dev-mis-alb"
+    PUBLIC_LB_BACKEND_TARGET_GROUP="dev-mis-alb-bws-tg"
+    PUBLIC_LB_URL="dev.delius-mis.hmpps-development.modernisation-platform.service.justice.gov.uk"
     if [[ -z $LBS ]]; then
       LBS="public"
     fi
   elif [[ $NDMIS_ENVIRONMENT == stage ]]; then
-    AWS_ACCOUNT=delius-mis-preproduction
-    PUBLIC_LB_NAME=stage-mis-alb
-    PUBLIC_LB_BACKEND_TARGET_GROUP=stage-mis-alb-bws-tg
-    PUBLIC_LB_URL=stage.delius-mis.hmpps-preproduction.modernisation-platform.service.justice.gov.uk
+    AWS_ACCOUNT="delius-mis-preproduction"
+    PUBLIC_LB_NAME="stage-mis-alb"
+    PUBLIC_LB_BACKEND_TARGET_GROUP="stage-mis-alb-bws-tg"
+    PUBLIC_LB_URL="stage.delius-mis.hmpps-preproduction.modernisation-platform.service.justice.gov.uk"
     if [[ -z $LBS ]]; then
       LBS="public"
     fi
   elif [[ $NDMIS_ENVIRONMENT == preprod ]]; then
-    AWS_ACCOUNT=delius-mis-preproduction
-    PUBLIC_LB_NAME=preprod-mis-alb
-    PUBLIC_LB_BACKEND_TARGET_GROUP=preprod-mis-alb-bws-tg
-    PUBLIC_LB_URL=preprod.delius-mis.hmpps-preproduction.modernisation-platform.service.justice.gov.uk
+    AWS_ACCOUNT="delius-mis-preproduction"
+    PUBLIC_LB_NAME="preprod-mis-alb"
+    PUBLIC_LB_BACKEND_TARGET_GROUP="preprod-mis-alb-bws-tg"
+    PUBLIC_LB_URL="preprod.delius-mis.hmpps-preproduction.modernisation-platform.service.justice.gov.uk"
     if [[ -z $LBS ]]; then
       LBS="public"
     fi
   elif [[ $NDMIS_ENVIRONMENT == prod ]]; then
-    AWS_ACCOUNT=delius-mis-production
-    PUBLIC_LB_NAME=prod-mis-alb
-    PUBLIC_LB_BACKEND_TARGET_GROUP=prod-mis-alb-bws-tg
-    PUBLIC_LB_URL=reporting.probation.service.justice.gov.uk
+    AWS_ACCOUNT="delius-mis-production"
+    PUBLIC_LB_NAME="prod-mis-alb"
+    PUBLIC_LB_BACKEND_TARGET_GROUP="prod-mis-alb-bws-tg"
+    PUBLIC_LB_URL="reporting.probation.service.justice.gov.uk"
     if [[ -z $LBS ]]; then
       LBS="public"
     fi
@@ -1142,6 +1143,103 @@ do_pipeline() {
   fi
 }
 
+wait_service_stopped() {
+  set -o pipefail
+
+  local i
+
+  logprefix="$1"
+  service="$2"
+  sleep_interval=$3
+  num_sleeps=$4
+  ec2s=$5
+
+  for ec2 in $ec2s; do
+    ec2name=$(cut -d: -f1 <<< "$ec2")
+    ec2id=$(cut -d: -f2 <<< "$ec2")
+    ec2status=$(cut -d: -f3 <<< "$ec2")
+
+    if [[ $ec2status != 'running' ]]; then
+      error "${logprefix}${ec2name}: cannot wait for $service stopped as EC2 instance $ec2status"
+      return 1
+    else
+      for ((i=0; i<num_sleeps; i=i+1)); do
+        output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active $service" "sudo systemctl is-active $service" 2>/dev/null || true)
+        if [[ $output != "inactive" ]]; then
+          echo "${logprefix}${ec2name}: waiting for $service to become inactive [$output]"
+          sleep "$sleep_interval"
+        else
+          echo "${logprefix}${ec2name}: $service is inactive"
+          break
+        fi
+      done
+      if [[ $i -eq $num_sleeps ]]; then
+        echo "${logprefix}${ec2name}: timed out waiting for $service to become inactive"
+      fi
+    fi
+  done
+}
+
+do_startstop_service() {
+  set -o pipefail
+
+  logprefix="$1"
+  start_or_stop=$2
+  service="$3"
+  ec2s=$4
+
+  for ec2 in $ec2s; do
+    ec2name=$(cut -d: -f1 <<< "$ec2")
+    ec2id=$(cut -d: -f2 <<< "$ec2")
+    ec2status=$(cut -d: -f3 <<< "$ec2")
+
+    if [[ $ec2status != 'running' ]]; then
+      error "${logprefix}${ec2name}: cannot $start_or_stop as EC2 instance $ec2status"
+      return 1
+    elif [[ $start_or_stop == "start" ]]; then
+      output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active $service" "sudo systemctl is-active $service" 2>/dev/null || true)
+      if [[ $output == "active" ]]; then
+        echo "${logprefix}${ec2name}: skipping: $service is already active"
+      elif ((DRYRUN == 0)); then
+        echo "${logprefix}${ec2name}: running:  systemctl start $service"
+        debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl start $service' 'sudo systemctl start $service'"
+        $EC2_RUN_SCRIPT shell "$ec2id" "systemctl start $service" "sudo systemctl start $service" "${logprefix}${ec2name}: " || true
+      else
+        echo "${logprefix}${ec2name}: DRYRUN:   systemctl start $service"
+      fi
+    elif [[ $start_or_stop == "stop" ]]; then
+      output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active $service" "sudo systemctl is-active $service" 2>/dev/null || true)
+      if [[ $output == "active" ]]; then
+        if ((DRYRUN == 0 )); then
+          echo "${logprefix}${ec2name}: running:  systemctl stop $service"
+          debug "${logprefix}${ec2name}: run_script_on_ec2.sh shell '$ec2id' 'systemctl stop $service' 'sudo systemctl stop $service'"
+          $EC2_RUN_SCRIPT shell "$ec2id" "systemctl stop $service" "sudo systemctl stop $service" "${logprefix}${ec2name}: " || true
+          waitec2="$waitec2 $ec2"
+        else
+          echo "${logprefix}${ec2name}: DRYRUN:   systemctl stop $service"
+        fi
+      elif [[ $output == "inactive" ]]; then
+        echo "${logprefix}${ec2name}: skipping: $service is already stopped"
+      else
+        echo "${logprefix}${ec2name}: skipping: $service state unknown: $output"
+      fi
+    else
+      usage
+    fi
+  done
+}
+
+do_rclone() {
+  if ! set_env_ec2_info; then
+    return 1
+  fi
+  do_startstop_service "rclone-sync: " "$1" "rclone-sync.timer" "$CMS_EC2_INFO"
+  if [[ "$1" == "stop" ]]; then
+    # wait up to 10 minutes to ensure rclone-sync cleanly stopped
+    wait_service_stopped "rclone-sync: " "rclone-sync" 10 60 "$CMS_EC2_INFO"
+  fi
+}
+
 main() {
   set -o pipefail
   while getopts "3:a:c:de:fg:l:qvw:" opt; do
@@ -1219,6 +1317,9 @@ main() {
   elif [[ $1 == "pipeline" ]]; then
     shift
     do_pipeline "$@"
+  elif [[ $1 == "rclone" ]]; then
+    shift
+    do_rclone "$@"
   else
     usage
     exit 1
