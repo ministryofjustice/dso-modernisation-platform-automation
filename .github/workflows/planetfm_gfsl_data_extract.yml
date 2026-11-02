@@ -3,17 +3,9 @@ name: PlanetFM GFSL Data Extract
 
 on:
   workflow_dispatch:
-  schedule:
     # files are created on share just after 04:00 and 12:20 localtime
-    # multiple crons to deal with BST/GMT and GitHub delays
-    - cron: "10 5 * * *"
-      timezone: "Europe/London"
-    - cron: "30 5 * * *"
-      timezone: "Europe/London"
-    - cron: "30 12 * * *"
-      timezone: "Europe/London"
-    - cron: "30 13 * * *"
-      timezone: "Europe/London"
+    # multiple crons to deal with BST/GMT and GitHub delays (pre-OCTOSTS move)
+    # this is currently managed via OCTOSTS lambda, may be able to go from 4x schedules to 2x schedules in future
 
 permissions:
   id-token: write
