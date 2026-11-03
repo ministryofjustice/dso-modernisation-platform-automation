@@ -192,6 +192,7 @@ jobs:
                    --extra-vars rat_replay_s3_location=${{ github.event.inputs.ReplayS3Location }} \
                    --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
                    --extra-vars "rat_replay_directory=${{ github.event.inputs.ReplayDirectoryName }}" \
+                   --extra-vars rat_replay_synchronization=${{ github.event.inputs.SynchronizationMethod }} \
                    roles/ansible/site.yml
               elif [ "${ACTION}" = "report replay" ]
               then
@@ -204,7 +205,6 @@ jobs:
                    --extra-vars rat_report_replay_name=${{ github.event.inputs.ReplayName }} \
                    --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
                    --extra-vars "rat_report_s3_bucket_name=${BUCKET_NAME}" \
-                   --extra-vars rat_replay_synchronization=${{ github.event.inputs.SynchronizationMethod }} \
                    roles/ansible/site.yml
               else
                 echo "Skipping Ansible playbook for Action: ${ACTION}"
