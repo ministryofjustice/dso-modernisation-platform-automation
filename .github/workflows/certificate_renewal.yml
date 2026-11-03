@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       scheduled_run:
-        description: 'Optional scheduled run selector: TUESDAY, WEDNESDAY or THURSDAY'
+        description: 'Optional scheduled run selector: tuesday, wednesday or thursday'
         required: false
         default: ''
       ec2_hostname:
@@ -47,17 +47,17 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             scheduled_run="${{ github.event.inputs.scheduled_run }}"
             if [[ -n "${scheduled_run}" ]]; then
-              if [[ "${scheduled_run}" != "TUESDAY" && "${scheduled_run}" != "WEDNESDAY" && "${scheduled_run}" != "THURSDAY" ]]; then
-                echo "Unexpected value for scheduled_run [${scheduled_run}], must be TUESDAY, WEDNESDAY or THURSDAY" >&2
+              if [[ "${scheduled_run}" != "tuesday" && "${scheduled_run}" != "wednesday" && "${scheduled_run}" != "thursday" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be tuesday, wednesday or thursday" >&2
                 exit 1
               fi
               le_server="LE_PROD"
               renew_expiry_days=28
-              if [[ "${scheduled_run}" == "TUESDAY" ]]; then
+              if [[ "${scheduled_run}" == "tuesday" ]]; then
                 matrix=$(src/certificates/get_strategy_matrix.sh schedule 0)
-              elif [[ "${scheduled_run}" == "WEDNESDAY" ]]; then
+              elif [[ "${scheduled_run}" == "wednesday" ]]; then
                 matrix=$(src/certificates/get_strategy_matrix.sh schedule 1)
-              elif [[ "${scheduled_run}" == "THURSDAY" ]]; then
+              elif [[ "${scheduled_run}" == "thursday" ]]; then
                 matrix=$(src/certificates/get_strategy_matrix.sh schedule 2)
               else
                 echo "Unsupported scheduled_run ${scheduled_run}"
