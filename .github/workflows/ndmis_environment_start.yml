@@ -4,6 +4,10 @@ name: NDMIS Environment Start
 on:
   workflow_dispatch:
     inputs:
+      scheduled_run:
+        description: 'Optional scheduled run selector: ndmis_environment_start'
+        required: false
+        default: ''
       ndmis_environment:
         type: choice
         description: Which delius-mis environment to start
@@ -47,14 +51,6 @@ on:
         description: Leave a gap between starting each CMS/APP EC2
         default: 30
 
-  schedule:
-    # runs at 06:45 local time
-    # second cron at 07:50 is a failsafe, in case something went wrong with the first run
-    - cron: "45 6 * * 1-5"
-      timezone: "Europe/London"
-    - cron: "50 7 * * 1-5"
-      timezone: "Europe/London"
-
 permissions:
   id-token: write
   contents: read
@@ -92,27 +88,34 @@ jobs:
           script_flags=
           pipeline_stages=all
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            ndmis_environments="${{ github.event.inputs.ndmis_environment }}"
-            pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
-            if [[ "${{ github.event.inputs.force }}" == "true" ]]; then
-              script_flags="$script_flags -f"
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "ndmis_environment_start" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be ndmis_environment_start" >&2
+                exit 1
+              fi
+              ndmis_environments="stage preprod" # space separated list
+              script_flags="-c 30 -a 30 -g 2"
+            else
+              ndmis_environments="${{ github.event.inputs.ndmis_environment }}"
+              pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
+              if [[ "${{ github.event.inputs.force }}" == "true" ]]; then
+                script_flags="$script_flags -f"
+              fi
+              if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+                script_flags="$script_flags -d"
+              fi
+              if [[ "${{ github.event.inputs.verbose }}" == "true" ]]; then
+                script_flags="$script_flags -v"
+              fi
+              if [[ -n "${{ github.event.inputs.ccm_gap_secs }}" ]]; then
+                script_flags="$script_flags -g ${{ github.event.inputs.ccm_gap_secs }}"
+              fi
+              if [[ -n "${{ github.event.inputs.ec2_gap_secs }}" ]]; then
+                script_flags="$script_flags -c ${{ github.event.inputs.ec2_gap_secs }}"
+                script_flags="$script_flags -a ${{ github.event.inputs.ec2_gap_secs }}"
+              fi
             fi
-            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
-              script_flags="$script_flags -d"
-            fi
-            if [[ "${{ github.event.inputs.verbose }}" == "true" ]]; then
-              script_flags="$script_flags -v"
-            fi
-            if [[ -n "${{ github.event.inputs.ccm_gap_secs }}" ]]; then
-              script_flags="$script_flags -g ${{ github.event.inputs.ccm_gap_secs }}"
-            fi
-            if [[ -n "${{ github.event.inputs.ec2_gap_secs }}" ]]; then
-              script_flags="$script_flags -c ${{ github.event.inputs.ec2_gap_secs }}"
-              script_flags="$script_flags -a ${{ github.event.inputs.ec2_gap_secs }}"
-            fi
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            ndmis_environments="stage preprod" # space separated list
-            script_flags="-c 30 -a 30 -g 2"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -167,4 +170,3 @@ jobs:
           pipeline_stages: "${{ needs.setup.outputs.pipeline_stages }}"
         run: |
           src/delius-mis/ndmis_control.sh -e "$ndmis_environment" $script_flags pipeline start "$pipeline_stages"
-

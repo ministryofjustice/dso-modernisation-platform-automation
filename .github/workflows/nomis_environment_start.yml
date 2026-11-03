@@ -4,6 +4,10 @@ name: NOMIS Environment Start
 on:
   workflow_dispatch:
     inputs:
+      scheduled_run:
+        description: 'Optional scheduled run selector: nomis_environment_start'
+        required: false
+        default: ''
       nomis_environment:
         type: choice
         description: Which nomis environment to start
@@ -28,13 +32,6 @@ on:
         options:
           - true
           - false
-
-  schedule:
-    # runs at 06:30 and 09:30 local time
-    - cron: "30 6 * * 1-5"
-      timezone: "Europe/London"
-    - cron: "30 9 * * 1-5"
-      timezone: "Europe/London"
 
 permissions:
   id-token: write
@@ -73,16 +70,23 @@ jobs:
           script_flags=
           dryrun=0
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            nomis_environments="${{ github.event.inputs.nomis_environment }}"
-            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
-              script_flags="$script_flags -d"
-              dryrun=1
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "nomis_environment_start" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be nomis_environment_start" >&2
+                exit 1
+              fi
+              nomis_environments="t3 preprod"
+            else
+              nomis_environments="${{ github.event.inputs.nomis_environment }}"
+              if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+                script_flags="$script_flags -d"
+                dryrun=1
+              fi
+              if [[ "${{ github.event.inputs.weblogic_deployment }}" != "auto" ]]; then
+                script_flags="$script_flags -${{ github.event.inputs.weblogic_deployment }}"
+              fi
             fi
-            if [[ "${{ github.event.inputs.weblogic_deployment }}" != "auto" ]]; then
-              script_flags="$script_flags -${{ github.event.inputs.weblogic_deployment }}"
-            fi
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            nomis_environments="t3 preprod"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -191,4 +195,3 @@ jobs:
         if: steps.active_asg_stats.outputs.maintenance_mode == 'enabled'
         run: |
           src/nomis/nomis_control.sh -0 $script_flags "$nomis_environment"
-
