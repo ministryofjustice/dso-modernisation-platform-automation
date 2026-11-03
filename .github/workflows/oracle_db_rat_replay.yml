@@ -118,6 +118,11 @@ jobs:
                   echo "Multiple WRC hosts are not expected for a replay."
                   exit 1
               fi
+            if [ "${ACTION}" = "process replay" ] && [ -n "${{ github.event.inputs.ReplayName }}" ]
+            then
+                echo "::error::ReplayName should not be provided for 'process replay' action."
+                exit 1
+            fi
               # Note that the TARGET_ENVIRONMENT is where we are running the 
               # Workload Replay Client (WRC) - and NOT where the target database is running.
               # This is because we typically run WRC on a different host to avoid its 
