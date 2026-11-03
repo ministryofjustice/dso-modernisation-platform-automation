@@ -36,6 +36,13 @@ on:
         options:
           - 'no'
           - 'yes'
+      SynchronizationMethod:
+        description: 'Method for synchronization of threads (not required for processing)'
+        default: 'TIME'
+        type: choice
+        options:
+          - 'TIME'
+          - 'SCN'
       ReplayHost:
         description: 'Host for Running Replay (for process replay it must be the target database host; other actions may be done remotely if a database connection is available)'
         default: ''
@@ -185,6 +192,7 @@ jobs:
                    --extra-vars rat_replay_s3_location=${{ github.event.inputs.ReplayS3Location }} \
                    --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
                    --extra-vars "rat_replay_directory=${{ github.event.inputs.ReplayDirectoryName }}" \
+
                    roles/ansible/site.yml
               elif [ "${ACTION}" = "report replay" ]
               then
@@ -197,6 +205,7 @@ jobs:
                    --extra-vars rat_report_replay_name=${{ github.event.inputs.ReplayName }} \
                    --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
                    --extra-vars "rat_report_s3_bucket_name=${BUCKET_NAME}" \
+                   --extra-vars rat_replay_synchronization=${{ github.event.inputs.SynchronizationMethod }} \
                    roles/ansible/site.yml
               else
                 echo "Skipping Ansible playbook for Action: ${ACTION}"
