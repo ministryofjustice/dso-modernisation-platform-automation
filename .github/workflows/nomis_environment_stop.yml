@@ -4,6 +4,10 @@ name: NOMIS Environment Stop
 on:
   workflow_dispatch:
     inputs:
+      scheduled_run:
+        description: 'Optional scheduled run selector: nomis_environment_stop'
+        required: false
+        default: ''
       nomis_environment:
         type: choice
         description: Which nomis environment to stop
@@ -29,17 +33,11 @@ on:
           - true
           - false
 
-  schedule:
-    # runs at 19:05 local time
-    - cron: "05 19 * * 1-5"
-      timezone: "Europe/London"
-
 permissions:
   id-token: write
   contents: read
 
 run-name: "NOMIS Environment Stop (${{ inputs.nomis_environment }}${{ inputs.weblogic_deployment == 'auto' && '' || inputs.weblogic_deployment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
-
 
 jobs:
   setup:
@@ -71,16 +69,23 @@ jobs:
           script_flags=
           dryrun=0
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            nomis_environments="${{ github.event.inputs.nomis_environment }}"
-            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
-              script_flags="$script_flags -d"
-              dryrun=1
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "nomis_environment_stop" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be nomis_environment_stop" >&2
+                exit 1
+              fi
+              nomis_environments="t1 t2 t3 preprod"
+            else
+              nomis_environments="${{ github.event.inputs.nomis_environment }}"
+              if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+                script_flags="$script_flags -d"
+                dryrun=1
+              fi
+              if [[ "${{ github.event.inputs.weblogic_deployment }}" != "auto" ]]; then
+                script_flags="$script_flags -${{ github.event.inputs.weblogic_deployment }}"
+              fi
             fi
-            if [[ "${{ github.event.inputs.weblogic_deployment }}" != "auto" ]]; then
-              script_flags="$script_flags -${{ github.event.inputs.weblogic_deployment }}"
-            fi
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            nomis_environments="t1 t2 t3 preprod"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -162,4 +167,3 @@ jobs:
           else
             echo "Dry Run: aws autoscaling set-desired-capacity --desired-capacity 0 --auto-scaling-group-name '$asg_name'" >&2
           fi
-

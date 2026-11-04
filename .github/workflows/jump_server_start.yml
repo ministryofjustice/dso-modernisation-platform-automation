@@ -4,6 +4,10 @@ name: JumpServer Start
 on:
   workflow_dispatch:
     inputs:
+      scheduled_run:
+        description: 'Optional scheduled run selector: jump_server_start'
+        required: false
+        default: ''
       jumpserver:
         type: choice
         description: Which environment to start
@@ -20,15 +24,6 @@ on:
         options:
           - true
           - false
-
-  schedule:
-    # runs at 06:45 to 08:45 local time as a backup
-    - cron: "45 6 * * 1-5"
-      timezone: "Europe/London"    
-    - cron: "45 7 * * 1-5"
-      timezone: "Europe/London"    
-    - cron: "45 8 * * 1-5"
-      timezone: "Europe/London"    
 
 permissions:
   id-token: write
@@ -67,13 +62,20 @@ jobs:
           script_flags=
           dryrun=0
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            jumpservers="${{ github.event.inputs.jumpserver }}"
-            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
-              script_flags="$script_flags -d"
-              dryrun=1
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "jump_server_start" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be jump_server_start" >&2
+                exit 1
+              fi
+              jumpservers="development test preproduction"
+            else
+              jumpservers="${{ github.event.inputs.jumpserver }}"
+              if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+                script_flags="$script_flags -d"
+                dryrun=1
+              fi
             fi
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            jumpservers="development test preproduction"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -150,4 +152,3 @@ jobs:
         if: steps.current_state.outputs.not_running_count != '0'
         run: |
           src/jumpserver/jumpserver_control.sh $script_flags -p on "$jumpserver"
-

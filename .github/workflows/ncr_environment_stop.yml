@@ -4,6 +4,10 @@ name: NCR Environment Stop
 on:
   workflow_dispatch:
     inputs:
+      scheduled_run:
+        description: 'Optional scheduled run selector: ncr_environment_stop'
+        required: false
+        default: ''
       ncr_environment:
         type: choice
         description: Which nomis combined reporting environment to stop
@@ -64,11 +68,6 @@ on:
         description: Leave a gap between stopping each CMS/APP EC2 sequentially
         default: 30
 
-  schedule:
-    # runs at 7pm local time
-    - cron: "05 19 * * 1-5"
-      timezone: "Europe/London"
-
 permissions:
   id-token: write
   contents: read
@@ -110,34 +109,41 @@ jobs:
           pipeline_stages=all
           stop_or_shutdown=shutdown
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
-            ncr_environments="${{ github.event.inputs.ncr_environment }}"
-            stop_or_shutdown="${{ github.event.inputs.stop_or_shutdown }}"
-            script_flags="$script_flags -3 ${{ github.event.inputs.pipeline_stage3_wait_secs }}"
-            if [[ "${{ github.event.inputs.force }}" == "true" ]]; then
-              script_flags="$script_flags -f"
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "ncr_environment_stop" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be ncr_environment_stop" >&2
+                exit 1
+              fi
+              gha_environment="nomis-combined-reporting-schedule"
+              ncr_environments="t1 pp" # space separated list
+              script_flags="-c 30 -a 30 -g 2 -q"
+            else
+              pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
+              ncr_environments="${{ github.event.inputs.ncr_environment }}"
+              stop_or_shutdown="${{ github.event.inputs.stop_or_shutdown }}"
+              script_flags="$script_flags -3 ${{ github.event.inputs.pipeline_stage3_wait_secs }}"
+              if [[ "${{ github.event.inputs.force }}" == "true" ]]; then
+                script_flags="$script_flags -f"
+              fi
+              if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+                script_flags="$script_flags -d"
+                gha_environment="nomis-combined-reporting-dryrun"
+              fi
+              if [[ "${{ github.event.inputs.verbose }}" == "true" ]]; then
+                script_flags="$script_flags -v"
+              fi
+              if [[ "${{ github.event.inputs.quick_mode }}" == "true" ]]; then
+                script_flags="$script_flags -q"
+              fi
+              if [[ -n "${{ github.event.inputs.ccm_gap_secs }}" ]]; then
+                script_flags="$script_flags -g ${{ github.event.inputs.ccm_gap_secs }}"
+              fi
+              if [[ -n "${{ github.event.inputs.ec2_gap_secs }}" ]]; then
+                script_flags="$script_flags -c ${{ github.event.inputs.ec2_gap_secs }}"
+                script_flags="$script_flags -a ${{ github.event.inputs.ec2_gap_secs }}"
+              fi
             fi
-            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
-              script_flags="$script_flags -d"
-              gha_environment="nomis-combined-reporting-dryrun"
-            fi
-            if [[ "${{ github.event.inputs.verbose }}" == "true" ]]; then
-              script_flags="$script_flags -v"
-            fi
-            if [[ "${{ github.event.inputs.quick_mode }}" == "true" ]]; then
-              script_flags="$script_flags -q"
-            fi
-            if [[ -n "${{ github.event.inputs.ccm_gap_secs }}" ]]; then
-              script_flags="$script_flags -g ${{ github.event.inputs.ccm_gap_secs }}"
-            fi
-            if [[ -n "${{ github.event.inputs.ec2_gap_secs }}" ]]; then
-              script_flags="$script_flags -c ${{ github.event.inputs.ec2_gap_secs }}"
-              script_flags="$script_flags -a ${{ github.event.inputs.ec2_gap_secs }}"
-            fi
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            gha_environment="nomis-combined-reporting-schedule"
-            ncr_environments="t1 pp" # space separated list
-            script_flags="-c 30 -a 30 -g 2 -q"
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -196,4 +202,3 @@ jobs:
           pipeline_stages: "${{ needs.setup.outputs.pipeline_stages }}"
         run: |
           src/nomis-combined-reporting/ncr_control.sh -e "$ncr_environment" $script_flags pipeline "$stop_or_shutdown" "$pipeline_stages"
-

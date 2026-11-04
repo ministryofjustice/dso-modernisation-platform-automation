@@ -4,6 +4,10 @@ name: ONR Environment Start
 on:
   workflow_dispatch:
     inputs:
+      scheduled_run:
+        description: 'Optional scheduled run selector: onr_environment_start'
+        required: false
+        default: ''
       onr_environment:
         type: choice
         description: Which oasys national reporting environment to start
@@ -46,14 +50,6 @@ on:
         description: Leave a gap between starting each CMS/APP EC2
         default: 30
 
-  schedule:
-    # runs at 06:45 local time
-    # second cron at 07:50 is a failsafe, in case something went wrong with the first run
-    - cron: "45 6 * * 1-5"
-      timezone: "Europe/London"
-    - cron: "50 7 * * 1-5"
-      timezone: "Europe/London"
-
 permissions:
   id-token: write
   contents: read
@@ -91,26 +87,33 @@ jobs:
           script_flags=
           pipeline_stages=all
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            onr_environments="${{ github.event.inputs.onr_environment }}"
-            pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
-            if [[ "${{ github.event.inputs.force }}" == "true" ]]; then
-              script_flags="$script_flags -f"
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "onr_environment_start" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be onr_environment_start" >&2
+                exit 1
+              fi
+              script_flags="-c 30 -g 2"
+              onr_environments="pp" # space separated list
+            else
+              onr_environments="${{ github.event.inputs.onr_environment }}"
+              pipeline_stages="${{ github.event.inputs.pipeline_stages }}"
+              if [[ "${{ github.event.inputs.force }}" == "true" ]]; then
+                script_flags="$script_flags -f"
+              fi
+              if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
+                script_flags="$script_flags -d"
+              fi
+              if [[ "${{ github.event.inputs.verbose }}" == "true" ]]; then
+                script_flags="$script_flags -v"
+              fi
+              if [[ -n "${{ github.event.inputs.ccm_gap_secs }}" ]]; then
+                script_flags="$script_flags -g ${{ github.event.inputs.ccm_gap_secs }}"
+              fi
+              if [[ -n "${{ github.event.inputs.ec2_gap_secs }}" ]]; then
+                script_flags="$script_flags -c ${{ github.event.inputs.ec2_gap_secs }}"
+              fi
             fi
-            if [[ "${{ github.event.inputs.dryrun }}" == "true" ]]; then
-              script_flags="$script_flags -d"
-            fi
-            if [[ "${{ github.event.inputs.verbose }}" == "true" ]]; then
-              script_flags="$script_flags -v"
-            fi
-            if [[ -n "${{ github.event.inputs.ccm_gap_secs }}" ]]; then
-              script_flags="$script_flags -g ${{ github.event.inputs.ccm_gap_secs }}"
-            fi
-            if [[ -n "${{ github.event.inputs.ec2_gap_secs }}" ]]; then
-              script_flags="$script_flags -c ${{ github.event.inputs.ec2_gap_secs }}"
-            fi
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            script_flags="-c 30 -g 2"
-            onr_environments="pp" # space separated list
           else
             echo "Unsupported event ${GITHUB_EVENT_NAME}"
             exit 1
@@ -165,4 +168,3 @@ jobs:
           pipeline_stages: "${{ needs.setup.outputs.pipeline_stages }}"
         run: |
           src/oasys-national-reporting/onr_control.sh -e "$onr_environment" $script_flags pipeline start "$pipeline_stages"
-
