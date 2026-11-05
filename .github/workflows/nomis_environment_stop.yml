@@ -37,7 +37,7 @@ permissions:
   id-token: write
   contents: read
 
-run-name: "NOMIS Environment Stop (${{ inputs.nomis_environment }}${{ inputs.weblogic_deployment == 'auto' && '' || inputs.weblogic_deployment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+run-name: ${{ inputs.scheduled_run == 'nomis_environment_stop' && 'NOMIS Environment Stop' || format('NOMIS Environment Stop ({0}{1})', inputs.nomis_environment, inputs.dryrun == 'true' && ' dryrun' || '') }}
 
 jobs:
   setup:

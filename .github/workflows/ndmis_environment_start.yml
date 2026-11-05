@@ -55,7 +55,7 @@ permissions:
   id-token: write
   contents: read
 
-run-name: "NDMIS Environment Start (${{ inputs.ndmis_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+run-name: ${{ inputs.scheduled_run == 'ndmis_environment_start' && 'NDMIS Environment Start' || format('NDMIS Environment Start ({0}{1})', inputs.ndmis_environment, inputs.dryrun == 'true' && ' dryrun' || '') }}
 
 jobs:
   setup:
