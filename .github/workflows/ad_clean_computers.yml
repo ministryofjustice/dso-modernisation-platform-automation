@@ -117,7 +117,7 @@
                 # cat "instances-${{ matrix.account_name }}.json"                
 
           - name: Upload results for ${{ matrix.account_name }}
-            uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+            uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
             with:
                 name: ec2-hostnames-${{ matrix.account_name }}
                 path: |
@@ -152,7 +152,7 @@
                 echo "Consolidation complete"
                 
            - name: Upload consolidated results
-             uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+             uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
              with:
                 name: consolidated-ec2-hostnames
                 path: |
@@ -250,7 +250,7 @@
             done
   
         - name: Upload all results
-          uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+          uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
           with:
              name: all_logs.zip
              path: |
@@ -368,7 +368,7 @@
             
         - name: Upload final results
           if: steps.find_final_files.outputs.files != ''
-          uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+          uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
           with:
             name: final-results
             path: ${{ steps.find_final_files.outputs.files }}
