@@ -29,7 +29,7 @@ permissions:
   id-token: write
   contents: read
 
-run-name: "JumpServer Start (${{ inputs.jumpserver }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+run-name: ${{ inputs.scheduled_run == 'jump_server_start' && 'JumpServer Start' || format('JumpServer Start ({0}{1})', inputs.jumpserver, inputs.dryrun == 'true' && ' dryrun' || '') }}
 
 jobs:
   setup:

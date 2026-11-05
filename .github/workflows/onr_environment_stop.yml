@@ -72,7 +72,7 @@ permissions:
   id-token: write
   contents: read
 
-run-name: "ONR Environment Stop (${{ inputs.onr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+run-name: ${{ inputs.scheduled_run == 'onr_environment_stop' && 'ONR Environment Stop' || format('ONR Environment Stop ({0}{1})', inputs.onr_environment, inputs.dryrun == 'true' && ' dryrun' || '') }}
 
 jobs:
   setup:

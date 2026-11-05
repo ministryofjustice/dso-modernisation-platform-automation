@@ -54,7 +54,7 @@ permissions:
   id-token: write
   contents: read
 
-run-name: "NCR Environment Start (${{ inputs.ncr_environment }}${{ inputs.dryrun == 'true' && ' dryrun)' || ')' }}"
+run-name: ${{ inputs.scheduled_run == 'ncr_environment_start' && 'NCR Environment Start' || format('NCR Environment Start ({0}{1})', inputs.ncr_environment, inputs.dryrun == 'true' && ' dryrun' || '') }}
 
 jobs:
   setup:
