@@ -14,7 +14,7 @@ on:
           - 'start replay'
           - 'report replay'
       ReplayS3Location:
-        description: 'For "process replay" this should be the Capture location, for "start replay" this should be the Processed location (for example, s3://delius-core-dev-oracle-db-rat-capture/processed/delius_core/dmdndas1/20260819140352/ )'
+        description: 'For "process replay" this should be the Capture location, for "start replay" this should be the Processed location (for example, s3://delius-core-dev-oracle-db-rat-capture/processed/delius_core/dmdndas1/20260819140352/ ).  Not required for reporting.'
         default: ''
         type: string
       ReplayDirectoryName:
@@ -30,14 +30,14 @@ on:
         default: ''
         type: string
       ReplayProcessParallel:
-        description: 'Use parallelism when processing a replay'
+        description: 'Use parallelism when processing a replay (not required for replay or reporting)'
         default: 'no'
         type: choice
         options:
           - 'no'
           - 'yes'
       SynchronizationMethod:
-        description: 'Method for synchronization of threads (not required for processing)'
+        description: 'Method for synchronization of threads (not required for processing or reporting)'
         default: 'TIME'
         type: choice
         options:
