@@ -14,6 +14,16 @@
   "dso-modernisation-platform-automation": [
     "certificate_renewal.yml",
     "github_workflow_monitoring.yml",
+    "jump_server_start.yml",
+    "jump_server_stop.yml",
+    "ncr_environment_start.yml",
+    "ncr_environment_stop.yml",
+    "ndmis_environment_start.yml",
+    "ndmis_environment_stop.yml",
+    "nomis_environment_start.yml",
+    "nomis_environment_stop.yml",
+    "onr_environment_start.yml",
+    "onr_environment_stop.yml",
     "security_hub_alerting.yml",
     "ssm_command_monitoring.yml"
   ],

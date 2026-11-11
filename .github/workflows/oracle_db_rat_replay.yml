@@ -14,7 +14,7 @@ on:
           - 'start replay'
           - 'report replay'
       ReplayS3Location:
-        description: 'For "process replay" this should be the Capture location, for "start replay" this should be the Processed location (for example, s3://delius-core-dev-oracle-db-rat-capture/processed/delius_core/dmdndas1/20260819140352/ )'
+        description: 'For "process replay" this should be the Capture location, for "start replay" this should be the Processed location (for example, s3://delius-core-dev-oracle-db-rat-capture/processed/delius_core/dmdndas1/20260819140352/ ).  Not required for reporting.'
         default: ''
         type: string
       ReplayDirectoryName:
@@ -30,12 +30,19 @@ on:
         default: ''
         type: string
       ReplayProcessParallel:
-        description: 'Use parallelism when processing a replay'
+        description: 'Use parallelism when processing a replay (not required for replay or reporting)'
         default: 'no'
         type: choice
         options:
           - 'no'
           - 'yes'
+      SynchronizationMethod:
+        description: 'Method for synchronization of threads (not required for processing or reporting)'
+        default: 'TIME'
+        type: choice
+        options:
+          - 'TIME'
+          - 'SCN'
       ReplayHost:
         description: 'Host for Running Replay (for process replay it must be the target database host; other actions may be done remotely if a database connection is available)'
         default: ''
@@ -111,6 +118,11 @@ jobs:
                   echo "Multiple WRC hosts are not expected for a replay."
                   exit 1
               fi
+            if [ "${ACTION}" = "process replay" ] && [ -n "${{ github.event.inputs.ReplayName }}" ]
+            then
+                echo "::error::ReplayName should not be provided for 'process replay' action."
+                exit 1
+            fi
               # Note that the TARGET_ENVIRONMENT is where we are running the 
               # Workload Replay Client (WRC) - and NOT where the target database is running.
               # This is because we typically run WRC on a different host to avoid its 
@@ -184,6 +196,8 @@ jobs:
                    --extra-vars rat_replay_name=${{ github.event.inputs.ReplayName }} \
                    --extra-vars rat_replay_s3_location=${{ github.event.inputs.ReplayS3Location }} \
                    --extra-vars tns_alias=${{ github.event.inputs.TargetTNSAlias }} \
+                   --extra-vars "rat_replay_directory=${{ github.event.inputs.ReplayDirectoryName }}" \
+                   --extra-vars rat_replay_synchronization=${{ github.event.inputs.SynchronizationMethod }} \
                    roles/ansible/site.yml
               elif [ "${ACTION}" = "report replay" ]
               then
