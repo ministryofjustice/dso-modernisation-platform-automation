@@ -8,6 +8,10 @@ name: OASYS Database Refresh
 on:
   workflow_dispatch:
     inputs:
+      scheduled_run:
+        description: 'Optional scheduled run selector: pp_oasys_db_a_PPOASYS, pp_onr_db_a_PPOASREP or pp_onr_db_a_PPMISTRN'
+        required: false
+        default: ''
       source_db_name:
         description: 'Source database name'
         required: true
@@ -26,15 +30,6 @@ on:
         required: true
         default: "main"
 
-  # Each scheduled job requires a unique time
-  schedule:
-    - cron: '00 07 * * 0' # pp-oasys-db-a PPOASYS
-      timezone: "Europe/London"
-    - cron: '00 08 * * 0' # pp-onr-db-a PPOASREP
-      timezone: "Europe/London"
-    - cron: '00 09 * * 0' # pp-onr-db-a PPMISTRN
-      timezone: "Europe/London"
-
 env:
   ALLOWED_PARAMS: "pp-oasys-db-a:OASPROD:PPOASYS pp-onr-db-a:MISTRANS:PPMISTRN pp-onr-db-a:OASYSREP:PPOASREP"
 
@@ -51,37 +46,43 @@ jobs:
         id: parseinput
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            source_db_name="${{github.event.inputs.source_db_name}}"
-            target_db_hostname="${{github.event.inputs.target_db_hostname}}"
-            target_db_name="${{github.event.inputs.target_db_name}}"
-            echo "Restoring ${target_db_name} database on ${target_db_hostname}"
-            if [[ -z "${target_db_hostname}" || -z "${source_db_name}"  || -z "{target_db_name}" ]]; then
-              echo "Error, target host name, source database and target database name must all be specified"
-              exit 1
-            fi
-            if ! (echo "${ALLOWED_PARAMS}" | grep -w "${target_db_hostname}:${source_db_name}:${target_db_name}" > /dev/null); then
-              echo "Unsupported target_db_hostname / source_db_name / target_db_name combination"
-              echo "[${target_db_hostname}:${source_db_name}:${target_db_name}] not in [${ALLOWED_PARAMS}]"
-              exit 1
-            fi
-          elif  [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            cron_time="${{github.event.schedule}}"
-            if [[ "${cron_time}" == '00 07 * * 0' ]]; then
-              target_db_hostname="pp-oasys-db-a"
-              source_db_name="OASPROD"
-              target_db_name="PPOASYS"
-            elif [[ "${cron_time}" == '00 08 * * 0' ]]; then
-              target_db_hostname="pp-onr-db-a"
-              source_db_name="OASYSREP"
-              target_db_name="PPOASREP"
-            elif [[ "${cron_time}" == '00 09 * * 0' ]]; then
-              target_db_hostname="pp-onr-db-a"
-              source_db_name="MISTRANS"
-              target_db_name="PPMISTRN"
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "pp_oasys_db_a_PPOASYS" && "${scheduled_run}" != "pp_onr_db_a_PPOASREP" && "${scheduled_run}" != "pp_onr_db_a_PPMISTRN" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be pp_oasys_db_a_PPOASYS, pp_onr_db_a_PPOASREP or pp_onr_db_a_PPMISTRN" >&2
+                exit 1
+              fi
+              if [[ "${scheduled_run}" == "pp_oasys_db_a_PPOASYS" ]]; then
+                target_db_hostname="pp-oasys-db-a"
+                source_db_name="OASPROD"
+                target_db_name="PPOASYS"
+              elif [[ "${scheduled_run}" == "pp_onr_db_a_PPOASREP" ]]; then
+                target_db_hostname="pp-onr-db-a"
+                source_db_name="OASYSREP"
+                target_db_name="PPOASREP"
+              elif [[ "${scheduled_run}" == "pp_onr_db_a_PPMISTRN" ]]; then
+                target_db_hostname="pp-onr-db-a"
+                source_db_name="MISTRANS"
+                target_db_name="PPMISTRN"
+              fi
             else
-              echo "Github Event ${GITHUB_EVENT_NAME} unsupported"
-              exit 1
+              source_db_name="${{ github.event.inputs.source_db_name }}"
+              target_db_hostname="${{ github.event.inputs.target_db_hostname }}"
+              target_db_name="${{ github.event.inputs.target_db_name }}"
+              echo "Restoring ${target_db_name} database on ${target_db_hostname}"
+              if [[ -z "${target_db_hostname}" || -z "${source_db_name}" || -z "${target_db_name}" ]]; then
+                echo "Error, target host name, source database and target database name must all be specified"
+                exit 1
+              fi
+              if ! (echo "${ALLOWED_PARAMS}" | grep -w "${target_db_hostname}:${source_db_name}:${target_db_name}" > /dev/null); then
+                echo "Unsupported target_db_hostname / source_db_name / target_db_name combination"
+                echo "[${target_db_hostname}:${source_db_name}:${target_db_name}] not in [${ALLOWED_PARAMS}]"
+                exit 1
+              fi
             fi
+          else
+            echo "Github Event ${GITHUB_EVENT_NAME} unsupported"
+            exit 1
           fi
           echo "target_db_hostname=${target_db_hostname}" >> $GITHUB_OUTPUT
           echo "source_db_name=${source_db_name}" >> $GITHUB_OUTPUT
@@ -102,4 +103,3 @@ jobs:
     secrets:
       environment_management: ${{ secrets.MODERNISATION_PLATFORM_ENVIRONMENT_MANAGEMENT }}
       dso_github_pat: ${{ secrets.DSO_GITHUB_PAT }}
-

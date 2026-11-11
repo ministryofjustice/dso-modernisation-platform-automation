@@ -8,25 +8,29 @@ name: NOMIS Database Refresh
 on:
   workflow_dispatch:
     inputs:
+      scheduled_run:
+        description: 'Optional scheduled run selector: preprod_nomis_db_1_a or preprod_nomis_db_2_a'
+        required: false
+        default: ''
       source_db_name:
         description: 'Source database name'
         required: true
         type: choice
-        options: 
+        options:
           - "CNOMP"
           - "MISP"
       target_db_hostname:
         description: 'Target database hostname or ansible group'
         required: true
         type: choice
-        options: 
+        options:
           - "preprod-nomis-db-1-a"
           - "preprod-nomis-db-2-a"
       target_db_name:
         description: 'Target database name'
         required: true
         type: choice
-        options: 
+        options:
           - "PPCNOM"
           - "PPMIS"
       source_config_version:
@@ -34,13 +38,6 @@ on:
         type: string
         required: true
         default: "main"
-
-  # Each scheduled job requires a unique time
-  schedule:
-    - cron: '00 07 * * 0' # preprod-nomis-db-1-a PPCNOM
-      timezone: "Europe/London"
-    - cron: '00 10 * * 0' # preprod-nomis-db-2-a PPMIS
-      timezone: "Europe/London"
 
 env:
   ALLOWED_PARAMS: "preprod-nomis-db-1-a:CNOMP:PPCNOM preprod-nomis-db-2-a:MISP:PPMIS"
@@ -58,33 +55,39 @@ jobs:
         id: parseinput
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            source_db_name="${{github.event.inputs.source_db_name}}"
-            target_db_hostname="${{github.event.inputs.target_db_hostname}}"
-            target_db_name="${{github.event.inputs.target_db_name}}"
-            echo "Restoring ${target_db_name} database on ${target_db_hostname}"
-            if [[ -z "${target_db_hostname}" || -z "${source_db_name}"  || -z "{target_db_name}" ]]; then
-              echo "Error, target host name, source database and target database name must all be specified"
-              exit 1
-            fi
-            if ! (echo "${ALLOWED_PARAMS}" | grep -w "${target_db_hostname}:${source_db_name}:${target_db_name}" > /dev/null); then
-              echo "Unsupported target_db_hostname / source_db_name / target_db_name combination"
-              echo "[${target_db_hostname}:${source_db_name}:${target_db_name}] not in [${ALLOWED_PARAMS}]"
-              exit 1
-            fi
-          elif  [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            cron_time="${{github.event.schedule}}"
-            if [[ "${cron_time}" == '00 07 * * 0' ]]; then
-              target_db_hostname="preprod-nomis-db-1-a"
-              source_db_name="CNOMP"
-              target_db_name="PPCNOM"
-            elif [[ "${cron_time}" == '00 10 * * 0' ]]; then
-              target_db_hostname="preprod-nomis-db-2-a"
-              source_db_name="MISP"
-              target_db_name="PPMIS"
+            scheduled_run="${{ github.event.inputs.scheduled_run }}"
+            if [[ -n "${scheduled_run}" ]]; then
+              if [[ "${scheduled_run}" != "preprod_nomis_db_1_a" && "${scheduled_run}" != "preprod_nomis_db_2_a" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be preprod_nomis_db_1_a or preprod_nomis_db_2_a" >&2
+                exit 1
+              fi
+              if [[ "${scheduled_run}" == "preprod_nomis_db_1_a" ]]; then
+                target_db_hostname="preprod-nomis-db-1-a"
+                source_db_name="CNOMP"
+                target_db_name="PPCNOM"
+              elif [[ "${scheduled_run}" == "preprod_nomis_db_2_a" ]]; then
+                target_db_hostname="preprod-nomis-db-2-a"
+                source_db_name="MISP"
+                target_db_name="PPMIS"
+              fi
             else
-              echo "Github Event ${GITHUB_EVENT_NAME} unsupported"
-              exit 1
+              source_db_name="${{github.event.inputs.source_db_name}}"
+              target_db_hostname="${{github.event.inputs.target_db_hostname}}"
+              target_db_name="${{github.event.inputs.target_db_name}}"
+              echo "Restoring ${target_db_name} database on ${target_db_hostname}"
+              if [[ -z "${target_db_hostname}" || -z "${source_db_name}"  || -z "{target_db_name}" ]]; then
+                echo "Error, target host name, source database and target database name must all be specified"
+                exit 1
+              fi
+              if ! (echo "${ALLOWED_PARAMS}" | grep -w "${target_db_hostname}:${source_db_name}:${target_db_name}" > /dev/null); then
+                echo "Unsupported target_db_hostname / source_db_name / target_db_name combination"
+                echo "[${target_db_hostname}:${source_db_name}:${target_db_name}] not in [${ALLOWED_PARAMS}]"
+                exit 1
+              fi
             fi
+          else
+            echo "Github Event ${GITHUB_EVENT_NAME} unsupported"
+            exit 1
           fi
           echo "target_db_hostname=${target_db_hostname}" >> $GITHUB_OUTPUT
           echo "source_db_name=${source_db_name}" >> $GITHUB_OUTPUT
