@@ -14,15 +14,15 @@ on:
         default: ''
       source_db_name:
         description: 'Source database name'
-        required: true
+        required: false
         type: string
       target_db_hostname:
         description: 'Target database hostname or ansible group'
-        required: true
+        required: false
         type: string
       target_db_name:
         description: 'Target database name'
-        required: true
+        required: false
         type: string
       source_config_version:
         description: "Source version for the modernisation-platform-configuration-management. Enter a branch or commit ID."
