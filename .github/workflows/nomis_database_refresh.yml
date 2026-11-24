@@ -26,6 +26,7 @@ on:
         options:
           - "preprod-nomis-db-1-a"
           - "preprod-nomis-db-2-a"
+          - "preprod-nomis-db-3-a"
       target_db_name:
         description: 'Target database name'
         required: false
@@ -33,6 +34,7 @@ on:
         options:
           - "PPCNOM"
           - "PPMIS"
+          - "PPMISG"
       source_config_version:
         description: "Source version for the modernisation-platform-configuration-management. Enter a branch or commit ID."
         type: string
@@ -40,7 +42,7 @@ on:
         default: "main"
 
 env:
-  ALLOWED_PARAMS: "preprod-nomis-db-1-a:CNOMP:PPCNOM preprod-nomis-db-2-a:MISP:PPMIS"
+  ALLOWED_PARAMS: "preprod-nomis-db-1-a:CNOMP:PPCNOM preprod-nomis-db-2-a:MISP:PPMIS preprod-nomis-db-3-a:MISP:PPMISG"
 
 jobs:
   parse_input:
@@ -57,8 +59,8 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             scheduled_run="${{ github.event.inputs.scheduled_run }}"
             if [[ -n "${scheduled_run}" ]]; then
-              if [[ "${scheduled_run}" != "preprod_nomis_db_1_a" && "${scheduled_run}" != "preprod_nomis_db_2_a" ]]; then
-                echo "Unexpected value for scheduled_run [${scheduled_run}], must be preprod_nomis_db_1_a or preprod_nomis_db_2_a" >&2
+              if [[ "${scheduled_run}" != "preprod_nomis_db_1_a" && "${scheduled_run}" != "preprod_nomis_db_2_a" && "${scheduled_run}" != "preprod_nomis_db_3_a" ]]; then
+                echo "Unexpected value for scheduled_run [${scheduled_run}], must be preprod_nomis_db_1_a or preprod_nomis_db_2_a or preprod_nomis_db_3_a" >&2
                 exit 1
               fi
               if [[ "${scheduled_run}" == "preprod_nomis_db_1_a" ]]; then
@@ -69,6 +71,10 @@ jobs:
                 target_db_hostname="preprod-nomis-db-2-a"
                 source_db_name="MISP"
                 target_db_name="PPMIS"
+              elif [[ "${scheduled_run}" == "preprod_nomis_db_3_a" ]]; then
+                target_db_hostname="preprod-nomis-db-3-a"
+                source_db_name="MISP"
+                target_db_name="PPMISG"
               fi
             else
               source_db_name="${{github.event.inputs.source_db_name}}"
