@@ -48,12 +48,13 @@ Where <cmd>:
   lb         get-target-group    arn|health|name      - get target group ARN, health or name on given LB
   lb         get-json            rules|rule           - debug lb json
   rclone     start|stop                               - start and stop rclone-sync
-  pipeline   start|stop|shutdown all|012345678        - start and stop services with given stages/steps, use dryrun flag to check, shutdown stops EC2 as well
+  pipeline   start|stop|shutdown all|0R12345678       - start and stop services with given stages/steps, use dryrun flag to check, shutdown stops EC2 as well
 
 For pipeline stop and shutdown, below steps are run 0 through to 8
 For pipeline start, below steps are run in reverse order 8 through to 0:
   STAGE      STOP          START    DESCRIPTION
   0          enable     or disable  maintenance mode on LB
+  R          stop       or start    rclone-sync
   1          stop       or start    on web servers
   2          disable    or enable   all BIP servers barring CMS and FRS
   3          wait 10 minutes
@@ -1039,12 +1040,19 @@ do_pipeline() {
       echo "SKIPPING STAGE 0 as some stages have failed"
       return 1
     fi
+    if [[ $2 == "all" || $2 == *R* ]]; then
+      do_startstop_service "STAGE R: " "start" "rclone-sync.timer" "$CMS_EC2_INFO"
+    fi
     if [[ $2 == "all" || $2 == *0* ]]; then
       pipeline_stage_lb "STAGE 0: public-lb web:   " disable public "$EXPECTED_WEB_EC2_COUNT"
     fi
   elif [[ $1 == "stop" || $1 == "shutdown" ]]; then
     if [[ $2 == "all" || $2 == *0* ]]; then
       pipeline_stage_lb "STAGE 0: public-lb web:    " enable  public  -1
+    fi
+    if [[ $2 == "all" || $2 == *R* ]]; then
+      do_startstop_service "STAGE R: " "stop" "rclone-sync.timer" "$CMS_EC2_INFO"
+      wait_service_stopped "STAGE R: " "rclone-sync" 10 60 "$CMS_EC2_INFO"
     fi
     if [[ $2 == "all" || $2 == *1* ]]; then
       pipeline_stage_ec2_stop_or_shutdown "STAGE 1: " "$1" "$WEB_START_STOP_SEQUENTIAL_WAIT_SECS" "$STAGE1_TIMEOUT_SECS"  "$WEB_EC2_INFO" || stage1_exitcode=$?
@@ -1166,7 +1174,7 @@ wait_service_stopped() {
       for ((i=0; i<num_sleeps; i=i+1)); do
         output=$($EC2_RUN_SCRIPT shell "$ec2id" "systemctl is-active $service" "sudo systemctl is-active $service" 2>/dev/null || true)
         if [[ $output != "inactive" ]]; then
-          echo "${logprefix}${ec2name}: waiting for $service to become inactive [$output]"
+          echo "${logprefix}${ec2name}: [$((i+1))/$num_sleeps] waiting for $service to become inactive [$output]"
           sleep "$sleep_interval"
         else
           echo "${logprefix}${ec2name}: $service is inactive"
